@@ -21,4 +21,21 @@ export interface DiaryItem {
   recipe?: DiaryRecipeMeta;
 }
 
-export type FoodItemLike = { id: string; name: string; kcal: number; protein: number; fat: number; carbs: number; fiber?: number; category?: string; tier?: string; description?: string; isVegetarian?: boolean; isGlutenFree?: boolean; isDairyFree?: boolean };
+export type FoodItemLike = {
+  id: string;
+  name: string;
+  kcal: number;
+  protein: number;
+  fat: number;
+  carbs: number;
+  fiber?: number;
+  category?: string;
+  tier?: string;
+  description?: string;
+  isVegetarian?: boolean;
+  isGlutenFree?: boolean;
+  isDairyFree?: boolean;
+  /** Штрихкод товара из сканера/OFF — стабильный ключ продукта из сети. */ barcode?: string;
+  /** Канон дневника: микросы из штрихкода (`sodium_mg`, `calcium_mg`, …). */
+  micros?: Record<string, number>;
+};

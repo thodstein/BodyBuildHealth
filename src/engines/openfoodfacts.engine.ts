@@ -30,37 +30,156 @@ export interface OFFProduct {
   };
 }
 
-const OFF_API_RU = 'https://ru.openfoodfacts.org/api/v0';
-const OFF_API_WORLD = 'https://world.openfoodfacts.org/api/v0';
-const OFF_API_US = 'https://us.openfoodfacts.org/api/v0';
+// Корни сайтов, а не /api/v0: `search.pl` живёт в корне
+// (`/api/v0/cgi/search.pl` у OFF отвечает `{"status":0,"status_verbose":"no code
+// or invalid code"}` — то есть 0 результатов ВСЕГДА), а продукты берутся по
+// `/api/v2/product/{code}.json` (измерено 2026-11-27: 0,2–1,2 с на ответ).
+const OFF_WEB_RU = 'https://ru.openfoodfacts.org';
+const OFF_WEB_WORLD = 'https://world.openfoodfacts.org';
+const OFF_SEARCH = 'https://search.openfoodfacts.org/search';
+/** Поля v2-продукта: ровно то, из чего normalizeProduct собирает запись. */
+const PRODUCT_FIELDS =
+  'code,product_name,product_name_ru,brands,categories,nutriments,serving_quantity,image_small_url';
+/** Поля search-a-licious: nutriments он не отдаёт вообще — КБЖУ добираем по коду. */
+const SEARCH_FIELDS = 'code,product_name,product_name_ru,brands,countries';
 const CACHE_STORE = 'food_cache';
 const CACHE_TTL = 7 * 24 * 60 * 60 * 1000;
 const LS_CACHE_KEY = 'he_off_cache';
 
 const CAT_KEYWORDS: Record<string, string[]> = {
-  protein: ['meat', 'мясо', 'chicken', 'куриц', 'fish', 'рыб', 'beef', 'говяд', 'pork', 'свинин',
-    'turkey', 'индейк', 'egg', 'яйц', 'seafood', 'морепродукт', 'tuna', 'тунец', 'salmon', 'лосос',
-    'sausage', 'колбас', 'ham', 'ветчин'],
-  dairy: ['milk', 'молок', 'cheese', 'сыр', 'yogurt', 'йогурт', 'cream', 'сливк', 'butter', 'масл',
-    'kefir', 'кефир', 'curd', 'творог'],
-  carb: ['rice', 'рис', 'pasta', 'макарон', 'bread', 'хлеб', 'potato', 'картофел', 'noodle', 'лапш',
-    'cereal', 'хлопь', 'tortilla', 'лепёшк'],
-  grain: ['oat', 'овсян', 'buckwheat', 'гречк', 'quinoa', 'киноа', 'bulgur', 'булгур', 'barley', 'перлов',
-    'couscous', 'кускус', 'millet', 'пшен', 'lentil', 'чечевиц'],
-  fat: ['oil', 'масл', 'avocado', 'авокад', 'nut', 'орех', 'seed', 'семечк', 'olive', 'оливк',
-    'coconut', 'кокос'],
-  veg_fruit: ['vegetable', 'овощ', 'fruit', 'фрукт', 'salad', 'салат', 'tomato', 'помидор',
-    'cucumber', 'огурец', 'broccoli', 'брокколи', 'berry', 'ягод'],
-  fast_food: ['pizza', 'пицц', 'burger', 'бургер', 'fries', 'фри', 'snack', 'чипс', 'chocolate', 'шоколад',
-    'candy', 'конфет', 'cookie', 'печень', 'cake', 'торт', 'soda', 'газировк'],
-  supplement: ['protein', 'протеин', 'vitamin', 'витамин', 'supplement', 'добавк', 'whey', 'сывороточн',
-    'bcaa', 'аминокислот', 'creatine', 'креатин'],
+  protein: [
+    'meat',
+    'мясо',
+    'chicken',
+    'куриц',
+    'fish',
+    'рыб',
+    'beef',
+    'говяд',
+    'pork',
+    'свинин',
+    'turkey',
+    'индейк',
+    'egg',
+    'яйц',
+    'seafood',
+    'морепродукт',
+    'tuna',
+    'тунец',
+    'salmon',
+    'лосос',
+    'sausage',
+    'колбас',
+    'ham',
+    'ветчин',
+  ],
+  dairy: [
+    'milk',
+    'молок',
+    'cheese',
+    'сыр',
+    'yogurt',
+    'йогурт',
+    'cream',
+    'сливк',
+    'butter',
+    'масл',
+    'kefir',
+    'кефир',
+    'curd',
+    'творог',
+  ],
+  carb: [
+    'rice',
+    'рис',
+    'pasta',
+    'макарон',
+    'bread',
+    'хлеб',
+    'potato',
+    'картофел',
+    'noodle',
+    'лапш',
+    'cereal',
+    'хлопь',
+    'tortilla',
+    'лепёшк',
+  ],
+  grain: [
+    'oat',
+    'овсян',
+    'buckwheat',
+    'гречк',
+    'quinoa',
+    'киноа',
+    'bulgur',
+    'булгур',
+    'barley',
+    'перлов',
+    'couscous',
+    'кускус',
+    'millet',
+    'пшен',
+    'lentil',
+    'чечевиц',
+  ],
+  fat: ['oil', 'масл', 'avocado', 'авокад', 'nut', 'орех', 'seed', 'семечк', 'olive', 'оливк', 'coconut', 'кокос'],
+  veg_fruit: [
+    'vegetable',
+    'овощ',
+    'fruit',
+    'фрукт',
+    'salad',
+    'салат',
+    'tomato',
+    'помидор',
+    'cucumber',
+    'огурец',
+    'broccoli',
+    'брокколи',
+    'berry',
+    'ягод',
+  ],
+  fast_food: [
+    'pizza',
+    'пицц',
+    'burger',
+    'бургер',
+    'fries',
+    'фри',
+    'snack',
+    'чипс',
+    'chocolate',
+    'шоколад',
+    'candy',
+    'конфет',
+    'cookie',
+    'печень',
+    'cake',
+    'торт',
+    'soda',
+    'газировк',
+  ],
+  supplement: [
+    'protein',
+    'протеин',
+    'vitamin',
+    'витамин',
+    'supplement',
+    'добавк',
+    'whey',
+    'сывороточн',
+    'bcaa',
+    'аминокислот',
+    'creatine',
+    'креатин',
+  ],
 };
 
 function detectCategory(categories?: string, name?: string): string {
   const text = ((categories || '') + ' ' + (name || '')).toLowerCase();
   for (const [cat, keywords] of Object.entries(CAT_KEYWORDS)) {
-    if (keywords.some(kw => text.includes(kw))) return cat;
+    if (keywords.some((kw) => text.includes(kw))) return cat;
   }
   return 'other';
 }
@@ -104,7 +223,7 @@ export function normalizeProduct(p: any): OFFProduct | null {
     barcode: p.code || '',
     name,
     nameRu: p.product_name_ru || undefined,
-    brand: p.brands || undefined,
+    brand: Array.isArray(p.brands) ? p.brands.join(', ') || undefined : p.brands || undefined,
     categories: p.categories || undefined,
     category: detectCategory(p.categories, name),
     kcal: Math.round(kcal || 0),
@@ -161,7 +280,9 @@ export async function saveToCache(product: OFFProduct): Promise<void> {
   } catch {}
 }
 
-function sanitizeBarcode(raw: string): string { return (raw || '').replace(/\D/g, '').trim(); }
+function sanitizeBarcode(raw: string): string {
+  return (raw || '').replace(/\D/g, '').trim();
+}
 
 /** Return equivalent GTIN spellings used by different product databases. */
 function barcodeVariants(raw: string): string[] {
@@ -175,30 +296,90 @@ function barcodeVariants(raw: string): string[] {
   return [...variants];
 }
 
-async function fetchFromApi(apiUrl: string, barcode: string): Promise<OFFProduct | null> {
-  const bc = sanitizeBarcode(barcode);
-  if (!bc) return null;
-  const urls = [
-    `${apiUrl}/product/${bc}.json`,
-    `${apiUrl.replace('/api/v0', '/api/v2')}/product/${bc}.json`,
-  ];
-  for (const url of urls) {
+function sleep(ms: number): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+/** 429/503 у OFF — это «сервис занят», а не «продукта нет»: один повтор через ~1,2 с. */
+const RETRYABLE_STATUS = new Set([429, 503]);
+const RETRY_DELAY_MS = 1200;
+const retryDelay = () => RETRY_DELAY_MS + Math.floor(Math.random() * 300);
+
+type OffResponse =
+  | { kind: 'ok'; data: any }
+  | { kind: 'miss'; status: number }
+  /** 429/503 повторились после паузы: хост недоступен, дальше спрашивать смысла нет. */
+  | { kind: 'unavailable' };
+
+/**
+ * Один GET с Accept: application/json, таймаутом и одним повтором на 429/503.
+ * User-Agent намеренно не выставляется — браузер/WebView отбрасывает этот
+ * заголовок (forbidden header), и запрос выглядел бы «неотправленным».
+ */
+async function fetchJson(url: string, timeoutMs = 8000): Promise<OffResponse> {
+  for (let attempt = 0; attempt < 2; attempt++) {
     const controller = typeof AbortController !== 'undefined' ? new AbortController() : null;
-    const timeout = controller ? setTimeout(() => controller.abort(), 9000) : undefined;
+    const timer = controller ? setTimeout(() => controller.abort(), timeoutMs) : undefined;
     try {
       const res = await fetch(url, {
         signal: controller?.signal,
         headers: { Accept: 'application/json' } as any,
       });
-      if (!res.ok) continue;
-      const data = await res.json();
-      const found = data.status === 1 || data.status === '1' || data.status === true;
-      if (found && data.product) return normalizeProduct(data.product);
+      if (res.ok) {
+        const data = await res.json().catch(() => null);
+        return data ? { kind: 'ok', data } : { kind: 'miss', status: res.status };
+      }
+      if (RETRYABLE_STATUS.has(res.status) && attempt === 0) {
+        await sleep(retryDelay());
+        continue;
+      }
+      return RETRYABLE_STATUS.has(res.status) ? { kind: 'unavailable' } : { kind: 'miss', status: res.status };
     } catch {
-      // Try the v2 endpoint before reporting a miss.
+      // Сеть/таймаут — повторять бессмысленно, отдаём промах.
+      return { kind: 'miss', status: 0 };
     } finally {
-      if (timeout !== undefined) clearTimeout(timeout);
+      if (timer !== undefined) clearTimeout(timer);
     }
+  }
+  return { kind: 'unavailable' };
+}
+
+function productUrl(base: string, version: 'v0' | 'v2', code: string): string {
+  return `${base}/api/${version}/product/${encodeURIComponent(code)}.json?fields=${PRODUCT_FIELDS}`;
+}
+
+/**
+ * Штрихкод → продукт. Порядок фиксированный и короткий: v2 хоста → v0 того же
+ * хоста. Раньше одновременно летели 6 запросов (3 хоста × 2 версии) — отсюда
+ * 429/503 и «не найден» на живых российских кодах.
+ */
+async function fetchFromApi(apiUrl: string, barcode: string): Promise<OFFProduct | null> {
+  const bc = sanitizeBarcode(barcode);
+  if (!bc) return null;
+  for (const version of ['v2', 'v0'] as const) {
+    const res = await fetchJson(productUrl(apiUrl, version, bc), 9000);
+    // 429/503 после повтора — сдаёмся без исключения.
+    if (res.kind === 'unavailable') return null;
+    if (res.kind !== 'ok') continue;
+    const data = res.data;
+    const found = data?.status === 1 || data?.status === '1' || data?.status === true;
+    if (found && data.product) {
+      const product = normalizeProduct({ ...data.product, code: data.product.code || bc });
+      if (product) return product;
+    }
+  }
+  return null;
+}
+
+/** Один продукт по коду — для добора КБЖУ у выдачи search-a-licious. */
+async function fetchProductByCode(code: string, timeoutMs = 8000): Promise<OFFProduct | null> {
+  const bc = sanitizeBarcode(code);
+  if (!bc) return null;
+  for (const version of ['v2', 'v0'] as const) {
+    const res = await fetchJson(productUrl(OFF_WEB_WORLD, version, bc), timeoutMs);
+    if (res.kind === 'unavailable') return null;
+    if (res.kind !== 'ok' || !res.data?.product) continue;
+    return normalizeProduct({ ...res.data.product, code: res.data.product.code || bc });
   }
   return null;
 }
@@ -218,11 +399,23 @@ export async function searchByBarcode(barcode: string): Promise<OFFProduct | nul
     if (cached) return cached;
   }
 
-  // РФ-приоритет: 460-469 — российские штрихкоды → RU первым, иначе тот же порядок (RU уже первый)
-  const requests = variants.flatMap(variant => [OFF_API_RU, OFF_API_WORLD, OFF_API_US]
-    .map(api => fetchFromApi(api, variant)));
-  const results = await Promise.all(requests);
-  const product = results.find(Boolean);
+  // Максимум 2 варианта (12↔13 цифр) параллельно, и каждый — не больше 2
+  // последовательных запросов на хост. Раньше 6 одновременных запросов сами
+  // провоцировали 429/503, и российский код «не находился».
+  const results = await Promise.all(
+    variants.map(async (variant) => {
+      // 46/48 — префиксы GS1, выданные в России: такие коды почти всегда есть
+      // только на ru.openfoodfacts.org, а world отвечает двумя промахами
+      // (v2+v0) до ~18 с. Остальные коды идём искать на world первым.
+      const hosts = /^(46|48)/.test(variant) ? [OFF_WEB_RU, OFF_WEB_WORLD] : [OFF_WEB_WORLD, OFF_WEB_RU];
+      for (const host of hosts) {
+        const product = await fetchFromApi(host, variant);
+        if (product) return product;
+      }
+      return null;
+    }),
+  );
+  const product = results.find(Boolean) || null;
   if (product) {
     await saveToCache(product);
     return product;
@@ -231,62 +424,69 @@ export async function searchByBarcode(barcode: string): Promise<OFFProduct | nul
 }
 
 export async function searchByBarcodeBatch(barcodes: string[]): Promise<(OFFProduct | null)[]> {
-  return Promise.all(barcodes.map(b => searchByBarcode(b)));
-}
-
-function offProductFromHit(p: any): OFFProduct | null {
-  if (!p) return null;
-  const src = p.product || p;
-  return normalizeProduct(src.code ? src : {
-    ...src,
-    code: src.code || src._id,
-    product_name: src.product_name || src.product_name_ru,
-    nutriments: src.nutriments,
-  });
-}
-
-async function fetchSearchALicious(query: string, pageSize: number, russiaOnly: boolean): Promise<OFFProduct[]> {
-  const term = russiaOnly ? `${query} AND countries_tags:"en:russia"` : query;
-  try {
-    const encoded = encodeURIComponent(term);
-    const res = await fetch(`https://search.openfoodfacts.org/search?q=${encoded}&page_size=${pageSize}`, { signal: AbortSignal.timeout(7000), headers: { 'Accept': 'application/json' } as any });
-    if (!res.ok) return [];
-    const data = await res.json();
-    const hits = (data.hits || data.products || []) as any[];
-    const products: OFFProduct[] = [];
-    for (const p of hits) {
-      const norm = offProductFromHit(p);
-      if (norm) products.push(norm);
-    }
-    return products;
-  } catch {
-    return [];
-  }
+  return Promise.all(barcodes.map((b) => searchByBarcode(b)));
 }
 
 /**
- * Старый API ru.openfoodfacts.org с фильтром страны. Именно он отдаёт
- * российские бренды (Простоквашино, Домик в деревне, Савушкин) — новый
- * Search-a-licious без фильтра ставит первыми иностранные позиции.
+ * Выдача search-a-licious. Форма ответа зависит от `fields`:
+ *   с `fields` — `{"hits":[{...}]}` (массив), без `fields` — `{"hits":{"hits":[...]}}`.
+ * Парсим обе, иначе вариант с `fields` читался бы как 0 результатов.
+ * `countries:"en:russia"` — синтаксис фильтра в этом индексе; прежний
+ * `q=... AND countries_tags:"en:russia"` давал 400 (Search field
+ * 'countries_tags' not found in index config) на любой запрос.
+ * nutriments этот API не отдаёт вообще (даже при `fields=`) → КБЖУ добираем по
+ * code через v2.
  */
-async function fetchRussiaLegacy(query: string, pageSize: number): Promise<OFFProduct[]> {
-  try {
-    const encoded = encodeURIComponent(query);
-    const url = `${OFF_API_RU}/cgi/search.pl?search_terms=${encoded}&page_size=${pageSize}&json=1`
-      + '&tagtype_0=countries&tag_contains_0=contains&tag_0=russia'
-      + '&fields=code,product_name,product_name_ru,brands,categories,nutriments,image_small_url,serving_quantity';
-    const res = await fetch(url, { signal: AbortSignal.timeout(7000), headers: { 'Accept': 'application/json' } as any });
-    if (!res.ok) return [];
-    const data = await res.json();
-    const products: OFFProduct[] = [];
-    for (const p of (data.products || [])) {
-      const norm = normalizeProduct(p);
-      if (norm) products.push(norm);
-    }
-    return products;
-  } catch {
-    return [];
-  }
+async function fetchSearchALiciousHits(query: string, pageSize: number, russiaOnly: boolean): Promise<any[]> {
+  const country = russiaOnly ? ' countries:"en:russia"' : '';
+  const url =
+    `${OFF_SEARCH}?q=${encodeURIComponent(query)}${country}` +
+    `&page_size=${pageSize}&langs=ru&fields=${SEARCH_FIELDS}`;
+  const res = await fetchJson(url, 8000);
+  if (res.kind !== 'ok' || !res.data) return [];
+  const data = res.data;
+  const hits = Array.isArray(data.hits) ? data.hits : data.hits?.hits || [];
+  return Array.isArray(hits) ? hits.filter(Boolean) : [];
+}
+
+function isRussiaHit(hit: any): boolean {
+  const countries = hit?.countries;
+  if (Array.isArray(countries)) return countries.includes('en:russia');
+  if (typeof countries === 'string') return countries.includes('en:russia');
+  return false;
+}
+
+/**
+ * Жёсткий фильтр страны слишком узкий («овсянка» — 1 хит, «ветчина» — 5),
+ * поэтому основной запрос идёт без него, а товары с `en:russia` в `countries`
+ * поднимаются в начало с сохранением исходного порядка релевантности.
+ */
+function russiaFirst(hits: any[]): any[] {
+  const local = hits.filter(isRussiaHit);
+  if (local.length === 0 || local.length === hits.length) return hits;
+  return [...local, ...hits.filter((hit) => !isRussiaHit(hit))];
+}
+
+/**
+ * Старый API. `search.pl` живёт в КОРНЕ сайта: `/api/v0/cgi/search.pl` у OFF
+ * отвечает `{"status":0,"status_verbose":"no code or invalid code"}` — то есть
+ * 0 результатов всегда. Держим как последний резерв: на world/ru этот скрипт
+ * часто отдаёт 503 «Page temporarily unavailable».
+ */
+async function fetchLegacySearch(
+  base: string,
+  query: string,
+  pageSize: number,
+  russiaOnly: boolean,
+): Promise<OFFProduct[]> {
+  const country = russiaOnly ? '&tagtype_0=countries&tag_contains_0=contains&tag_0=en:russia' : '';
+  const url =
+    `${base}/cgi/search.pl?search_terms=${encodeURIComponent(query)}` +
+    `&page_size=${pageSize}&json=1${country}&fields=${PRODUCT_FIELDS}`;
+  const res = await fetchJson(url, 8000);
+  if (res.kind !== 'ok' || !res.data) return [];
+  const products = Array.isArray(res.data.products) ? res.data.products : [];
+  return products.map(normalizeProduct).filter(Boolean) as OFFProduct[];
 }
 
 function dedupeOff(products: OFFProduct[], seen: Set<string>): OFFProduct[] {
@@ -300,15 +500,92 @@ function dedupeOff(products: OFFProduct[], seen: Set<string>): OFFProduct[] {
   return out;
 }
 
+/** Сколько кодов добираем по v2 за один поиск и с какой параллельностью. */
+const ENRICH_LIMIT = 16;
+const ENRICH_CONCURRENCY = 3;
+const ENRICH_DEADLINE_MS = 8000;
+
+/**
+ * КБЖУ по кодам из выдачи search-a-licious: v2 product, не больше 3 запросов
+ * одновременно, общий бюджет 8 с. Порядок — как у поиска, не найденные коды
+ * просто выпадают (раньше такой продукт оставался с 0 ккал и UI отбрасывал его
+ * как «нет КБЖУ»).
+ */
+async function hydrateCodes(codes: string[], targetUsable = codes.length): Promise<Map<string, OFFProduct>> {
+  const found = new Map<string, OFFProduct>();
+  const queue = codes.slice();
+  const until = Date.now() + ENRICH_DEADLINE_MS;
+  let usable = 0;
+  const worker = async () => {
+    // Останавливаемся, как только набрали нужное число товаров С КБЖУ: записям
+    // без пищевой ценности (их в OFF много) в дневнике делать нечего.
+    while (queue.length > 0 && Date.now() < until && usable < targetUsable) {
+      const code = queue.shift()!;
+      const product = await fetchProductByCode(code);
+      if (!product) continue;
+      found.set(code, product);
+      if (hasNutritionValues(product)) usable += 1;
+    }
+  };
+  await Promise.all(Array.from({ length: ENRICH_CONCURRENCY }, worker));
+  return found;
+}
+
+/** Коды выдачи в порядке релевантности, без повторов. */
+function hitCodes(hits: any[]): string[] {
+  const codes: string[] = [];
+  const seen = new Set<string>();
+  for (const hit of hits) {
+    const code = sanitizeBarcode(String(hit?.code ?? hit?.product?.code ?? ''));
+    if (!code || seen.has(code)) continue;
+    seen.add(code);
+    codes.push(code);
+  }
+  return codes;
+}
+
+/** search-a-licious → добор КБЖУ по коду → продукты в порядке релевантности. */
+async function collectFromSearch(
+  queries: string[],
+  pageSize: number,
+  russiaOnly: boolean,
+  seen: Set<string>,
+  expired: () => boolean,
+): Promise<OFFProduct[]> {
+  const out: OFFProduct[] = [];
+  const usableCount = () => out.filter(hasNutritionValues).length;
+  for (const qq of queries) {
+    if (expired() || usableCount() >= pageSize) break;
+    const hits = await fetchSearchALiciousHits(qq, pageSize, russiaOnly);
+    const codes = hitCodes(russiaOnly ? hits : russiaFirst(hits))
+      .filter((code) => !seen.has(code))
+      .slice(0, ENRICH_LIMIT);
+    if (codes.length === 0) continue;
+    const hydrated = await hydrateCodes(codes, pageSize);
+    for (const code of codes) {
+      const product = hydrated.get(code);
+      if (!product || seen.has(product.barcode || product.id)) continue;
+      seen.add(product.barcode || product.id || code);
+      // Запись без КБЖУ слот не занимает: иначе «ветчина» = три пустые строки.
+      if (!hasNutritionValues(product)) continue;
+      out.push(product);
+      if (usableCount() >= pageSize) break;
+    }
+  }
+  return out;
+}
+
 export async function searchByName(query: string, pageSize = 20): Promise<OFFProduct[]> {
   const q = (query || '').trim();
   if (!q) return [];
 
+  // Кэш — дополнение к сети, а не замена: раньше один раз отсканированное
+  // «Молоко 3.2%» оставалось единственным ответом на поиск «молоко», и сеть
+  // не спрашивалась вообще (а товар с 0 ккал UI отбрасывал → «ничего не найдено»).
   const cached = await searchCacheByName(q);
-  if (cached.length > 0) return cached;
 
   const tryQueries = [q];
-  const parts = q.split(/\s+/).filter(p => p.length > 2);
+  const parts = q.split(/\s+/).filter((p) => p.length > 2);
   if (parts.length > 1) {
     const brand = parts[parts.length - 1];
     if (brand.toLowerCase() !== q.toLowerCase()) tryQueries.push(brand);
@@ -316,70 +593,109 @@ export async function searchByName(query: string, pageSize = 20): Promise<OFFPro
     if (withoutBrand) tryQueries.push(withoutBrand);
   }
 
-  // RF-first: бренды РФ должны быть в начале выдачи, а не после иностранных
-  // товаров. Оба российских источника спрашиваем параллельно (последовательно
-  // это 2×7 с ожидания при медленной сети), добираем остаток и следим за
-  // общим дедлайном — строка «ищем ещё…» не должна крутиться бесконечно.
+  // RF-first: основной запрос — без фильтра страны (с `langs=ru`), найденное
+  // пересортировывается так, чтобы товары из России были первыми; жёсткий
+  // фильтр остаётся вторым запросом, если без него пусто. Legacy search.pl —
+  // последний резерв. Общий дедлайн, чтобы «ищем ещё…» не крутилось бесконечно.
   const startedAt = Date.now();
   const deadline = 12_000;
   const expired = () => Date.now() - startedAt > deadline;
 
   const seen = new Set<string>();
-  const collected: OFFProduct[] = [];
-  for (const qq of tryQueries) {
-    if (expired()) break;
-    const [legacy, salic] = await Promise.all([
-      fetchRussiaLegacy(qq, pageSize),
-      fetchSearchALicious(qq, pageSize, true),
-    ]);
-    collected.push(...dedupeOff(legacy, seen), ...dedupeOff(salic, seen));
-    if (collected.length >= pageSize) break;
+  // Точные кэш-совпадения идут первыми; fallback-ступени ниже включаются по
+  // пустоте СЕТЕВОЙ выдачи, а не общего списка (кэш не должен их глушить).
+  const collected: OFFProduct[] = dedupeOff(cached, seen);
+  const network: OFFProduct[] = [];
+
+  // 1. Основная выдача: вся база + страны в хитах, РФ — в начало.
+  network.push(...(await collectFromSearch(tryQueries, pageSize, false, seen, expired)));
+
+  // 2. Пусто → тот же поиск с жёстким фильтром страны.
+  if (network.length === 0 && !expired()) {
+    network.push(...(await collectFromSearch(tryQueries, pageSize, true, seen, expired)));
   }
-  // Если по стране данных мало — добираем общий индекс, но только в конец.
-  if (collected.length < pageSize && !expired()) {
-    for (const qq of tryQueries) {
-      if (expired()) break;
-      collected.push(...dedupeOff(await fetchSearchALicious(qq, pageSize, false), seen));
-      if (collected.length >= pageSize) break;
+
+  // 3. Последний резерв — legacy search.pl в корне сайта (с фильтром и без).
+  if (network.length === 0 && !expired()) {
+    for (const base of [OFF_WEB_RU, OFF_WEB_WORLD]) {
+      for (const russiaOnly of [true, false]) {
+        if (expired()) break;
+        network.push(...dedupeOff(await fetchLegacySearch(base, q, pageSize, russiaOnly), seen));
+        if (network.length > 0) break;
+      }
+      if (network.length > 0 || expired()) break;
     }
   }
 
-  if (collected.length === 0 && !expired()) {
-    // Последний шанс — старый API без фильтра.
-    for (const api of [OFF_API_RU, OFF_API_WORLD]) {
-      try {
-        const encoded = encodeURIComponent(q);
-        const res = await fetch(`${api}/cgi/search.pl?search_terms=${encoded}&page_size=${pageSize}&json=1&fields=code,product_name,product_name_ru,brands,categories,nutriments,image_small_url`, { signal: AbortSignal.timeout(7000), headers: { 'Accept': 'application/json' } as any });
-        if (!res.ok) continue;
-        const data = await res.json();
-        collected.push(...dedupeOff((data.products || []).map(normalizeProduct).filter(Boolean) as OFFProduct[], seen));
-        if (collected.length > 0) break;
-      } catch {}
-    }
+  collected.push(...network);
+  // В OFF много записей без пищевой ценности («ветчина» без КБЖУ): для дневника
+  // они бесполезны — в него нельзя положить позицию с нулями. Такие товары не
+  // отбрасываем совсем (если других нет — пользователь увидит хотя бы название),
+  // но слоты выдачи отдаём продуктам с КБЖУ, иначе «ветчина» = три пустые строки.
+  const usable = collected.filter(hasNutritionValues);
+  const result = (usable.length > 0 ? usable : collected).slice(0, pageSize);
+  for (const p of network) {
+    if (!result.includes(p)) continue;
+    try {
+      await saveToCache(p);
+    } catch {}
   }
+  return result;
+}
 
-  for (const p of collected.slice(0, pageSize)) {
-    try { await saveToCache(p); } catch {}
-  }
-  return collected.slice(0, pageSize);
+/** Есть ли хоть одно значение КБЖУ (0 ккал + 0 БЖУ — запись без пищевой ценности). */
+function hasNutritionValues(p: { kcal?: number; protein?: number; fat?: number; carbs?: number }): boolean {
+  return (
+    (Number(p.kcal) || 0) > 0 || (Number(p.protein) || 0) > 0 || (Number(p.fat) || 0) > 0 || (Number(p.carbs) || 0) > 0
+  );
 }
 
 async function searchCacheByName(query: string): Promise<OFFProduct[]> {
   try {
     const all = await db.getAll<OFFProduct>(CACHE_STORE);
     const q = query.toLowerCase();
-    return all.filter(p =>
-      Date.now() - p.cachedAt < CACHE_TTL &&
-      (p.name.toLowerCase().includes(q) || (p.nameRu && p.nameRu.toLowerCase().includes(q)) || (p.brand && p.brand.toLowerCase().includes(q)))
-    ).slice(0, 20);
+    return all
+      .filter(
+        (p) =>
+          Date.now() - p.cachedAt < CACHE_TTL &&
+          (p.name.toLowerCase().includes(q) ||
+            (p.nameRu && p.nameRu.toLowerCase().includes(q)) ||
+            (p.brand && p.brand.toLowerCase().includes(q))),
+      )
+      .slice(0, 20);
   } catch {
     return [];
   }
 }
 
+/**
+ * Микросы OFF (`sodium`, `calcium`, … в мг/мкг на 100 г) → канон дневника
+ * (`sodium_mg`, `calcium_mg`, …). Без этого очередь и отчёт теряли числа из
+ * штрихкода и заполняли витамины «по имени продукта».
+ */
+export function offMicrosToDiary(micros?: OFFProduct['micros']): Record<string, number> | undefined {
+  if (!micros) return undefined;
+  const map: Array<[string, number | undefined]> = [
+    ['sodium_mg', micros.sodium],
+    ['potassium_mg', micros.potassium],
+    ['magnesium_mg', micros.magnesium],
+    ['calcium_mg', micros.calcium],
+    ['iron_mg', micros.iron],
+    ['vitamin_c_mg', micros.vitaminC],
+    ['vitamin_d_mcg', micros.vitaminD],
+    ['vitamin_b12_mcg', micros.vitaminB12],
+  ];
+  const out: Record<string, number> = {};
+  for (const [key, value] of map) {
+    if (typeof value === 'number' && Number.isFinite(value) && value > 0) out[key] = value;
+  }
+  return Object.keys(out).length > 0 ? out : undefined;
+}
+
 export function productToFoodItem(p: OFFProduct) {
   return {
     id: p.barcode || p.id,
+    barcode: p.barcode,
     name: p.name,
     category: p.category || 'other',
     kcal: p.kcal,
@@ -387,6 +703,8 @@ export function productToFoodItem(p: OFFProduct) {
     fat: p.fat,
     carbs: p.carbs,
     fiber: p.fiber,
+    /** Канон дневника (`sodium_mg`, …) — очередь и отчёт читают именно его. */
+    micros: offMicrosToDiary(p.micros),
     saturatedFat: p.micros?.saturatedFat,
     sugars: p.micros?.sugars,
     sodium: p.micros?.sodium,

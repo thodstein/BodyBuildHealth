@@ -1,10 +1,23 @@
 import React, { useState, useRef, useEffect, useMemo } from 'react';
 import { FOOD_DB } from '../../../../core/nutrition-database';
+import { RU_DELI_FOODS } from '../../../../data/ru-deli-foods';
 import { CAT_MAP_EMOJI } from '../../../../core/nutrition-utils';
 import { type FoodItemLike } from '../types';
 import { BarcodeScanner } from '../../../components/BarcodeScanner';
-import { type OFFProduct, productToFoodItem, searchByBarcode, searchByName as searchOFF } from '../../../../engines/openfoodfacts.engine';
-import { RETAIL_CHAINS, RETAIL_RESULT_LIMIT, retailToFoodItem, searchRetailProducts, type RetailProduct } from '../../../../engines/retail-search.engine';
+import {
+  type OFFProduct,
+  productToFoodItem,
+  searchByName as searchOFF,
+} from '../../../../engines/openfoodfacts.engine';
+import {
+  RETAIL_CHAINS,
+  RETAIL_RESULT_LIMIT,
+  retailToFoodItem,
+  searchRetailProducts,
+  type RetailProduct,
+} from '../../../../engines/retail-search.engine';
+import { lookupBarcode } from '../../../../engines/barcode-lookup.engine';
+import { searchLocalFoods } from '../../../../engines/food-search.engine';
 import { isCapacitorNative } from '../../../../core/app-platform';
 import { parseNutritionText, findFood } from '../../../../engines/nutrition-ocr-parser';
 import { readDiaryV2 } from '../diary-storage-v2';
@@ -28,7 +41,11 @@ interface AddFoodPanelProps {
   allMealTypes: string[];
   onAddFoodFromDB: (food: FoodItemLike, qty?: number) => void;
   /** Рецепт из базы/«Моих рецептов» → очередь (блюдо целиком с составом). */
-  onAddRecipe?: (recipe: import('../../../../engines/nutrition-periodization.engine').Recipe, servings?: number, custom?: boolean) => void;
+  onAddRecipe?: (
+    recipe: import('../../../../engines/nutrition-periodization.engine').Recipe,
+    servings?: number,
+    custom?: boolean,
+  ) => void;
   onDirectAdd?: (food: FoodItemLike, qty?: number) => void;
   customMealInput: string;
   onCustomMealInputChange: (value: string) => void;
@@ -36,7 +53,7 @@ interface AddFoodPanelProps {
   onShowBarcode: () => void;
   onCloseBarcode: () => void;
   showBarcode: boolean;
-  onBarcodeProduct: (product: OFFProduct) => void;
+  onBarcodeProduct: (product: OFFProduct, grams?: number) => void;
   labelOpen: boolean;
   labelLoading: boolean;
   labelProgress: number;
@@ -103,18 +120,79 @@ const POPULAR_QUERIES = ['творог', 'куриная грудка', 'гре�
 /** 8–14 цифр — это штрихкод (EAN-8/13, UPC, ITF-14), а не название продукта. */
 const isBarcodeQuery = (q: string) => /^\d{8,14}$/.test((q || '').trim());
 
+/** Реальные длины GTIN: EAN-8, UPC-A (12), EAN-13, ITF-14. */
+const BARCODE_LENGTHS = new Set([8, 12, 13, 14]);
+
 export const AddFoodPanel: React.FC<AddFoodPanelProps> = ({
-  foodSearch, onFoodSearchChange, debouncedSearch, usdaFoods, mealType, onMealTypeChange,
-  allMealTypes, onAddFoodFromDB, onAddRecipe, onDirectAdd, customMealInput, onCustomMealInputChange, onAddCustomMeal, onShowBarcode, onCloseBarcode, showBarcode, onBarcodeProduct,
-  labelOpen, labelLoading, labelProgress, labelHint, labelError, labelDraft, labelRawText, labelBarcodeLoading,
-  onOpenLabelScan, onCloseLabelScan, onLabelCamera, onLabelGallery, onLabelFieldChange, onLabelSaveToBase, onLabelAddToDiary, onLabelBarcodeScan,
+  foodSearch,
+  onFoodSearchChange,
+  debouncedSearch,
+  usdaFoods,
+  mealType,
+  onMealTypeChange,
+  allMealTypes,
+  onAddFoodFromDB,
+  onAddRecipe,
+  onDirectAdd,
+  customMealInput,
+  onCustomMealInputChange,
+  onAddCustomMeal,
+  onShowBarcode,
+  onCloseBarcode,
+  showBarcode,
+  onBarcodeProduct,
+  labelOpen,
+  labelLoading,
+  labelProgress,
+  labelHint,
+  labelError,
+  labelDraft,
+  labelRawText,
+  labelBarcodeLoading,
+  onOpenLabelScan,
+  onCloseLabelScan,
+  onLabelCamera,
+  onLabelGallery,
+  onLabelFieldChange,
+  onLabelSaveToBase,
+  onLabelAddToDiary,
+  onLabelBarcodeScan,
   onOcrFile,
-  ocrFileLoading, ocrProgress = 0, onShowOCR, showOCR, ocrText, onOcrTextChange, onOcrSubmit, ocrError, ocrHint, onOcrClose,
-  parsedItems, onRemoveParsedItem, onUpdateParsedItemQty, onFillMicros, onSaveItems, onEditParsedItem,
+  ocrFileLoading,
+  ocrProgress = 0,
+  onShowOCR,
+  showOCR,
+  ocrText,
+  onOcrTextChange,
+  onOcrSubmit,
+  ocrError,
+  ocrHint,
+  onOcrClose,
+  parsedItems,
+  onRemoveParsedItem,
+  onUpdateParsedItemQty,
+  onFillMicros,
+  onSaveItems,
+  onEditParsedItem,
   onFixAllLowConfidence,
-  favoriteFoods, mealPresets, onAddPreset, showCustomFood, onToggleCustomFood,
-  customFoodName, onCustomFoodNameChange, customFoodKcal, customFoodP, customFoodF, customFoodC,
-  onCustomFoodFieldChange, onAddCustomFood, ocrFileRef, ocrCameraRef, onClearQueue, below, onFavoritesChanged,
+  favoriteFoods,
+  mealPresets,
+  onAddPreset,
+  showCustomFood,
+  onToggleCustomFood,
+  customFoodName,
+  onCustomFoodNameChange,
+  customFoodKcal,
+  customFoodP,
+  customFoodF,
+  customFoodC,
+  onCustomFoodFieldChange,
+  onAddCustomFood,
+  ocrFileRef,
+  ocrCameraRef,
+  onClearQueue,
+  below,
+  onFavoritesChanged,
 }) => {
   // АПК: системная камера/галерея вместо сырого file-input (в WebView он
   // открывается через раз). Перехват клика по плитке «Фото».
@@ -134,12 +212,18 @@ export const AddFoodPanel: React.FC<AddFoodPanelProps> = ({
       try {
         const { dataUrlToBlob } = await import('../../../../engines/ocr-preprocess');
         blob = dataUrlToBlob(photo.uri);
-      } catch { /* fallback ниже */ }
+      } catch {
+        /* fallback ниже */
+      }
       if (!blob) blob = await (await fetch(photo.uri)).blob();
       const file = new File([blob], `food.${photo.format || 'jpg'}`, { type: blob.type || 'image/jpeg' });
       onOcrFile(file);
     } catch {
-      try { ocrFileRef.current?.click(); } catch { /* ignore */ }
+      try {
+        ocrFileRef.current?.click();
+      } catch {
+        /* ignore */
+      }
     }
   };
 
@@ -149,7 +233,12 @@ export const AddFoodPanel: React.FC<AddFoodPanelProps> = ({
   // ── Мгновенная обратная связь: продукт попал в очередь ───────────────────
   const [lastQueued, setLastQueued] = useState('');
   const lastQueuedTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
-  useEffect(() => () => { if (lastQueuedTimer.current) clearTimeout(lastQueuedTimer.current); }, []);
+  useEffect(
+    () => () => {
+      if (lastQueuedTimer.current) clearTimeout(lastQueuedTimer.current);
+    },
+    [],
+  );
   /** Что именно добавили — чтобы «Отменить» снимало нужную позицию. */
   const lastQueuedRef = useRef<{ name: string; idx: number } | null>(null);
   const queueFood = (food: any, qty = 100) => {
@@ -198,8 +287,8 @@ export const AddFoodPanel: React.FC<AddFoodPanelProps> = ({
       if (!at || String(at.name) !== rec.name) {
         const same = parsedItems
           .map((it, i) => ({ name: String(it?.name || ''), i }))
-          .filter(x => x.name === rec.name)
-          .map(x => x.i);
+          .filter((x) => x.name === rec.name)
+          .map((x) => x.i);
         idx = same.length ? same[same.length - 1] : -1;
       }
       if (idx >= 0) onRemoveParsedItem(idx);
@@ -220,26 +309,42 @@ export const AddFoodPanel: React.FC<AddFoodPanelProps> = ({
     toggleFavorite({
       id,
       name: String(food.name || 'Продукт'),
-      kcal: food.kcal, protein: food.protein, fat: food.fat, carbs: food.carbs,
+      kcal: food.kcal,
+      protein: food.protein,
+      fat: food.fat,
+      carbs: food.carbs,
       category: food.category,
     });
     setFavIds(readFavIds());
-    try { onFavoritesChanged?.(); } catch { /* ignore */ }
+    try {
+      onFavoritesChanged?.();
+    } catch {
+      /* ignore */
+    }
   };
   const favButton = (food: any) => {
     const on = favIds.includes(String(food?.id || food?.name || ''));
     return (
       <button
-        onClick={(e) => { e.stopPropagation(); toggleFav(food); }}
+        onClick={(e) => {
+          e.stopPropagation();
+          toggleFav(food);
+        }}
         aria-label={on ? 'Убрать из избранного' : 'В избранное'}
         aria-pressed={on}
         title={on ? 'Убрать из избранного' : 'В избранное'}
         className="nd-fav-toggle"
         data-fav={on ? 'true' : undefined}
         style={{
-          width: 36, height: 44, flexShrink: 0,
-          border: 'none', background: 'transparent', cursor: 'pointer',
-          fontSize: 15, lineHeight: 1, padding: 0,
+          width: 36,
+          height: 44,
+          flexShrink: 0,
+          border: 'none',
+          background: 'transparent',
+          cursor: 'pointer',
+          fontSize: 15,
+          lineHeight: 1,
+          padding: 0,
           color: on ? '#fbbf24' : 'rgba(255,255,255,0.32)',
         }}
       >
@@ -253,45 +358,24 @@ export const AddFoodPanel: React.FC<AddFoodPanelProps> = ({
     const match = String(qty ?? '').match(/(\d+(?:[.,]\d+)?)/);
     return match ? Number(match[1].replace(',', '.')) || 100 : 100;
   };
-  const queueKcal = parsedItems.reduce(
-    (sum, it) => sum + Math.round(((it.kcal || 0) * queueQty(it.qty)) / 100), 0,
-  );
+  const queueKcal = parsedItems.reduce((sum, it) => sum + Math.round(((it.kcal || 0) * queueQty(it.qty)) / 100), 0);
 
+  /**
+   * Ранжирование локальной выдачи живёт в food-search.engine (точное имя →
+   * префикс → все слова → синонимы → опечатки), здесь только секции, лимиты
+   * и дедуп: «Творог 5%» не должен тонуть под «Сырниками творожными».
+   */
   const foodSearchResults = useMemo(() => {
     if (query.length < 2) return [];
-    const norm = (s: unknown) => String(s || '').toLowerCase().replace(/ё/g, 'е').trim();
-    const q = norm(query);
-    const tokens = q.split(/\s+/).filter(t => t.length > 1);
-    if (tokens.length === 0) tokens.push(q);
-    const hasAll = (text: unknown) => {
-      const t = norm(text);
-      return tokens.every(tok => t.includes(tok));
-    };
-    /** 0 — точное имя, 1 — имя с этого слова, 2 — все слова есть в имени,
-     *  3 — имя содержит запрос, 4 — совпадение по бренду/описанию, -1 — не подходит.
-     *  Без ранжирования «Творог 5%» тонул под «Сырниками творожными». */
-    const score = (f: any): number => {
-      const n = norm(f.name);
-      const words = n.split(/[\s,()/–—-]+/);
-      if (n === q) return 0;
-      if (n.startsWith(q)) return 1;
-      if (tokens.every(tok => words.some(w => w.startsWith(tok)))) return 2;
-      if (tokens.every(tok => n.includes(tok))) return 3;
-      if (hasAll(f.brand) || hasAll(f.description)) return 4;
-      return -1;
-    };
-    const take = (list: any[], cap: number) => list
-      .map(f => ({ f, s: score(f) }))
-      .filter(x => x.s >= 0)
-      .sort((a, b) => a.s - b.s)
-      .slice(0, cap)
-      .map(x => x.f);
-    const custom = take(customFoods.map(customFoodToFoodItem), 8);
+    const take = (list: any[], cap: number) => searchLocalFoods(list as any[], query, cap).map((x) => x.item as any);
+    const custom = take(customFoods.map(customFoodToFoodItem) as any[], 8);
+    // Бытовая гастрономия (ветчина/сосиски/окорок) живёт вне FOOD_DB: см. src/data/ru-deli-foods.ts.
+    const deli = take(RU_DELI_FOODS as any[], 8);
     const internal = take(FOOD_DB as any[], 24);
-    const usda = take(usdaFoods, 24);
+    const usda = take(usdaFoods as any[], 24);
     const seen = new Set<string>();
     const out: any[] = [];
-    for (const f of [...custom, ...internal, ...usda]) {
+    for (const f of [...custom, ...deli, ...internal, ...usda]) {
       const key = String(f.id || f.name || '').toLowerCase();
       if (key && seen.has(key)) continue;
       seen.add(key);
@@ -300,7 +384,14 @@ export const AddFoodPanel: React.FC<AddFoodPanelProps> = ({
     return out.slice(0, 40);
   }, [query, usdaFoods, customFoods]);
 
-  const [history, setHistory] = useState<string[]>(() => { try { const v = JSON.parse(localStorage.getItem('he_search_history') || '[]'); return Array.isArray(v) ? v.filter((x: any) => typeof x === 'string').slice(0, 5) : []; } catch { return []; } });
+  const [history, setHistory] = useState<string[]>(() => {
+    try {
+      const v = JSON.parse(localStorage.getItem('he_search_history') || '[]');
+      return Array.isArray(v) ? v.filter((x: any) => typeof x === 'string').slice(0, 5) : [];
+    } catch {
+      return [];
+    }
+  });
   const [showQuickAdd, setShowQuickAdd] = useState(false);
   const [recipeOpen, setRecipeOpen] = useState(false);
   const [recipeQuery, setRecipeQuery] = useState('');
@@ -317,7 +408,7 @@ export const AddFoodPanel: React.FC<AddFoodPanelProps> = ({
       const diary = readDiaryV2();
       const all: any[] = [];
       Object.values(diary as any).forEach((day: any) => {
-        Object.values(day.meals || {}).forEach((items: any) => (items as any[]).forEach(it => all.push(it)));
+        Object.values(day.meals || {}).forEach((items: any) => (items as any[]).forEach((it) => all.push(it)));
       });
       const seen = new Map<string, any>();
       for (let i = all.length - 1; i >= 0 && seen.size < 8; i--) {
@@ -326,7 +417,9 @@ export const AddFoodPanel: React.FC<AddFoodPanelProps> = ({
         if (key && !seen.has(key)) seen.set(key, it);
       }
       return [...seen.values()];
-    } catch { return []; }
+    } catch {
+      return [];
+    }
   });
   const [internetResults, setInternetResults] = useState<any[]>([]);
   const [isSearchingNet, setIsSearchingNet] = useState(false);
@@ -337,10 +430,12 @@ export const AddFoodPanel: React.FC<AddFoodPanelProps> = ({
 
   useEffect(() => {
     if (query && !isBarcodeQuery(query) && foodSearchResults.length > 0) {
-      setHistory(prev => {
+      setHistory((prev) => {
         if (prev[0] === query) return prev;
-        const next = [query, ...prev.filter(x => x !== query)].slice(0, 5);
-        try { localStorage.setItem('he_search_history', JSON.stringify(next)); } catch {}
+        const next = [query, ...prev.filter((x) => x !== query)].slice(0, 5);
+        try {
+          localStorage.setItem('he_search_history', JSON.stringify(next));
+        } catch {}
         return next;
       });
     }
@@ -352,7 +447,7 @@ export const AddFoodPanel: React.FC<AddFoodPanelProps> = ({
       const diary = readDiaryV2();
       const all: any[] = [];
       Object.values(diary as any).forEach((day: any) => {
-        Object.values(day.meals || {}).forEach((items: any) => (items as any[]).forEach(it => all.push(it)));
+        Object.values(day.meals || {}).forEach((items: any) => (items as any[]).forEach((it) => all.push(it)));
       });
       const seen = new Map<string, any>();
       for (let i = all.length - 1; i >= 0 && seen.size < 8; i--) {
@@ -366,45 +461,118 @@ export const AddFoodPanel: React.FC<AddFoodPanelProps> = ({
 
   useEffect(() => {
     const q = query;
-    if (!q || q.length < 3 || isBarcodeQuery(q)) { setInternetResults([]); return; }
+    if (!q || q.length < 3 || isBarcodeQuery(q)) {
+      setInternetResults([]);
+      return;
+    }
     let cancelled = false;
     setIsSearchingNet(true);
-    searchOFF(q, 16).then(res => {
-      if (cancelled) return;
-      const mapped = res.map(productToFoodItem as any).filter((f: any) => f && f.kcal > 0).slice(0, 16);
-      setInternetResults(mapped);
-    }).catch(() => { if (!cancelled) setInternetResults([]); }).finally(() => { if (!cancelled) setIsSearchingNet(false); });
-    return () => { cancelled = true; };
+    searchOFF(q, 16)
+      .then((res) => {
+        if (cancelled) return;
+        const mapped = res
+          .map(productToFoodItem as any)
+          .filter((f: any) => f && f.kcal > 0)
+          .slice(0, 16);
+        setInternetResults(mapped);
+      })
+      .catch(() => {
+        if (!cancelled) setInternetResults([]);
+      })
+      .finally(() => {
+        if (!cancelled) setIsSearchingNet(false);
+      });
+    return () => {
+      cancelled = true;
+    };
   }, [query]);
 
   // ── Штрихкод, вставленный в поиск («4600…») — ищем сразу по нему ─────────
+  // Цепочка та же, что у сканера (barcode-lookup.engine): свои продукты → OFF
+  // → общая база → сети. Найденный без КБЖУ товар — не «не найден».
   const barcodeQuery = isBarcodeQuery(query) ? query : '';
-  const [barcodeFood, setBarcodeFood] = useState<any>(null);
+  /** Искать есть смысл только на реальных длинах GTIN: набор 13 цифр с паузами
+   * >250 мс отдаёт дебаунсу 8,9,10,…,14 — на каждой длине уходила своя цепочка
+   * OFF (до 6 параллельных по 4–8 запросов), из-за чего OFF отвечал 429/503. */
+  const barcodeLengthOk = BARCODE_LENGTHS.has(barcodeQuery.length);
+  const [barcodeFound, setBarcodeFound] = useState<{ product: any; incomplete: boolean; barcode: string } | null>(null);
   const [barcodeLoading, setBarcodeLoading] = useState(false);
+  /** Последний искомый код и его результат: повторный тот же код не гоняет сеть. */
+  const lastBarcodeLookupRef = useRef<{
+    code: string;
+    found: { product: any; incomplete: boolean; barcode: string } | null;
+  } | null>(null);
   useEffect(() => {
-    if (!barcodeQuery) { setBarcodeFood(null); setBarcodeLoading(false); return; }
+    if (!barcodeQuery) {
+      setBarcodeFound(null);
+      setBarcodeLoading(false);
+      return;
+    }
+    if (!BARCODE_LENGTHS.has(barcodeQuery.length)) {
+      setBarcodeFound(null);
+      setBarcodeLoading(false);
+      return;
+    }
+    const remembered = lastBarcodeLookupRef.current;
+    if (remembered && remembered.code === barcodeQuery) {
+      setBarcodeFound(remembered.found);
+      setBarcodeLoading(false);
+      return;
+    }
     let cancelled = false;
     setBarcodeLoading(true);
-    searchByBarcode(barcodeQuery)
-      .then(p => { if (!cancelled) setBarcodeFood(p ? productToFoodItem(p) : null); })
-      .catch(() => { if (!cancelled) setBarcodeFood(null); })
-      .finally(() => { if (!cancelled) setBarcodeLoading(false); });
-    return () => { cancelled = true; };
+    lookupBarcode(barcodeQuery)
+      .then((res) => {
+        if (cancelled) return;
+        const found = res.hit
+          ? {
+              product: productToFoodItem(res.hit.product),
+              incomplete: res.hit.incomplete,
+              barcode: res.barcode || barcodeQuery,
+            }
+          : null;
+        lastBarcodeLookupRef.current = { code: barcodeQuery, found };
+        setBarcodeFound(found);
+      })
+      .catch(() => {
+        if (!cancelled) setBarcodeFound(null);
+      })
+      .finally(() => {
+        if (!cancelled) setBarcodeLoading(false);
+      });
+    return () => {
+      cancelled = true;
+    };
   }, [barcodeQuery]);
 
   useEffect(() => {
     const q = query;
-    if (!q || q.length < 2 || isBarcodeQuery(q)) { setRetailResults([]); return; }
+    if (!q || q.length < 2 || isBarcodeQuery(q)) {
+      setRetailResults([]);
+      return;
+    }
     let cancelled = false;
     setIsSearchingRetail(true);
     // 24 = 3 сети × 8 позиций: раньше забирали 9 суммарно, поэтому
     // «супермаркеты» выглядели почти пустыми.
-    searchRetailProducts(q, RETAIL_RESULT_LIMIT).then(res => {
-      if (cancelled) return;
-      setRetailAvailable(res.available);
-      setRetailResults(res.available ? res.items.slice(0, RETAIL_RESULT_LIMIT) : []);
-    }).catch(() => { if (!cancelled) { setRetailAvailable(false); setRetailResults([]); } }).finally(() => { if (!cancelled) setIsSearchingRetail(false); });
-    return () => { cancelled = true; };
+    searchRetailProducts(q, RETAIL_RESULT_LIMIT)
+      .then((res) => {
+        if (cancelled) return;
+        setRetailAvailable(res.available);
+        setRetailResults(res.available ? res.items.slice(0, RETAIL_RESULT_LIMIT) : []);
+      })
+      .catch(() => {
+        if (!cancelled) {
+          setRetailAvailable(false);
+          setRetailResults([]);
+        }
+      })
+      .finally(() => {
+        if (!cancelled) setIsSearchingRetail(false);
+      });
+    return () => {
+      cancelled = true;
+    };
   }, [query]);
 
   // После распознавания очередь продуктов должна быть видна сразу.
@@ -418,7 +586,11 @@ export const AddFoodPanel: React.FC<AddFoodPanelProps> = ({
     if (prev === 0 && parsedItems.length > 0 && !hasQuery) {
       const el = queueRef.current;
       if (el && typeof el.scrollIntoView === 'function') {
-        try { el.scrollIntoView({ block: 'start', behavior: 'smooth' }); } catch { /* WebView без options */ }
+        try {
+          el.scrollIntoView({ block: 'start', behavior: 'smooth' });
+        } catch {
+          /* WebView без options */
+        }
       }
     }
   }, [parsedItems.length, hasQuery]);
@@ -428,7 +600,11 @@ export const AddFoodPanel: React.FC<AddFoodPanelProps> = ({
     if (!showOCR) return;
     const el = ocrPanelRef.current;
     if (el && typeof el.scrollIntoView === 'function') {
-      try { el.scrollIntoView({ block: 'start', behavior: 'smooth' }); } catch { /* WebView без options */ }
+      try {
+        el.scrollIntoView({ block: 'start', behavior: 'smooth' });
+      } catch {
+        /* WebView без options */
+      }
     }
   }, [showOCR]);
 
@@ -444,9 +620,14 @@ export const AddFoodPanel: React.FC<AddFoodPanelProps> = ({
     setEditingIdx(idx);
     setEditName(item.name || '');
     // qty в старых записях — строка «250 г», в новых — число граммов.
-    const rawQty = typeof item.qty === 'number'
-      ? item.qty
-      : Number(String(item.qty ?? '').match(/(\d+(?:[.,]\d+)?)/)?.[1]?.replace(',', '.'));
+    const rawQty =
+      typeof item.qty === 'number'
+        ? item.qty
+        : Number(
+            String(item.qty ?? '')
+              .match(/(\d+(?:[.,]\d+)?)/)?.[1]
+              ?.replace(',', '.'),
+          );
     setEditQty(Number.isFinite(rawQty) && rawQty > 0 ? rawQty : 100);
     setEditKcal(Math.round(item.kcal || 0));
     setEditP(Math.round((item.p || 0) * 10) / 10);
@@ -471,44 +652,95 @@ export const AddFoodPanel: React.FC<AddFoodPanelProps> = ({
   // показываем одну и ту же позицию дважды (в интернете прячем совпадения по имени).
   const internetUnique = useMemo(() => {
     const taken = new Set<string>();
-    for (const f of foodSearchResults) taken.add(String(f.name || '').toLowerCase().replace(/ё/g, 'е').trim());
-    for (const p of retailResults) taken.add(String(p.name || '').toLowerCase().replace(/ё/g, 'е').trim());
-    return internetResults.filter(f => {
-      const key = String(f.name || '').toLowerCase().replace(/ё/g, 'е').trim();
+    for (const f of foodSearchResults)
+      taken.add(
+        String(f.name || '')
+          .toLowerCase()
+          .replace(/ё/g, 'е')
+          .trim(),
+      );
+    for (const p of retailResults)
+      taken.add(
+        String(p.name || '')
+          .toLowerCase()
+          .replace(/ё/g, 'е')
+          .trim(),
+      );
+    return internetResults.filter((f) => {
+      const key = String(f.name || '')
+        .toLowerCase()
+        .replace(/ё/g, 'е')
+        .trim();
       return key ? !taken.has(key) : true;
     });
   }, [foodSearchResults, retailResults, internetResults]);
 
   const totalFound = foodSearchResults.length + retailResults.length + internetUnique.length;
-  const showEmpty = hasQuery && query.length >= 2 && !barcodeQuery && totalFound === 0 && !isSearchingNet && !isSearchingRetail;
+  const showEmpty =
+    hasQuery && query.length >= 2 && !barcodeQuery && totalFound === 0 && !isSearchingNet && !isSearchingRetail;
 
   // ── Общие стили строк результата ─────────────────────────────────────────
   const rowStyle: React.CSSProperties = {
-    padding: '12px 12px', borderRadius: 12, color: '#fff', display: 'flex',
-    alignItems: 'center', gap: 8, minHeight: 64, background: 'rgba(255,255,255,0.02)',
+    padding: '12px 12px',
+    borderRadius: 12,
+    color: '#fff',
+    display: 'flex',
+    alignItems: 'center',
+    gap: 8,
+    minHeight: 64,
+    background: 'rgba(255,255,255,0.02)',
     border: '1px solid rgba(255,255,255,0.04)',
   };
   const nameStyle: React.CSSProperties = {
-    fontSize: 12, fontWeight: 700, lineHeight: 1.3,
-    whiteSpace: 'normal', overflowWrap: 'anywhere', wordBreak: 'break-word',
+    fontSize: 12,
+    fontWeight: 700,
+    lineHeight: 1.3,
+    whiteSpace: 'normal',
+    overflowWrap: 'anywhere',
+    wordBreak: 'break-word',
   };
   const metaStyle: React.CSSProperties = {
-    display: 'flex', flexWrap: 'wrap', gap: '2px 8px', fontSize: 9,
-    color: 'rgba(255,255,255,0.65)', marginTop: 3, fontVariantNumeric: 'tabular-nums',
+    display: 'flex',
+    flexWrap: 'wrap',
+    gap: '2px 8px',
+    fontSize: 9,
+    color: 'rgba(255,255,255,0.65)',
+    marginTop: 3,
+    fontVariantNumeric: 'tabular-nums',
   };
   const addBtnStyle: React.CSSProperties = {
-    padding: '8px 10px', borderRadius: 12, border: '1px solid rgba(255,255,255,0.12)',
-    background: 'rgba(255,255,255,0.07)', color: '#fff', fontSize: 18,
-    cursor: 'pointer', minHeight: 48, minWidth: 52, flexShrink: 0,
+    padding: '8px 10px',
+    borderRadius: 12,
+    border: '1px solid rgba(255,255,255,0.12)',
+    background: 'rgba(255,255,255,0.07)',
+    color: '#fff',
+    fontSize: 18,
+    cursor: 'pointer',
+    minHeight: 48,
+    minWidth: 52,
+    flexShrink: 0,
   };
   const nowBtnStyle: React.CSSProperties = {
-    padding: '8px 10px', borderRadius: 12, border: 'none',
-    background: 'linear-gradient(135deg,#00e68a,#00c8a0)', color: '#000',
-    fontSize: 12, fontWeight: 800, cursor: 'pointer', minHeight: 48, flexShrink: 0,
+    padding: '8px 10px',
+    borderRadius: 12,
+    border: 'none',
+    background: 'linear-gradient(135deg,#00e68a,#00c8a0)',
+    color: '#000',
+    fontSize: 12,
+    fontWeight: 800,
+    cursor: 'pointer',
+    minHeight: 48,
+    flexShrink: 0,
   };
   const sectionHead = (color: string): React.CSSProperties => ({
-    fontSize: 11, fontWeight: 800, color, marginBottom: 6, display: 'flex',
-    alignItems: 'center', gap: 6, flexWrap: 'wrap',
+    fontSize: 11,
+    fontWeight: 800,
+    color,
+    marginBottom: 6,
+    display: 'flex',
+    alignItems: 'center',
+    gap: 6,
+    flexWrap: 'wrap',
   });
 
   const macros = (kcal: number, p: number, f: number, c: number) => (
@@ -521,101 +753,330 @@ export const AddFoodPanel: React.FC<AddFoodPanelProps> = ({
   );
 
   return (
-    <div className="nd-add" style={{ flex: 1, minHeight: 0, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
+    <div
+      className="nd-add"
+      style={{ flex: 1, minHeight: 0, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}
+    >
       {/* ── Верх: поиск и приём пищи. Не скроллится — всегда под рукой. ── */}
-      <div className="nd-add-top" style={{ flexShrink: 0, padding: '10px 12px 8px', background: '#141417', borderBottom: '1px solid rgba(255,255,255,0.07)' }}>
+      <div
+        className="nd-add-top"
+        style={{
+          flexShrink: 0,
+          padding: '10px 12px 8px',
+          background: '#141417',
+          borderBottom: '1px solid rgba(255,255,255,0.07)',
+        }}
+      >
         <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
-          <input type="text" value={foodSearch} onChange={e => onFoodSearchChange(e.target.value)}
-            onKeyDown={e => { if (e.key === 'Enter') { (e.currentTarget as HTMLInputElement).blur(); } }}
-            aria-label="Поиск продуктов" placeholder="🔍 Продукт или бренд: Простоквашино, ВкусВилл…"
-            className="nd-search-input" inputMode="search" enterKeyHint="search"
-            autoComplete="off" autoCorrect="off" autoCapitalize="none" spellCheck={false}
-            style={{ flex: 1, padding: '12px 14px', borderRadius: 12, background: '#202023',
-              border: '1px solid rgba(255,255,255,0.07)', color: '#fff', fontSize: 16, boxSizing: 'border-box',
-              outline: 'none', minHeight: 48 }} />
-          {foodSearch && <button onClick={() => onFoodSearchChange('')} aria-label="Очистить поиск" className="nd-search-clear" style={{ width: 44, height: 48, borderRadius: 12, border: '1px solid rgba(255,255,255,0.08)', background: 'rgba(255,255,255,0.04)', color: '#fff', cursor: 'pointer', fontSize: 14, flexShrink: 0 }}>✕</button>}
+          <input
+            type="text"
+            value={foodSearch}
+            onChange={(e) => onFoodSearchChange(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter') {
+                (e.currentTarget as HTMLInputElement).blur();
+              }
+            }}
+            aria-label="Поиск продуктов"
+            placeholder="🔍 Продукт или бренд: Простоквашино, ВкусВилл…"
+            className="nd-search-input"
+            inputMode="search"
+            enterKeyHint="search"
+            autoComplete="off"
+            autoCorrect="off"
+            autoCapitalize="none"
+            spellCheck={false}
+            style={{
+              flex: 1,
+              padding: '12px 14px',
+              borderRadius: 12,
+              background: '#202023',
+              border: '1px solid rgba(255,255,255,0.07)',
+              color: '#fff',
+              fontSize: 16,
+              boxSizing: 'border-box',
+              outline: 'none',
+              minHeight: 48,
+            }}
+          />
+          {foodSearch && (
+            <button
+              onClick={() => onFoodSearchChange('')}
+              aria-label="Очистить поиск"
+              className="nd-search-clear"
+              style={{
+                width: 44,
+                height: 48,
+                borderRadius: 12,
+                border: '1px solid rgba(255,255,255,0.08)',
+                background: 'rgba(255,255,255,0.04)',
+                color: '#fff',
+                cursor: 'pointer',
+                fontSize: 14,
+                flexShrink: 0,
+              }}
+            >
+              ✕
+            </button>
+          )}
         </div>
 
-        <div className="nd-mealchips" style={{ display: 'flex', gap: 6, flexWrap: 'nowrap', overflowX: 'auto', marginTop: 8, paddingBottom: 4 }}>
-          <span style={{ fontSize: 9, fontWeight: 700, color: 'rgba(255,255,255,0.5)', alignSelf: 'center', flexShrink: 0 }}>Приём:</span>
-          {allMealTypes.map(mt => {
+        <div
+          className="nd-mealchips"
+          style={{ display: 'flex', gap: 6, flexWrap: 'nowrap', overflowX: 'auto', marginTop: 8, paddingBottom: 4 }}
+        >
+          <span
+            style={{ fontSize: 9, fontWeight: 700, color: 'rgba(255,255,255,0.5)', alignSelf: 'center', flexShrink: 0 }}
+          >
+            Приём:
+          </span>
+          {allMealTypes.map((mt) => {
             const isActive = mealType === mt;
-            const icon = mt.toLowerCase().includes('завтрак') ? '🌅' : mt.toLowerCase().includes('обед') ? '☀️' : mt.toLowerCase().includes('ужин') ? '🌙' : mt.toLowerCase().includes('перекус') ? '🍿' : mt.toLowerCase().includes('трениров') ? '💪' : '🍽';
+            const icon = mt.toLowerCase().includes('завтрак')
+              ? '🌅'
+              : mt.toLowerCase().includes('обед')
+                ? '☀️'
+                : mt.toLowerCase().includes('ужин')
+                  ? '🌙'
+                  : mt.toLowerCase().includes('перекус')
+                    ? '🍿'
+                    : mt.toLowerCase().includes('трениров')
+                      ? '💪'
+                      : '🍽';
             return (
-              <button key={mt} onClick={() => onMealTypeChange(isActive ? '' : mt)}
-                aria-label={`Приём: ${mt}`} aria-pressed={isActive} data-active={isActive} className="nd-mealchip"
-                style={{ padding: '9px 13px', borderRadius: 999, fontSize: 11, cursor: 'pointer', whiteSpace: 'nowrap', display: 'flex', alignItems: 'center', gap: 5, flexShrink: 0,
+              <button
+                key={mt}
+                onClick={() => onMealTypeChange(isActive ? '' : mt)}
+                aria-label={`Приём: ${mt}`}
+                aria-pressed={isActive}
+                data-active={isActive}
+                className="nd-mealchip"
+                style={{
+                  padding: '9px 13px',
+                  borderRadius: 999,
+                  fontSize: 11,
+                  cursor: 'pointer',
+                  whiteSpace: 'nowrap',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: 5,
+                  flexShrink: 0,
                   background: isActive ? 'linear-gradient(135deg,#00e68a,#00c8a0)' : '#202023',
                   border: isActive ? '1px solid #00e68a' : '1px solid rgba(255,255,255,0.07)',
-                  color: isActive ? '#000' : '#fff', fontWeight: isActive ? 800 : 500,
-                  minHeight: 40 }}>
+                  color: isActive ? '#000' : '#fff',
+                  fontWeight: isActive ? 800 : 500,
+                  minHeight: 40,
+                }}
+              >
                 <span style={{ fontSize: 11 }}>{icon}</span> {mt}
               </button>
             );
           })}
-          <button onClick={() => setCustomMealOpen(v => !v)} aria-label={customMealOpen ? 'Скрыть новый приём' : 'Новый приём пищи'}
+          <button
+            onClick={() => setCustomMealOpen((v) => !v)}
+            aria-label={customMealOpen ? 'Скрыть новый приём' : 'Новый приём пищи'}
             className="nd-mealchip"
-            style={{ padding: '9px 12px', borderRadius: 999, fontSize: 12, cursor: 'pointer', flexShrink: 0, minHeight: 40,
+            style={{
+              padding: '9px 12px',
+              borderRadius: 999,
+              fontSize: 12,
+              cursor: 'pointer',
+              flexShrink: 0,
+              minHeight: 40,
               background: customMealOpen ? 'rgba(139,92,246,0.16)' : 'rgba(255,255,255,0.04)',
               border: `1px solid ${customMealOpen ? 'rgba(139,92,246,0.35)' : 'rgba(255,255,255,0.08)'}`,
-              color: customMealOpen ? '#a78bfa' : 'rgba(255,255,255,0.75)' }}>
+              color: customMealOpen ? '#a78bfa' : 'rgba(255,255,255,0.75)',
+            }}
+          >
             {customMealOpen ? '✕' : '＋ свой'}
           </button>
         </div>
 
         {customMealOpen && (
           <div style={{ display: 'flex', gap: 6, marginTop: 4 }}>
-            <input value={customMealInput} onChange={e => onCustomMealInputChange(e.target.value)}
-              onKeyDown={e => { if (e.key === 'Enter') onAddCustomMeal(); }}
-              placeholder="Название приёма (например: Перед сном)" aria-label="Новый тип приёма пищи"
+            <input
+              value={customMealInput}
+              onChange={(e) => onCustomMealInputChange(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter') onAddCustomMeal();
+              }}
+              placeholder="Название приёма (например: Перед сном)"
+              aria-label="Новый тип приёма пищи"
               className="nd-custommeal-input"
-              style={{ flex: 1, padding: '10px 12px', borderRadius: 10, background: '#202023', border: '1px solid rgba(255,255,255,0.07)', color: '#fff', fontSize: 16, minHeight: 44 }} />
-            <button onClick={onAddCustomMeal} aria-label="Добавить тип приёма пищи" className="nd-custommeal-add"
-              style={{ padding: '10px 14px', borderRadius: 10, border: '1px solid rgba(0,230,138,0.25)', background: 'rgba(0,230,138,0.10)', color: '#00e68a', fontSize: 13, minHeight: 44, minWidth: 44 }}>＋</button>
+              style={{
+                flex: 1,
+                padding: '10px 12px',
+                borderRadius: 10,
+                background: '#202023',
+                border: '1px solid rgba(255,255,255,0.07)',
+                color: '#fff',
+                fontSize: 16,
+                minHeight: 44,
+              }}
+            />
+            <button
+              onClick={onAddCustomMeal}
+              aria-label="Добавить тип приёма пищи"
+              className="nd-custommeal-add"
+              style={{
+                padding: '10px 14px',
+                borderRadius: 10,
+                border: '1px solid rgba(0,230,138,0.25)',
+                background: 'rgba(0,230,138,0.10)',
+                color: '#00e68a',
+                fontSize: 13,
+                minHeight: 44,
+                minWidth: 44,
+              }}
+            >
+              ＋
+            </button>
           </div>
         )}
       </div>
 
       {/* ── Скроллируемое тело: результаты/инструменты/очередь ── */}
-      <div className={`nd-add-body${hasQuery ? ' nd-add-body--search' : ''}`} style={{ flex: 1, minHeight: 0, overflowY: 'auto', WebkitOverflowScrolling: 'touch', overscrollBehavior: 'contain', padding: '10px 12px 16px', display: 'flex', flexDirection: 'column', gap: 10 }}>
-
+      <div
+        className={`nd-add-body${hasQuery ? ' nd-add-body--search' : ''}`}
+        style={{
+          flex: 1,
+          minHeight: 0,
+          overflowY: 'auto',
+          WebkitOverflowScrolling: 'touch',
+          overscrollBehavior: 'contain',
+          padding: '10px 12px 16px',
+          display: 'flex',
+          flexDirection: 'column',
+          gap: 10,
+        }}
+      >
         {/* Статус фото-распознавания, когда панель «Текст» закрыта:
             иначе ошибка/подсказка просто не видна. */}
         {!showOCR && ocrError && (
-          <div role="alert" className="nd-ocr-err nd-ocr-err-bar"
-            style={{ padding: '10px 12px', borderRadius: 12, background: 'rgba(239,68,68,0.10)', border: '1px solid rgba(239,68,68,0.30)', color: '#fca5a5', fontSize: 11, lineHeight: 1.35, display: 'flex', alignItems: 'center', gap: 8 }}>
+          <div
+            role="alert"
+            className="nd-ocr-err nd-ocr-err-bar"
+            style={{
+              padding: '10px 12px',
+              borderRadius: 12,
+              background: 'rgba(239,68,68,0.10)',
+              border: '1px solid rgba(239,68,68,0.30)',
+              color: '#fca5a5',
+              fontSize: 11,
+              lineHeight: 1.35,
+              display: 'flex',
+              alignItems: 'center',
+              gap: 8,
+            }}
+          >
             <span style={{ flex: 1, minWidth: 0 }}>{ocrError}</span>
-            <button onClick={onShowOCR} aria-label="Открыть текст" style={{ flexShrink: 0, padding: '8px 10px', borderRadius: 9, border: '1px solid rgba(239,68,68,0.30)', background: 'rgba(239,68,68,0.12)', color: '#fecaca', fontSize: 10, fontWeight: 700, cursor: 'pointer', minHeight: 36 }}>Текст</button>
+            <button
+              onClick={onShowOCR}
+              aria-label="Открыть текст"
+              style={{
+                flexShrink: 0,
+                padding: '8px 10px',
+                borderRadius: 9,
+                border: '1px solid rgba(239,68,68,0.30)',
+                background: 'rgba(239,68,68,0.12)',
+                color: '#fecaca',
+                fontSize: 10,
+                fontWeight: 700,
+                cursor: 'pointer',
+                minHeight: 36,
+              }}
+            >
+              Текст
+            </button>
           </div>
         )}
         {!showOCR && ocrHint && !ocrError && !ocrFileLoading && (
-          <div role="status" className="nd-ocr-hint nd-ocr-hint-bar"
-            style={{ padding: '10px 12px', borderRadius: 12, background: 'rgba(0,230,138,0.08)', border: '1px solid rgba(0,230,138,0.16)', color: '#86efac', fontSize: 11, lineHeight: 1.35 }}>
+          <div
+            role="status"
+            className="nd-ocr-hint nd-ocr-hint-bar"
+            style={{
+              padding: '10px 12px',
+              borderRadius: 12,
+              background: 'rgba(0,230,138,0.08)',
+              border: '1px solid rgba(0,230,138,0.16)',
+              color: '#86efac',
+              fontSize: 11,
+              lineHeight: 1.35,
+            }}
+          >
             {ocrHint}
           </div>
         )}
 
         {/* Тост «добавлено» — чтобы «＋» ощущалось как действие, а не «ничего» */}
         {lastQueued && (
-          <div role="status" aria-live="polite" className="nd-queued-toast"
-            style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '9px 12px', borderRadius: 12,
-              background: 'rgba(0,230,138,0.10)', border: '1px solid rgba(0,230,138,0.25)', color: '#86efac', fontSize: 11, fontWeight: 700 }}>
+          <div
+            role="status"
+            aria-live="polite"
+            className="nd-queued-toast"
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: 8,
+              padding: '9px 12px',
+              borderRadius: 12,
+              background: 'rgba(0,230,138,0.10)',
+              border: '1px solid rgba(0,230,138,0.25)',
+              color: '#86efac',
+              fontSize: 11,
+              fontWeight: 700,
+            }}
+          >
             <span aria-hidden>✓</span>
             <span style={{ flex: 1, minWidth: 0, overflowWrap: 'anywhere' }}>В очереди: {lastQueued}</span>
-            <button type="button" onClick={undoLastQueued} aria-label="Отменить добавление" title="Убрать из очереди"
+            <button
+              type="button"
+              onClick={undoLastQueued}
+              aria-label="Отменить добавление"
+              title="Убрать из очереди"
               className="nd-queued-undo"
-              style={{ flexShrink: 0, width: 32, height: 32, borderRadius: 8, border: '1px solid rgba(255,255,255,0.14)',
-                background: 'rgba(255,255,255,0.06)', color: 'rgba(255,255,255,0.8)', fontSize: 12, fontWeight: 800, cursor: 'pointer' }}>
+              style={{
+                flexShrink: 0,
+                width: 32,
+                height: 32,
+                borderRadius: 8,
+                border: '1px solid rgba(255,255,255,0.14)',
+                background: 'rgba(255,255,255,0.06)',
+                color: 'rgba(255,255,255,0.8)',
+                fontSize: 12,
+                fontWeight: 800,
+                cursor: 'pointer',
+              }}
+            >
               ↩
             </button>
-            <button type="button" onClick={() => {
-              const el = queueRef.current;
-              if (el && typeof el.scrollIntoView === 'function') {
-                try { el.scrollIntoView({ block: 'start', behavior: 'smooth' }); } catch { /* noop */ }
-              }
-            }} aria-label="Показать очередь" className="nd-queued-open"
-              style={{ flexShrink: 0, padding: '6px 10px', borderRadius: 8, border: '1px solid rgba(0,230,138,0.25)',
-                background: 'rgba(0,230,138,0.12)', color: '#00e68a', fontSize: 10, fontWeight: 800, cursor: 'pointer', minHeight: 32 }}>
+            <button
+              type="button"
+              onClick={() => {
+                const el = queueRef.current;
+                if (el && typeof el.scrollIntoView === 'function') {
+                  try {
+                    el.scrollIntoView({ block: 'start', behavior: 'smooth' });
+                  } catch {
+                    /* noop */
+                  }
+                }
+              }}
+              aria-label="Показать очередь"
+              className="nd-queued-open"
+              style={{
+                flexShrink: 0,
+                padding: '6px 10px',
+                borderRadius: 8,
+                border: '1px solid rgba(0,230,138,0.25)',
+                background: 'rgba(0,230,138,0.12)',
+                color: '#00e68a',
+                fontSize: 10,
+                fontWeight: 800,
+                cursor: 'pointer',
+                minHeight: 32,
+              }}
+            >
               {parsedItems.length} поз. ↓
             </button>
           </div>
@@ -625,33 +1086,117 @@ export const AddFoodPanel: React.FC<AddFoodPanelProps> = ({
             при активном поиске — ниже результатов (CSS order), чтобы выдача
             не «прыгала» после каждого «＋». */}
         {parsedItems.length > 0 && (
-          <div ref={queueRef} className="nd-queue" style={{ padding: 12, borderRadius: 16, background: 'rgba(0,230,138,0.05)', border: '1px solid rgba(0,230,138,0.18)', scrollMarginTop: 8 }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 8, marginBottom: 8 }}>
-              <span style={{ fontSize: 12, color: '#00e68a', fontWeight: 800 }}>📋 На очереди ({parsedItems.length})</span>
-              <span style={{ marginLeft: 'auto', fontSize: 10, color: 'rgba(255,255,255,0.7)', fontVariantNumeric: 'tabular-nums' }}>{queueKcal} ккал</span>
-              <span style={{ fontSize: 9, fontWeight: 700, padding: '3px 8px', borderRadius: 999, background: 'rgba(0,230,138,0.10)', color: '#00e68a', border: '1px solid rgba(0,230,138,0.18)' }}>{mealType || 'Приём пищи'}</span>
+          <div
+            ref={queueRef}
+            className="nd-queue"
+            style={{
+              padding: 12,
+              borderRadius: 16,
+              background: 'rgba(0,230,138,0.05)',
+              border: '1px solid rgba(0,230,138,0.18)',
+              scrollMarginTop: 8,
+            }}
+          >
+            <div
+              style={{
+                display: 'flex',
+                justifyContent: 'space-between',
+                alignItems: 'center',
+                gap: 8,
+                marginBottom: 8,
+              }}
+            >
+              <span style={{ fontSize: 12, color: '#00e68a', fontWeight: 800 }}>
+                📋 На очереди ({parsedItems.length})
+              </span>
+              <span
+                style={{
+                  marginLeft: 'auto',
+                  fontSize: 10,
+                  color: 'rgba(255,255,255,0.7)',
+                  fontVariantNumeric: 'tabular-nums',
+                }}
+              >
+                {queueKcal} ккал
+              </span>
+              <span
+                style={{
+                  fontSize: 9,
+                  fontWeight: 700,
+                  padding: '3px 8px',
+                  borderRadius: 999,
+                  background: 'rgba(0,230,138,0.10)',
+                  color: '#00e68a',
+                  border: '1px solid rgba(0,230,138,0.18)',
+                }}
+              >
+                {mealType || 'Приём пищи'}
+              </span>
               {onClearQueue && (
-                <button onClick={() => { setEditingIdx(-1); onClearQueue(); }} aria-label="Очистить очередь" title="Очистить очередь"
-                  style={{ width: 32, height: 32, borderRadius: 9, border: '1px solid rgba(239,68,68,0.25)', background: 'rgba(239,68,68,0.10)', color: '#f87171', fontSize: 12, cursor: 'pointer', flexShrink: 0 }}>🗑</button>
+                <button
+                  onClick={() => {
+                    setEditingIdx(-1);
+                    onClearQueue();
+                  }}
+                  aria-label="Очистить очередь"
+                  title="Очистить очередь"
+                  style={{
+                    width: 32,
+                    height: 32,
+                    borderRadius: 9,
+                    border: '1px solid rgba(239,68,68,0.25)',
+                    background: 'rgba(239,68,68,0.10)',
+                    color: '#f87171',
+                    fontSize: 12,
+                    cursor: 'pointer',
+                    flexShrink: 0,
+                  }}
+                >
+                  🗑
+                </button>
               )}
             </div>
 
             {parsedItems.map((item, i) => {
               const q = item.qty || 100;
-              const kcal = Math.round(item.kcal * q / 100);
-              const p = fmt((item.p || 0) * q / 100);
-              const f = fmt((item.f || 0) * q / 100);
-              const c = fmt((item.c || 0) * q / 100);
+              const kcal = Math.round((item.kcal * q) / 100);
+              const p = fmt(((item.p || 0) * q) / 100);
+              const f = fmt(((item.f || 0) * q) / 100);
+              const c = fmt(((item.c || 0) * q) / 100);
               const isLowConf = typeof item.confidence === 'number' && item.confidence < 0.5;
               const isEditing = editingIdx === i;
 
               return (
-                <div key={i} className="nd-queueitem" style={{ padding: '10px 12px', borderRadius: 12, background: isEditing ? 'rgba(245,158,11,0.06)' : '#202023', border: `1px solid ${isEditing ? 'rgba(245,158,11,0.25)' : 'rgba(255,255,255,0.06)'}`, marginBottom: 6 }}>
+                <div
+                  key={i}
+                  className="nd-queueitem"
+                  style={{
+                    padding: '10px 12px',
+                    borderRadius: 12,
+                    background: isEditing ? 'rgba(245,158,11,0.06)' : '#202023',
+                    border: `1px solid ${isEditing ? 'rgba(245,158,11,0.25)' : 'rgba(255,255,255,0.06)'}`,
+                    marginBottom: 6,
+                  }}
+                >
                   {isEditing ? (
                     <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-                      <input value={editName} onChange={e => setEditName(e.target.value)} placeholder="Название"
-                        aria-label="Название блюда" className="nd-qedit-name"
-                        style={{ width: '100%', padding: '8px 10px', borderRadius: 8, background: '#18181b', border: '1px solid rgba(255,255,255,0.06)', color: '#fff', fontSize: 16, minHeight: 44 }} />
+                      <input
+                        value={editName}
+                        onChange={(e) => setEditName(e.target.value)}
+                        placeholder="Название"
+                        aria-label="Название блюда"
+                        className="nd-qedit-name"
+                        style={{
+                          width: '100%',
+                          padding: '8px 10px',
+                          borderRadius: 8,
+                          background: '#18181b',
+                          border: '1px solid rgba(255,255,255,0.06)',
+                          color: '#fff',
+                          fontSize: 16,
+                          minHeight: 44,
+                        }}
+                      />
                       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(5, 1fr)', gap: 4 }}>
                         {[
                           { l: 'г', v: editQty, f: setEditQty },
@@ -661,75 +1206,264 @@ export const AddFoodPanel: React.FC<AddFoodPanelProps> = ({
                           { l: 'У', v: editC, f: setEditC },
                         ].map((x, xi) => (
                           <div key={xi}>
-                            <label style={{ fontSize: 8, color: 'rgba(255,255,255,0.6)', marginBottom: 1, display: 'block' }}>{x.l}</label>
-                            <input type="number" value={x.v} onChange={e => x.f(Number.parseFloat(e.target.value) || 0)}
-                              aria-label={x.l} className="nd-qedit-num"
-                              style={{ width: '100%', padding: '6px', borderRadius: 6, background: '#18181b', border: '1px solid rgba(255,255,255,0.06)', color: '#fff', fontSize: 16, minHeight: 44, boxSizing: 'border-box' }} />
+                            <label
+                              style={{ fontSize: 8, color: 'rgba(255,255,255,0.6)', marginBottom: 1, display: 'block' }}
+                            >
+                              {x.l}
+                            </label>
+                            <input
+                              type="number"
+                              value={x.v}
+                              onChange={(e) => x.f(Number.parseFloat(e.target.value) || 0)}
+                              aria-label={x.l}
+                              className="nd-qedit-num"
+                              style={{
+                                width: '100%',
+                                padding: '6px',
+                                borderRadius: 6,
+                                background: '#18181b',
+                                border: '1px solid rgba(255,255,255,0.06)',
+                                color: '#fff',
+                                fontSize: 16,
+                                minHeight: 44,
+                                boxSizing: 'border-box',
+                              }}
+                            />
                           </div>
                         ))}
                       </div>
                       <div style={{ display: 'flex', gap: 6, marginTop: 4 }}>
-                        <button onClick={saveEdit} aria-label="Сохранить правку" className="nd-qedit-save" style={{ flex: 1, padding: '8px', borderRadius: 8, border: 'none', cursor: 'pointer', background: 'linear-gradient(135deg,#00e68a,#00c8a0)', color: '#000', fontWeight: 700, fontSize: 12, minHeight: 44 }}>✓</button>
-                        <button onClick={() => setEditingIdx(-1)} aria-label="Отменить правку" className="nd-qedit-cancel" style={{ flex: 1, padding: '8px', borderRadius: 8, border: '1px solid rgba(255,255,255,0.08)', background: '#18181b', color: 'rgba(255,255,255,0.7)', fontSize: 12, minHeight: 44 }}>✕</button>
+                        <button
+                          onClick={saveEdit}
+                          aria-label="Сохранить правку"
+                          className="nd-qedit-save"
+                          style={{
+                            flex: 1,
+                            padding: '8px',
+                            borderRadius: 8,
+                            border: 'none',
+                            cursor: 'pointer',
+                            background: 'linear-gradient(135deg,#00e68a,#00c8a0)',
+                            color: '#000',
+                            fontWeight: 700,
+                            fontSize: 12,
+                            minHeight: 44,
+                          }}
+                        >
+                          ✓
+                        </button>
+                        <button
+                          onClick={() => setEditingIdx(-1)}
+                          aria-label="Отменить правку"
+                          className="nd-qedit-cancel"
+                          style={{
+                            flex: 1,
+                            padding: '8px',
+                            borderRadius: 8,
+                            border: '1px solid rgba(255,255,255,0.08)',
+                            background: '#18181b',
+                            color: 'rgba(255,255,255,0.7)',
+                            fontSize: 12,
+                            minHeight: 44,
+                          }}
+                        >
+                          ✕
+                        </button>
                       </div>
                     </div>
                   ) : (
                     <>
-                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 8, marginBottom: 6 }}>
+                      <div
+                        style={{
+                          display: 'flex',
+                          justifyContent: 'space-between',
+                          alignItems: 'flex-start',
+                          gap: 8,
+                          marginBottom: 6,
+                        }}
+                      >
                         <div style={{ display: 'flex', alignItems: 'center', gap: 6, minWidth: 0, flexWrap: 'wrap' }}>
-                          <span style={{ fontSize: 12, fontWeight: 700, color: '#fff', lineHeight: 1.3, overflowWrap: 'anywhere', cursor: isLowConf ? 'pointer' : 'default', textDecoration: isLowConf ? 'underline dotted' : 'none' }} onClick={() => isLowConf && startEdit(i, item)}>{item.name}</span>
+                          <span
+                            style={{
+                              fontSize: 12,
+                              fontWeight: 700,
+                              color: '#fff',
+                              lineHeight: 1.3,
+                              overflowWrap: 'anywhere',
+                              cursor: isLowConf ? 'pointer' : 'default',
+                              textDecoration: isLowConf ? 'underline dotted' : 'none',
+                            }}
+                            onClick={() => isLowConf && startEdit(i, item)}
+                          >
+                            {item.name}
+                          </span>
                           {item.recipe && (
-                            <span style={{ fontSize: 9, color: '#fbbf24', fontWeight: 700, background: 'rgba(245,158,11,0.12)', padding: '2px 6px', borderRadius: 6 }}>
+                            <span
+                              style={{
+                                fontSize: 9,
+                                color: '#fbbf24',
+                                fontWeight: 700,
+                                background: 'rgba(245,158,11,0.12)',
+                                padding: '2px 6px',
+                                borderRadius: 6,
+                              }}
+                            >
                               🍲 рецепт · {item.recipe.components?.length || 0} прод.
                             </span>
                           )}
                           {isLowConf && (
-                            <span onClick={() => startEdit(i, item)} style={{ fontSize: 9, color: '#f59e0b', fontWeight: 700, background: 'rgba(245,158,11,0.12)', padding: '2px 6px', borderRadius: 6, cursor: 'pointer' }}>⚠ проверьте</span>
+                            <span
+                              onClick={() => startEdit(i, item)}
+                              style={{
+                                fontSize: 9,
+                                color: '#f59e0b',
+                                fontWeight: 700,
+                                background: 'rgba(245,158,11,0.12)',
+                                padding: '2px 6px',
+                                borderRadius: 6,
+                                cursor: 'pointer',
+                              }}
+                            >
+                              ⚠ проверьте
+                            </span>
                           )}
                         </div>
                         <div style={{ display: 'flex', alignItems: 'center', gap: 4, flexShrink: 0 }}>
                           {!isLowConf && (
-                            <button onClick={() => startEdit(i, item)} aria-label="Изменить"
-                              style={{ padding: '4px 8px', borderRadius: 8, border: 'none', cursor: 'pointer',
-                                background: 'rgba(59,130,246,0.12)', color: '#3b82f6', fontSize: 12, minHeight: 44, minWidth: 44 }}>
+                            <button
+                              onClick={() => startEdit(i, item)}
+                              aria-label="Изменить"
+                              style={{
+                                padding: '4px 8px',
+                                borderRadius: 8,
+                                border: 'none',
+                                cursor: 'pointer',
+                                background: 'rgba(59,130,246,0.12)',
+                                color: '#3b82f6',
+                                fontSize: 12,
+                                minHeight: 44,
+                                minWidth: 44,
+                              }}
+                            >
                               ✎
                             </button>
                           )}
-                          <button onClick={() => onRemoveParsedItem(i)} aria-label="Удалить"
-                            style={{ padding: '4px 8px', borderRadius: 8, border: 'none', cursor: 'pointer',
-                              background: 'rgba(239,68,68,0.12)', color: '#ef4444', fontSize: 12, minHeight: 44, minWidth: 44 }}>
+                          <button
+                            onClick={() => onRemoveParsedItem(i)}
+                            aria-label="Удалить"
+                            style={{
+                              padding: '4px 8px',
+                              borderRadius: 8,
+                              border: 'none',
+                              cursor: 'pointer',
+                              background: 'rgba(239,68,68,0.12)',
+                              color: '#ef4444',
+                              fontSize: 12,
+                              minHeight: 44,
+                              minWidth: 44,
+                            }}
+                          >
                             ✕
                           </button>
                         </div>
                       </div>
-                      <div className="nd-qtyrow" style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: 4, background: '#18181b', borderRadius: 10, padding: '2px 4px' }}>
-                          <button onClick={() => onUpdateParsedItemQty(i, clampItemGrams(q - 10))} aria-label="Уменьшить"
+                      <div
+                        className="nd-qtyrow"
+                        style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}
+                      >
+                        <div
+                          style={{
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: 4,
+                            background: '#18181b',
+                            borderRadius: 10,
+                            padding: '2px 4px',
+                          }}
+                        >
+                          <button
+                            onClick={() => onUpdateParsedItemQty(i, clampItemGrams(q - 10))}
+                            aria-label="Уменьшить"
                             className="nd-qtybtn"
-                            style={{ width: 44, height: 44, borderRadius: 10, border: 'none', background: 'rgba(255,255,255,0.06)',
-                              color: '#fff', cursor: 'pointer', fontSize: 16, fontWeight: 600, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                            style={{
+                              width: 44,
+                              height: 44,
+                              borderRadius: 10,
+                              border: 'none',
+                              background: 'rgba(255,255,255,0.06)',
+                              color: '#fff',
+                              cursor: 'pointer',
+                              fontSize: 16,
+                              fontWeight: 600,
+                              display: 'flex',
+                              alignItems: 'center',
+                              justifyContent: 'center',
+                            }}
+                          >
                             −
                           </button>
-                          <button onClick={() => startEdit(i, item)} aria-label={`Изменить количество: ${q} г`}
+                          <button
+                            onClick={() => startEdit(i, item)}
+                            aria-label={`Изменить количество: ${q} г`}
                             className="nd-qtyval"
-                            style={{ minWidth: 52, height: 44, borderRadius: 10, border: 'none', background: 'transparent',
-                              color: '#fff', cursor: 'pointer', fontSize: 14, fontWeight: 700, fontVariantNumeric: 'tabular-nums', padding: 0 }}>
+                            style={{
+                              minWidth: 52,
+                              height: 44,
+                              borderRadius: 10,
+                              border: 'none',
+                              background: 'transparent',
+                              color: '#fff',
+                              cursor: 'pointer',
+                              fontSize: 14,
+                              fontWeight: 700,
+                              fontVariantNumeric: 'tabular-nums',
+                              padding: 0,
+                            }}
+                          >
                             {q}г
                           </button>
-                          <button onClick={() => onUpdateParsedItemQty(i, clampItemGrams(q + 10))} aria-label="Увеличить"
+                          <button
+                            onClick={() => onUpdateParsedItemQty(i, clampItemGrams(q + 10))}
+                            aria-label="Увеличить"
                             className="nd-qtybtn"
-                            style={{ width: 44, height: 44, borderRadius: 10, border: 'none', background: 'rgba(255,255,255,0.06)',
-                              color: '#fff', cursor: 'pointer', fontSize: 16, fontWeight: 600, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                            style={{
+                              width: 44,
+                              height: 44,
+                              borderRadius: 10,
+                              border: 'none',
+                              background: 'rgba(255,255,255,0.06)',
+                              color: '#fff',
+                              cursor: 'pointer',
+                              fontSize: 16,
+                              fontWeight: 600,
+                              display: 'flex',
+                              alignItems: 'center',
+                              justifyContent: 'center',
+                            }}
+                          >
                             +
                           </button>
                         </div>
                         <div style={{ display: 'flex', gap: 4, marginLeft: 'auto', flexWrap: 'wrap' }}>
-                          {[50, 100, 200, 300].map(v => (
-                            <button key={v} onClick={() => onUpdateParsedItemQty(i, v)} aria-label={`${v} грамм`} aria-pressed={q === v} className="nd-qpreset"
-                              style={{ padding: '4px 10px', borderRadius: 8, border: '1px solid rgba(255,255,255,0.06)',
+                          {[50, 100, 200, 300].map((v) => (
+                            <button
+                              key={v}
+                              onClick={() => onUpdateParsedItemQty(i, v)}
+                              aria-label={`${v} грамм`}
+                              aria-pressed={q === v}
+                              className="nd-qpreset"
+                              style={{
+                                padding: '4px 10px',
+                                borderRadius: 8,
+                                border: '1px solid rgba(255,255,255,0.06)',
                                 background: q === v ? 'rgba(0,230,138,0.12)' : '#18181b',
-                                color: q === v ? '#00e68a' : 'rgba(255,255,255,0.7)', cursor: 'pointer',
-                                fontSize: 11, fontWeight: q === v ? 700 : 400, minHeight: 44 }}>
+                                color: q === v ? '#00e68a' : 'rgba(255,255,255,0.7)',
+                                cursor: 'pointer',
+                                fontSize: 11,
+                                fontWeight: q === v ? 700 : 400,
+                                minHeight: 44,
+                              }}
+                            >
                               {v}г
                             </button>
                           ))}
@@ -755,25 +1489,69 @@ export const AddFoodPanel: React.FC<AddFoodPanelProps> = ({
             })}
 
             <div style={{ display: 'flex', gap: 8, marginTop: 8, flexWrap: 'wrap' }}>
-              {parsedItems.some(item => typeof item.confidence === 'number' && item.confidence < 0.5) && onFixAllLowConfidence && (
-                <button onClick={onFixAllLowConfidence} aria-label="Исправить все"
-                  style={{ flex: 1, minWidth: 130, padding: '10px', borderRadius: 10, border: '1px solid rgba(245,158,11,0.25)',
-                    background: 'rgba(245,158,11,0.06)', color: '#fbbf24', cursor: 'pointer', fontSize: 12, fontWeight: 700, minHeight: 44 }}>
-                  ⚡ Исправить все ({parsedItems.filter(item => typeof item.confidence === 'number' && item.confidence < 0.5).length})
-                </button>
-              )}
-              <button onClick={onFillMicros} aria-label="Микронутриенты"
-                style={{ flex: 1, minWidth: 130, padding: '10px', borderRadius: 10, border: '1px solid rgba(34,197,94,0.2)',
-                  background: 'rgba(34,197,94,0.06)', color: '#86efac', cursor: 'pointer', fontSize: 12, fontWeight: 700, minHeight: 44 }}>
+              {parsedItems.some((item) => typeof item.confidence === 'number' && item.confidence < 0.5) &&
+                onFixAllLowConfidence && (
+                  <button
+                    onClick={onFixAllLowConfidence}
+                    aria-label="Исправить все"
+                    style={{
+                      flex: 1,
+                      minWidth: 130,
+                      padding: '10px',
+                      borderRadius: 10,
+                      border: '1px solid rgba(245,158,11,0.25)',
+                      background: 'rgba(245,158,11,0.06)',
+                      color: '#fbbf24',
+                      cursor: 'pointer',
+                      fontSize: 12,
+                      fontWeight: 700,
+                      minHeight: 44,
+                    }}
+                  >
+                    ⚡ Исправить все (
+                    {parsedItems.filter((item) => typeof item.confidence === 'number' && item.confidence < 0.5).length})
+                  </button>
+                )}
+              <button
+                onClick={onFillMicros}
+                aria-label="Микронутриенты"
+                style={{
+                  flex: 1,
+                  minWidth: 130,
+                  padding: '10px',
+                  borderRadius: 10,
+                  border: '1px solid rgba(34,197,94,0.2)',
+                  background: 'rgba(34,197,94,0.06)',
+                  color: '#86efac',
+                  cursor: 'pointer',
+                  fontSize: 12,
+                  fontWeight: 700,
+                  minHeight: 44,
+                }}
+              >
                 ✨ Микронутриенты
               </button>
             </div>
             {/* Второй «зелёный» CTA под очередью спорил с нижней строкой
                 листа: оставляем спокойную вторичную кнопку. */}
-            <button onClick={onSaveItems} aria-label="Добавить позиции в дневник" className="nd-ocr-add-inline"
-              style={{ width: '100%', marginTop: 8, padding: '10px', borderRadius: 10, cursor: 'pointer',
-                background: 'rgba(0,230,138,0.06)', border: '1px solid rgba(0,230,138,0.25)', color: '#00e68a',
-                fontWeight: 700, fontSize: 11, minHeight: 44 }}>
+            <button
+              onClick={onSaveItems}
+              aria-label="Добавить позиции в дневник"
+              className="nd-ocr-add-inline"
+              style={{
+                width: '100%',
+                marginTop: 8,
+                padding: '10px',
+                borderRadius: 10,
+                cursor: 'pointer',
+                background: 'rgba(0,230,138,0.06)',
+                border: '1px solid rgba(0,230,138,0.25)',
+                color: '#00e68a',
+                fontWeight: 700,
+                fontSize: 11,
+                minHeight: 44,
+              }}
+            >
               💾 Добавить {parsedItems.length} поз. в дневник
             </button>
           </div>
@@ -781,50 +1559,168 @@ export const AddFoodPanel: React.FC<AddFoodPanelProps> = ({
 
         {/* OCR-панель */}
         {showOCR && (
-          <div ref={ocrPanelRef} className="nd-ocr" style={{ padding: 14, borderRadius: 16, background: '#18181b', border: '1px solid rgba(255,255,255,0.06)', scrollMarginTop: 8 }}>
+          <div
+            ref={ocrPanelRef}
+            className="nd-ocr"
+            style={{
+              padding: 14,
+              borderRadius: 16,
+              background: '#18181b',
+              border: '1px solid rgba(255,255,255,0.06)',
+              scrollMarginTop: 8,
+            }}
+          >
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
-              <span style={{ fontSize: 11, color: 'rgba(255,255,255,0.85)', fontWeight: 600 }}>Скриншот из приложения калорий</span>
-              <button onClick={onOcrClose} aria-label="Закрыть OCR"
-                style={{ padding: '4px 10px', borderRadius: 8, border: 'none', cursor: 'pointer',
-                  background: 'rgba(239,68,68,0.1)', color: '#ef4444', fontSize: 10, minHeight: 32 }}>
+              <span style={{ fontSize: 11, color: 'rgba(255,255,255,0.85)', fontWeight: 600 }}>
+                Скриншот из приложения калорий
+              </span>
+              <button
+                onClick={onOcrClose}
+                aria-label="Закрыть OCR"
+                style={{
+                  padding: '4px 10px',
+                  borderRadius: 8,
+                  border: 'none',
+                  cursor: 'pointer',
+                  background: 'rgba(239,68,68,0.1)',
+                  color: '#ef4444',
+                  fontSize: 10,
+                  minHeight: 32,
+                }}
+              >
                 ✕
               </button>
             </div>
-            <textarea aria-label="Текст для распознавания" value={ocrText} onChange={e => onOcrTextChange(e.target.value)}
+            <textarea
+              aria-label="Текст для распознавания"
+              value={ocrText}
+              onChange={(e) => onOcrTextChange(e.target.value)}
               placeholder="Курица 200 г 330 ккал Б:35 Ж:7 У:0"
               className="nd-ocr-text"
-              style={{ width: '100%', minHeight: 88, padding: 12, borderRadius: 12, border: '1px solid rgba(255,255,255,0.06)',
-                background: '#202023', color: '#fff', fontSize: 16, resize: 'vertical', boxSizing: 'border-box', marginBottom: 8 }} />
-            <button onClick={onOcrSubmit} aria-label="Распознать"
-              style={{ width: '100%', padding: '10px', borderRadius: 10, border: 'none',
-                background: 'linear-gradient(135deg,#00e68a,#00c8a0)', color: '#000', fontWeight: 700,
-                fontSize: 12, cursor: 'pointer', minHeight: 44 }}>
+              style={{
+                width: '100%',
+                minHeight: 88,
+                padding: 12,
+                borderRadius: 12,
+                border: '1px solid rgba(255,255,255,0.06)',
+                background: '#202023',
+                color: '#fff',
+                fontSize: 16,
+                resize: 'vertical',
+                boxSizing: 'border-box',
+                marginBottom: 8,
+              }}
+            />
+            <button
+              onClick={onOcrSubmit}
+              aria-label="Распознать"
+              style={{
+                width: '100%',
+                padding: '10px',
+                borderRadius: 10,
+                border: 'none',
+                background: 'linear-gradient(135deg,#00e68a,#00c8a0)',
+                color: '#000',
+                fontWeight: 700,
+                fontSize: 12,
+                cursor: 'pointer',
+                minHeight: 44,
+              }}
+            >
               ✨ Распознать
             </button>
 
             {ocrFileLoading && (
-              <div role="status" aria-live="polite" className="nd-ocr-progress"
-                style={{ marginTop: 10, padding: '10px 12px', borderRadius: 12, background: 'rgba(0,230,138,0.06)', border: '1px solid rgba(0,230,138,0.18)' }}>
-                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8, fontSize: 11, fontWeight: 700, color: '#86efac' }}>
+              <div
+                role="status"
+                aria-live="polite"
+                className="nd-ocr-progress"
+                style={{
+                  marginTop: 10,
+                  padding: '10px 12px',
+                  borderRadius: 12,
+                  background: 'rgba(0,230,138,0.06)',
+                  border: '1px solid rgba(0,230,138,0.18)',
+                }}
+              >
+                <div
+                  style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'space-between',
+                    gap: 8,
+                    fontSize: 11,
+                    fontWeight: 700,
+                    color: '#86efac',
+                  }}
+                >
                   <span>Распознаю скриншот…</span>
-                  <span aria-label="Прогресс распознавания" style={{ fontVariantNumeric: 'tabular-nums', color: '#00e68a' }}>{ocrProgress > 0 ? `${Math.round(ocrProgress * 100)}%` : '—'}</span>
+                  <span
+                    aria-label="Прогресс распознавания"
+                    style={{ fontVariantNumeric: 'tabular-nums', color: '#00e68a' }}
+                  >
+                    {ocrProgress > 0 ? `${Math.round(ocrProgress * 100)}%` : '—'}
+                  </span>
                 </div>
-                <div style={{ marginTop: 8, height: 6, borderRadius: 999, background: 'rgba(255,255,255,0.10)', overflow: 'hidden' }}>
-                  <div style={{ width: `${Math.max(4, Math.min(100, Math.round(ocrProgress * 100)))}%`, height: '100%', borderRadius: 999, background: 'linear-gradient(90deg,#00e68a,#00c8a0)', transition: 'width 0.3s ease' }} />
+                <div
+                  style={{
+                    marginTop: 8,
+                    height: 6,
+                    borderRadius: 999,
+                    background: 'rgba(255,255,255,0.10)',
+                    overflow: 'hidden',
+                  }}
+                >
+                  <div
+                    style={{
+                      width: `${Math.max(4, Math.min(100, Math.round(ocrProgress * 100)))}%`,
+                      height: '100%',
+                      borderRadius: 999,
+                      background: 'linear-gradient(90deg,#00e68a,#00c8a0)',
+                      transition: 'width 0.3s ease',
+                    }}
+                  />
                 </div>
                 <div style={{ marginTop: 8, fontSize: 10, color: 'rgba(255,255,255,0.55)' }}>
-                  {ocrProgress > 0 ? 'Распознавание на устройстве…' : 'Отправляю скриншот… (первый запуск дольше обычного)'}
+                  {ocrProgress > 0
+                    ? 'Распознавание на устройстве…'
+                    : 'Отправляю скриншот… (первый запуск дольше обычного)'}
                 </div>
               </div>
             )}
 
             {ocrError && (
-              <div role="alert" className="nd-ocr-err" style={{ marginTop: 8, padding: '10px 12px', borderRadius: 12, background: 'rgba(239,68,68,0.1)', border: '1px solid rgba(239,68,68,0.3)', color: '#fca5a5', fontSize: 11, lineHeight: 1.35 }}>
+              <div
+                role="alert"
+                className="nd-ocr-err"
+                style={{
+                  marginTop: 8,
+                  padding: '10px 12px',
+                  borderRadius: 12,
+                  background: 'rgba(239,68,68,0.1)',
+                  border: '1px solid rgba(239,68,68,0.3)',
+                  color: '#fca5a5',
+                  fontSize: 11,
+                  lineHeight: 1.35,
+                }}
+              >
                 {ocrError}
               </div>
             )}
             {ocrHint && !ocrError && !ocrFileLoading && (
-              <div className="nd-ocr-hint" style={{ marginTop: 8, padding: '10px 12px', borderRadius: 12, background: 'rgba(0,230,138,0.08)', border: '1px solid rgba(0,230,138,0.15)', color: '#86efac', fontSize: 11, lineHeight: 1.35 }}>
+              <div
+                className="nd-ocr-hint"
+                style={{
+                  marginTop: 8,
+                  padding: '10px 12px',
+                  borderRadius: 12,
+                  background: 'rgba(0,230,138,0.08)',
+                  border: '1px solid rgba(0,230,138,0.15)',
+                  color: '#86efac',
+                  fontSize: 11,
+                  lineHeight: 1.35,
+                }}
+              >
                 {ocrHint}
               </div>
             )}
@@ -834,39 +1730,168 @@ export const AddFoodPanel: React.FC<AddFoodPanelProps> = ({
         {/* ── Результаты поиска (полноэкранно, без обрезки названий) ── */}
         {hasQuery && (
           <div className="nd-results" style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 10, color: 'rgba(255,255,255,0.65)' }}>
-              <span role="status" aria-live="polite">🔎 Найдено: <b style={{ color: '#fff' }}>{totalFound}</b></span>
+            <div
+              style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 10, color: 'rgba(255,255,255,0.65)' }}
+            >
+              <span role="status" aria-live="polite">
+                🔎 Найдено: <b style={{ color: '#fff' }}>{totalFound}</b>
+              </span>
               <span style={{ color: 'rgba(255,255,255,0.4)' }}>· КБЖУ на 100 г</span>
               {(isSearchingRetail || isSearchingNet) && (
                 <span style={{ display: 'inline-flex', alignItems: 'center', gap: 5, color: '#00e68a' }}>
-                  <span style={{ width: 11, height: 11, border: '2px solid rgba(0,230,138,0.3)', borderTop: '2px solid #00e68a', borderRadius: '50%', display: 'inline-block', animation: 'spin 0.8s linear infinite' }} />
+                  <span
+                    style={{
+                      width: 11,
+                      height: 11,
+                      border: '2px solid rgba(0,230,138,0.3)',
+                      borderTop: '2px solid #00e68a',
+                      borderRadius: '50%',
+                      display: 'inline-block',
+                      animation: 'spin 0.8s linear infinite',
+                    }}
+                  />
                   ищем ещё…
                 </span>
               )}
             </div>
 
             {barcodeQuery && (
-              <div className="nd-barcode-result" style={{ padding: '10px 12px', borderRadius: 12, background: 'rgba(59,130,246,0.06)', border: '1px solid rgba(59,130,246,0.16)', display: 'flex', alignItems: 'center', gap: 8 }}>
-                <span style={{ fontSize: 16, width: 24, textAlign: 'center', flexShrink: 0 }}>🔢</span>
-                {barcodeLoading ? (
-                  <span role="status" aria-live="polite" style={{ fontSize: 11, color: '#60a5fa' }}>Ищем штрихкод {barcodeQuery}…</span>
-                ) : barcodeFood ? (
-                  <>
+              <div
+                className="nd-barcode-result"
+                style={{
+                  padding: '10px 12px',
+                  borderRadius: 12,
+                  background: 'rgba(59,130,246,0.06)',
+                  border: '1px solid rgba(59,130,246,0.16)',
+                }}
+              >
+                <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                  <span style={{ fontSize: 16, width: 24, textAlign: 'center', flexShrink: 0 }}>🔢</span>
+                  {barcodeLoading ? (
+                    <span role="status" aria-live="polite" style={{ fontSize: 11, color: '#60a5fa' }}>
+                      Ищем штрихкод {barcodeQuery}…
+                    </span>
+                  ) : barcodeFound && !barcodeFound.incomplete ? (
+                    <>
+                      <div style={{ flex: 1, minWidth: 0 }}>
+                        <div style={nameStyle}>{barcodeFound.product.name}</div>
+                        <div style={{ ...metaStyle, color: 'rgba(96,165,250,0.85)' }}>штрихкод {barcodeQuery}</div>
+                        {macros(
+                          barcodeFound.product.kcal,
+                          barcodeFound.product.protein,
+                          barcodeFound.product.fat,
+                          barcodeFound.product.carbs,
+                        )}
+                      </div>
+                      {favButton(barcodeFound.product)}
+                    </>
+                  ) : barcodeFound ? (
                     <div style={{ flex: 1, minWidth: 0 }}>
-                      <div style={nameStyle}>{barcodeFood.name}</div>
-                      <div style={{ ...metaStyle, color: 'rgba(96,165,250,0.85)' }}>штрихкод {barcodeQuery}</div>
-                      {macros(barcodeFood.kcal, barcodeFood.protein, barcodeFood.fat, barcodeFood.carbs)}
+                      <div style={nameStyle}>{barcodeFound.product.name}</div>
+                      <div style={{ ...metaStyle, color: 'rgba(251,191,36,0.9)' }}>
+                        штрихкод {barcodeQuery} • найден, но без КБЖУ
+                      </div>
                     </div>
-                    <button onClick={() => openPortion(barcodeFood)} aria-label="Указать порцию" className="nd-addq"
-                      style={{ ...addBtnStyle, border: '1px solid rgba(59,130,246,0.18)', background: 'rgba(59,130,246,0.08)', color: '#60a5fa' }}>＋</button>
-                    {onDirectAdd && <button onClick={() => onDirectAdd(barcodeFood)} aria-label="Сразу в дневник" className="nd-addnow"
-                      style={{ ...nowBtnStyle, background: 'linear-gradient(135deg,#60a5fa,#3b82f6)', color: '#fff' }}>⚡ 100г</button>}
-                    {favButton(barcodeFood)}
-                  </>
-                ) : (
-                  <span style={{ fontSize: 11, color: 'rgba(255,255,255,0.6)' }}>
-                    Штрихкод {barcodeQuery} не найден в базе — попробуйте отсканировать камерой (кнопка «Штрих-код»).
-                  </span>
+                  ) : !barcodeLengthOk ? (
+                    <span className="nd-barcode-hint" style={{ fontSize: 11, color: 'rgba(251,191,36,0.9)' }}>
+                      Введите 8–14 цифр штрихкода — ищем на длинах EAN-8, UPC-A (12), EAN-13 и ITF-14.
+                    </span>
+                  ) : (
+                    <span style={{ fontSize: 11, color: 'rgba(255,255,255,0.6)' }}>
+                      Штрихкод {barcodeQuery} не найден в базе — попробуйте отсканировать камерой (кнопка «Штрих-код»).
+                    </span>
+                  )}
+                </div>
+                {!barcodeLoading && barcodeFound && !barcodeFound.incomplete && (
+                  <div style={{ display: 'flex', gap: 6, marginTop: 8 }}>
+                    <button
+                      onClick={() => queueFood(barcodeFound.product, 100)}
+                      aria-label="Добавить 100 грамм в очередь"
+                      className="nd-barcode-queue"
+                      style={{ ...nowBtnStyle, flex: 1 }}
+                    >
+                      ＋ 100 г в очередь
+                    </button>
+                    <button
+                      onClick={() => openPortion(barcodeFound.product)}
+                      aria-label="Указать порцию"
+                      className="nd-addq"
+                      style={{
+                        ...addBtnStyle,
+                        border: '1px solid rgba(59,130,246,0.18)',
+                        background: 'rgba(59,130,246,0.08)',
+                        color: '#60a5fa',
+                      }}
+                    >
+                      ⚖
+                    </button>
+                    {onDirectAdd && (
+                      <button
+                        onClick={() => onDirectAdd(barcodeFound.product)}
+                        aria-label="Сразу в дневник"
+                        className="nd-addnow"
+                        style={{ ...nowBtnStyle, background: 'linear-gradient(135deg,#60a5fa,#3b82f6)', color: '#fff' }}
+                      >
+                        ⚡
+                      </button>
+                    )}
+                  </div>
+                )}
+                {!barcodeLoading && barcodeFound && barcodeFound.incomplete && (
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 6, marginTop: 8 }}>
+                    <button
+                      onClick={() => {
+                        onFoodSearchChange('');
+                        onOpenLabelScan();
+                      }}
+                      aria-label="Снять КБЖУ с упаковки"
+                      className="nd-barcode-label"
+                      style={{ ...nowBtnStyle, width: '100%' }}
+                    >
+                      🏷 Снять КБЖУ с упаковки
+                    </button>
+                    <button
+                      onClick={() => openBase({ name: barcodeFound.product.name, barcode: barcodeQuery })}
+                      aria-label="Ввести КБЖУ вручную"
+                      className="nd-barcode-manual"
+                      style={{
+                        width: '100%',
+                        padding: '10px 12px',
+                        borderRadius: 12,
+                        border: '1px solid rgba(139,92,246,0.3)',
+                        background: 'rgba(139,92,246,0.10)',
+                        color: '#c4b5fd',
+                        fontWeight: 700,
+                        fontSize: 12,
+                        cursor: 'pointer',
+                        minHeight: 44,
+                      }}
+                    >
+                      ✎ Ввести вручную (штрихкод сохранится)
+                    </button>
+                  </div>
+                )}
+                {!barcodeLoading && !barcodeFound && barcodeLengthOk && (
+                  <button
+                    onClick={() => openBase({ barcode: barcodeQuery })}
+                    aria-label="Создать свою еду по штрихкоду"
+                    className="nd-barcode-base"
+                    style={{
+                      width: '100%',
+                      marginTop: 8,
+                      padding: '10px 12px',
+                      borderRadius: 12,
+                      border: '1px solid rgba(139,92,246,0.3)',
+                      background: 'rgba(139,92,246,0.10)',
+                      color: '#c4b5fd',
+                      fontWeight: 700,
+                      fontSize: 12,
+                      cursor: 'pointer',
+                      minHeight: 44,
+                    }}
+                  >
+                    ＋ Создать свою еду (штрихкод сохранится)
+                  </button>
                 )}
               </div>
             )}
@@ -875,20 +1900,78 @@ export const AddFoodPanel: React.FC<AddFoodPanelProps> = ({
               <div>
                 <div className="nd-nethead" style={sectionHead('#00e68a')}>
                   <span>🥗 База продуктов</span>
-                  <span style={{ fontSize: 8, padding: '2px 6px', borderRadius: 999, background: 'rgba(0,230,138,0.12)', color: '#00e68a', border: '1px solid rgba(0,230,138,0.18)' }}>{foodSearchResults.length}</span>
+                  <span
+                    style={{
+                      fontSize: 8,
+                      padding: '2px 6px',
+                      borderRadius: 999,
+                      background: 'rgba(0,230,138,0.12)',
+                      color: '#00e68a',
+                      border: '1px solid rgba(0,230,138,0.18)',
+                    }}
+                  >
+                    {foodSearchResults.length}
+                  </span>
                 </div>
                 <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-                  {foodSearchResults.map(f => (
+                  {foodSearchResults.map((f) => (
                     <div key={f.id} className="nd-result" style={rowStyle}>
-                      <span className="nd-result-emoji" style={{ fontSize: 18, width: 24, textAlign: 'center', flexShrink: 0 }}>{CAT_MAP_EMOJI[f.category || 'other'] || '📦'}</span>
-                      <button onClick={() => openPortion(f)} role="button" aria-label={`Добавить ${f.name}`}
-                        style={{ flex: 1, minWidth: 0, background: 'none', border: 'none', padding: 0, textAlign: 'left', cursor: 'pointer', color: '#fff' }}>
+                      <span
+                        className="nd-result-emoji"
+                        style={{ fontSize: 18, width: 24, textAlign: 'center', flexShrink: 0 }}
+                      >
+                        {CAT_MAP_EMOJI[f.category || 'other'] || '📦'}
+                      </span>
+                      <button
+                        onClick={() => openPortion(f)}
+                        role="button"
+                        aria-label={`Добавить ${f.name}`}
+                        style={{
+                          flex: 1,
+                          minWidth: 0,
+                          background: 'none',
+                          border: 'none',
+                          padding: 0,
+                          textAlign: 'left',
+                          cursor: 'pointer',
+                          color: '#fff',
+                        }}
+                      >
                         <div style={nameStyle}>{f.name}</div>
                         {macros(f.kcal, f.protein, f.fat, f.carbs)}
-                        {f.description ? <div style={{ fontSize: 9, color: 'rgba(255,255,255,0.45)', marginTop: 2, overflowWrap: 'anywhere' }}>{f.description}</div> : null}
+                        {f.description ? (
+                          <div
+                            style={{
+                              fontSize: 9,
+                              color: 'rgba(255,255,255,0.45)',
+                              marginTop: 2,
+                              overflowWrap: 'anywhere',
+                            }}
+                          >
+                            {f.description}
+                          </div>
+                        ) : null}
                       </button>
-                      <button onClick={() => openPortion(f)} title="Указать граммы и добавить" aria-label="Указать порцию" className="nd-addq" style={addBtnStyle}>＋</button>
-                      {onDirectAdd && <button onClick={() => onDirectAdd(f)} title={`Сразу в ${mealType || 'дневник'} 100г`} aria-label="Сразу в дневник" className="nd-addnow" style={nowBtnStyle}>⚡ 100г</button>}
+                      <button
+                        onClick={() => openPortion(f)}
+                        title="Указать граммы и добавить"
+                        aria-label="Указать порцию"
+                        className="nd-addq"
+                        style={addBtnStyle}
+                      >
+                        ＋
+                      </button>
+                      {onDirectAdd && (
+                        <button
+                          onClick={() => onDirectAdd(f)}
+                          title={`Сразу в ${mealType || 'дневник'} 100г`}
+                          aria-label="Сразу в дневник"
+                          className="nd-addnow"
+                          style={nowBtnStyle}
+                        >
+                          ⚡ 100г
+                        </button>
+                      )}
                       {favButton(f)}
                     </div>
                   ))}
@@ -901,29 +1984,111 @@ export const AddFoodPanel: React.FC<AddFoodPanelProps> = ({
                 <div className="nd-nethead" style={sectionHead('#00e68a')}>
                   <span>🏪 Супермаркеты РФ</span>
                   {retailResults.length > 0 && (
-                    <span style={{ fontSize: 8, padding: '2px 6px', borderRadius: 999, background: 'rgba(0,230,138,0.12)', color: '#00e68a', border: '1px solid rgba(0,230,138,0.18)' }}>{retailResults.length}</span>
+                    <span
+                      style={{
+                        fontSize: 8,
+                        padding: '2px 6px',
+                        borderRadius: 999,
+                        background: 'rgba(0,230,138,0.12)',
+                        color: '#00e68a',
+                        border: '1px solid rgba(0,230,138,0.18)',
+                      }}
+                    >
+                      {retailResults.length}
+                    </span>
                   )}
-                  {Array.from(new Set(retailResults.map(p => RETAIL_CHAINS[p.source]?.label).filter(Boolean))).map(label => (
-                    <span key={label} style={{ fontSize: 8, padding: '2px 6px', borderRadius: 999, background: 'rgba(255,255,255,0.05)', color: 'rgba(255,255,255,0.75)', border: '1px solid rgba(255,255,255,0.08)' }}>{label}</span>
-                  ))}
+                  {Array.from(new Set(retailResults.map((p) => RETAIL_CHAINS[p.source]?.label).filter(Boolean))).map(
+                    (label) => (
+                      <span
+                        key={label}
+                        style={{
+                          fontSize: 8,
+                          padding: '2px 6px',
+                          borderRadius: 999,
+                          background: 'rgba(255,255,255,0.05)',
+                          color: 'rgba(255,255,255,0.75)',
+                          border: '1px solid rgba(255,255,255,0.08)',
+                        }}
+                      >
+                        {label}
+                      </span>
+                    ),
+                  )}
                 </div>
                 {isSearchingRetail && retailResults.length === 0 && (
-                  <div style={{ fontSize: 10, color: 'rgba(0,230,138,0.85)', padding: '10px 12px', background: 'rgba(0,230,138,0.05)', borderRadius: 10, border: '1px solid rgba(0,230,138,0.12)', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6 }}>
-                    <span style={{ width: 12, height: 12, border: '2px solid rgba(0,230,138,0.3)', borderTop: '2px solid #00e68a', borderRadius: '50%', display: 'inline-block', animation: 'spin 0.8s linear infinite' }} />
+                  <div
+                    style={{
+                      fontSize: 10,
+                      color: 'rgba(0,230,138,0.85)',
+                      padding: '10px 12px',
+                      background: 'rgba(0,230,138,0.05)',
+                      borderRadius: 10,
+                      border: '1px solid rgba(0,230,138,0.12)',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      gap: 6,
+                    }}
+                  >
+                    <span
+                      style={{
+                        width: 12,
+                        height: 12,
+                        border: '2px solid rgba(0,230,138,0.3)',
+                        borderTop: '2px solid #00e68a',
+                        borderRadius: '50%',
+                        display: 'inline-block',
+                        animation: 'spin 0.8s linear infinite',
+                      }}
+                    />
                     🏪 Ищем в каталогах сетей…
                   </div>
                 )}
                 {retailResults.length > 0 && (
                   <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-                    {retailResults.map(p => {
+                    {retailResults.map((p) => {
                       const meta = RETAIL_CHAINS[p.source];
                       if (!meta) return null;
                       return (
-                        <div key={`${p.source}-${p.id}`} className="nd-netrow" style={{ ...rowStyle, background: 'rgba(0,230,138,0.03)', border: '1px solid rgba(0,230,138,0.10)' }}>
-                          <button onClick={() => openPortion(retailToFoodItem(p) as any)} role="button" aria-label={`Добавить ${p.name} из ${meta.label}`}
-                            style={{ flex: 1, minWidth: 0, background: 'none', border: 'none', padding: 0, textAlign: 'left', cursor: 'pointer', color: '#fff' }}>
+                        <div
+                          key={`${p.source}-${p.id}`}
+                          className="nd-netrow"
+                          style={{
+                            ...rowStyle,
+                            background: 'rgba(0,230,138,0.03)',
+                            border: '1px solid rgba(0,230,138,0.10)',
+                          }}
+                        >
+                          <button
+                            onClick={() => openPortion(retailToFoodItem(p) as any)}
+                            role="button"
+                            aria-label={`Добавить ${p.name} из ${meta.label}`}
+                            style={{
+                              flex: 1,
+                              minWidth: 0,
+                              background: 'none',
+                              border: 'none',
+                              padding: 0,
+                              textAlign: 'left',
+                              cursor: 'pointer',
+                              color: '#fff',
+                            }}
+                          >
                             <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
-                              <span style={{ fontSize: 9, fontWeight: 700, padding: '2px 6px', borderRadius: 999, background: `${meta.color}1c`, color: meta.color, border: `1px solid ${meta.color}35`, whiteSpace: 'nowrap' }}>{meta.emoji} {meta.label}</span>
+                              <span
+                                style={{
+                                  fontSize: 9,
+                                  fontWeight: 700,
+                                  padding: '2px 6px',
+                                  borderRadius: 999,
+                                  background: `${meta.color}1c`,
+                                  color: meta.color,
+                                  border: `1px solid ${meta.color}35`,
+                                  whiteSpace: 'nowrap',
+                                }}
+                              >
+                                {meta.emoji} {meta.label}
+                              </span>
                               <span style={nameStyle}>{p.name}</span>
                             </div>
                             <div style={{ ...metaStyle, color: 'rgba(255,255,255,0.55)' }}>
@@ -935,8 +2100,31 @@ export const AddFoodPanel: React.FC<AddFoodPanelProps> = ({
                               <span style={{ color: '#fb923c' }}>У {p.carbs}</span>
                             </div>
                           </button>
-                          <button onClick={() => openPortion(retailToFoodItem(p) as any)} title="Указать граммы и добавить" aria-label="Указать порцию" className="nd-addq" style={{ ...addBtnStyle, border: '1px solid rgba(0,230,138,0.2)', background: 'rgba(0,230,138,0.08)', color: '#00e68a' }}>＋</button>
-                          {onDirectAdd && <button onClick={() => onDirectAdd(retailToFoodItem(p) as any)} title={`Сразу в ${mealType || 'дневник'} 100г`} aria-label="Сразу в дневник" className="nd-addnow" style={nowBtnStyle}>⚡ 100г</button>}
+                          <button
+                            onClick={() => openPortion(retailToFoodItem(p) as any)}
+                            title="Указать граммы и добавить"
+                            aria-label="Указать порцию"
+                            className="nd-addq"
+                            style={{
+                              ...addBtnStyle,
+                              border: '1px solid rgba(0,230,138,0.2)',
+                              background: 'rgba(0,230,138,0.08)',
+                              color: '#00e68a',
+                            }}
+                          >
+                            ＋
+                          </button>
+                          {onDirectAdd && (
+                            <button
+                              onClick={() => onDirectAdd(retailToFoodItem(p) as any)}
+                              title={`Сразу в ${mealType || 'дневник'} 100г`}
+                              aria-label="Сразу в дневник"
+                              className="nd-addnow"
+                              style={nowBtnStyle}
+                            >
+                              ⚡ 100г
+                            </button>
+                          )}
                           {favButton(retailToFoodItem(p) as any)}
                         </div>
                       );
@@ -949,7 +2137,18 @@ export const AddFoodPanel: React.FC<AddFoodPanelProps> = ({
             {/* Сети реально недоступны (бэкенд/403) — говорим об этом прямо,
                 иначе пустой раздел «супермаркеты» выглядит как баг. */}
             {hasQuery && !isSearchingRetail && retailAvailable === false && (
-              <div className="nd-retail-off" style={{ fontSize: 10, lineHeight: 1.35, color: 'rgba(255,255,255,0.5)', padding: '8px 10px', borderRadius: 10, background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.05)' }}>
+              <div
+                className="nd-retail-off"
+                style={{
+                  fontSize: 10,
+                  lineHeight: 1.35,
+                  color: 'rgba(255,255,255,0.5)',
+                  padding: '8px 10px',
+                  borderRadius: 10,
+                  background: 'rgba(255,255,255,0.02)',
+                  border: '1px solid rgba(255,255,255,0.05)',
+                }}
+              >
                 🏪 Каталоги сетей сейчас недоступны — показаны база продуктов и бренды РФ.
               </div>
             )}
@@ -959,28 +2158,124 @@ export const AddFoodPanel: React.FC<AddFoodPanelProps> = ({
                 <div className="nd-nethead" style={sectionHead('#60a5fa')}>
                   <span>🌐 Бренды РФ и интернет</span>
                   {internetUnique.length > 0 && (
-                    <span style={{ fontSize: 8, padding: '2px 6px', borderRadius: 999, background: 'rgba(59,130,246,0.12)', color: '#60a5fa', border: '1px solid rgba(59,130,246,0.18)' }}>{internetUnique.length}</span>
+                    <span
+                      style={{
+                        fontSize: 8,
+                        padding: '2px 6px',
+                        borderRadius: 999,
+                        background: 'rgba(59,130,246,0.12)',
+                        color: '#60a5fa',
+                        border: '1px solid rgba(59,130,246,0.18)',
+                      }}
+                    >
+                      {internetUnique.length}
+                    </span>
                   )}
                 </div>
                 {isSearchingNet && internetUnique.length === 0 && (
-                  <div style={{ fontSize: 10, color: 'rgba(96,165,250,0.85)', padding: '10px 12px', background: 'rgba(59,130,246,0.06)', borderRadius: 10, border: '1px solid rgba(59,130,246,0.12)', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6 }}>
-                    <span style={{ width: 12, height: 12, border: '2px solid rgba(96,165,250,0.3)', borderTop: '2px solid #60a5fa', borderRadius: '50%', display: 'inline-block', animation: 'spin 0.8s linear infinite' }} />
+                  <div
+                    style={{
+                      fontSize: 10,
+                      color: 'rgba(96,165,250,0.85)',
+                      padding: '10px 12px',
+                      background: 'rgba(59,130,246,0.06)',
+                      borderRadius: 10,
+                      border: '1px solid rgba(59,130,246,0.12)',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      gap: 6,
+                    }}
+                  >
+                    <span
+                      style={{
+                        width: 12,
+                        height: 12,
+                        border: '2px solid rgba(96,165,250,0.3)',
+                        borderTop: '2px solid #60a5fa',
+                        borderRadius: '50%',
+                        display: 'inline-block',
+                        animation: 'spin 0.8s linear infinite',
+                      }}
+                    />
                     🌐 Ищем российские бренды…
                   </div>
                 )}
                 {internetUnique.length > 0 && (
                   <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-                    {internetUnique.map(f => (
-                      <div key={f.id} className="nd-netrow" style={{ ...rowStyle, background: 'rgba(59,130,246,0.03)', border: '1px solid rgba(59,130,246,0.10)' }}>
-                        <span className="nd-result-emoji" style={{ fontSize: 18, width: 24, textAlign: 'center', flexShrink: 0 }}>🌐</span>
-                        <button onClick={() => openPortion(f)} role="button" aria-label={`Добавить ${f.name}`}
-                          style={{ flex: 1, minWidth: 0, background: 'none', border: 'none', padding: 0, textAlign: 'left', cursor: 'pointer', color: '#fff' }}>
+                    {internetUnique.map((f) => (
+                      <div
+                        key={f.id}
+                        className="nd-netrow"
+                        style={{
+                          ...rowStyle,
+                          background: 'rgba(59,130,246,0.03)',
+                          border: '1px solid rgba(59,130,246,0.10)',
+                        }}
+                      >
+                        <span
+                          className="nd-result-emoji"
+                          style={{ fontSize: 18, width: 24, textAlign: 'center', flexShrink: 0 }}
+                        >
+                          🌐
+                        </span>
+                        <button
+                          onClick={() => openPortion(f)}
+                          role="button"
+                          aria-label={`Добавить ${f.name}`}
+                          style={{
+                            flex: 1,
+                            minWidth: 0,
+                            background: 'none',
+                            border: 'none',
+                            padding: 0,
+                            textAlign: 'left',
+                            cursor: 'pointer',
+                            color: '#fff',
+                          }}
+                        >
                           <div style={nameStyle}>{f.name}</div>
-                          {f.brand ? <div style={{ fontSize: 9, color: 'rgba(255,255,255,0.6)', marginTop: 2, overflowWrap: 'anywhere' }}>🏷 {f.brand}</div> : null}
+                          {f.brand ? (
+                            <div
+                              style={{
+                                fontSize: 9,
+                                color: 'rgba(255,255,255,0.6)',
+                                marginTop: 2,
+                                overflowWrap: 'anywhere',
+                              }}
+                            >
+                              🏷 {f.brand}
+                            </div>
+                          ) : null}
                           {macros(f.kcal, f.protein, f.fat, f.carbs)}
                         </button>
-                        <button onClick={() => openPortion(f)} aria-label="Указать порцию" className="nd-addq" style={{ ...addBtnStyle, border: '1px solid rgba(59,130,246,0.18)', background: 'rgba(59,130,246,0.08)', color: '#60a5fa' }}>＋</button>
-                        {onDirectAdd && <button onClick={() => onDirectAdd(f)} aria-label="Сразу в дневник" className="nd-addnow" style={{ ...nowBtnStyle, background: 'linear-gradient(135deg,#60a5fa,#3b82f6)', color: '#fff' }}>⚡ 100г</button>}
+                        <button
+                          onClick={() => openPortion(f)}
+                          aria-label="Указать порцию"
+                          className="nd-addq"
+                          style={{
+                            ...addBtnStyle,
+                            border: '1px solid rgba(59,130,246,0.18)',
+                            background: 'rgba(59,130,246,0.08)',
+                            color: '#60a5fa',
+                          }}
+                        >
+                          ＋
+                        </button>
+                        {onDirectAdd && (
+                          <button
+                            onClick={() => onDirectAdd(f)}
+                            aria-label="Сразу в дневник"
+                            className="nd-addnow"
+                            style={{
+                              ...nowBtnStyle,
+                              background: 'linear-gradient(135deg,#60a5fa,#3b82f6)',
+                              color: '#fff',
+                            }}
+                          >
+                            ⚡ 100г
+                          </button>
+                        )}
                         {favButton(f)}
                       </div>
                     ))}
@@ -990,34 +2285,123 @@ export const AddFoodPanel: React.FC<AddFoodPanelProps> = ({
             )}
 
             {showEmpty && (
-              <div className="nd-noresult" style={{ fontSize: 12, color: 'rgba(255,255,255,0.55)', textAlign: 'center', padding: '16px 12px', background: 'rgba(255,255,255,0.02)', borderRadius: 12, border: '1px solid rgba(255,255,255,0.05)' }}>
+              <div
+                className="nd-noresult"
+                style={{
+                  fontSize: 12,
+                  color: 'rgba(255,255,255,0.55)',
+                  textAlign: 'center',
+                  padding: '16px 12px',
+                  background: 'rgba(255,255,255,0.02)',
+                  borderRadius: 12,
+                  border: '1px solid rgba(255,255,255,0.05)',
+                }}
+              >
                 <div>Ничего не найдено по «{query}».</div>
-                <div style={{ fontSize: 10, marginTop: 4, color: 'rgba(255,255,255,0.45)' }}>Добавьте продукт один раз — дальше он находится поиском и сканером.</div>
-                <button onClick={() => openBase({ name: query })} aria-label="Добавить найденное название в базу" className="nd-base-empty"
-                  style={{ width: '100%', marginTop: 10, padding: '12px 14px', borderRadius: 12, border: 'none', cursor: 'pointer', background: 'linear-gradient(135deg,#8b5cf6,#6d28d9)', color: '#fff', fontWeight: 800, fontSize: 12, minHeight: 48 }}>
-                  ＋ Добавить «{query}» в базу
+                <div style={{ fontSize: 10, marginTop: 4, color: 'rgba(255,255,255,0.45)' }}>
+                  Добавьте продукт один раз — дальше он находится поиском и сканером.
+                </div>
+                <button
+                  onClick={() => openBase({ name: query })}
+                  aria-label="Добавить найденное название в базу"
+                  className="nd-base-empty"
+                  style={{
+                    width: '100%',
+                    marginTop: 10,
+                    padding: '12px 14px',
+                    borderRadius: 12,
+                    border: 'none',
+                    cursor: 'pointer',
+                    background: 'linear-gradient(135deg,#8b5cf6,#6d28d9)',
+                    color: '#fff',
+                    fontWeight: 800,
+                    fontSize: 12,
+                    minHeight: 48,
+                  }}
+                >
+                  ＋ Создать свой продукт «{query}»
                 </button>
-                <button onClick={() => { if (query && !customFoodName) onCustomFoodNameChange(query); onToggleCustomFood(); }} className="nd-base-quick"
-                  style={{ marginTop: 8, padding: '10px 16px', borderRadius: 12, border: '1px solid rgba(139,92,246,0.25)', background: 'rgba(139,92,246,0.10)', color: '#a78bfa', fontWeight: 700, fontSize: 12, cursor: 'pointer', minHeight: 44 }}>🍎 Быстро: только КБЖУ</button>
+                <button
+                  onClick={() => {
+                    if (query && !customFoodName) onCustomFoodNameChange(query);
+                    onToggleCustomFood();
+                  }}
+                  className="nd-base-quick"
+                  style={{
+                    width: '100%',
+                    marginTop: 8,
+                    padding: '10px 16px',
+                    borderRadius: 12,
+                    border: '1px solid rgba(255,255,255,0.10)',
+                    background: 'rgba(255,255,255,0.04)',
+                    color: 'rgba(255,255,255,0.7)',
+                    fontWeight: 700,
+                    fontSize: 12,
+                    cursor: 'pointer',
+                    minHeight: 44,
+                  }}
+                >
+                  🍎 Быстро: только КБЖУ
+                </button>
               </div>
             )}
 
             {/* Рецепт по тому же запросу: «борщ» ищется и среди блюд, а не
                 только среди отдельных продуктов. */}
             {query.length >= 2 && (
-              <button type="button" onClick={() => { setRecipeQuery(query); setRecipeOpen(true); }} aria-label="Искать рецепт"
+              <button
+                type="button"
+                onClick={() => {
+                  setRecipeQuery(query);
+                  setRecipeOpen(true);
+                }}
+                aria-label="Искать рецепт"
                 className="nd-recipe-search-link"
-                style={{ width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8, padding: '12px 14px', borderRadius: 12, cursor: 'pointer', minHeight: 48,
-                  background: 'rgba(245,158,11,0.08)', border: '1px solid rgba(245,158,11,0.25)', color: '#fbbf24', fontSize: 12, fontWeight: 700 }}>
+                style={{
+                  width: '100%',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  gap: 8,
+                  padding: '12px 14px',
+                  borderRadius: 12,
+                  cursor: 'pointer',
+                  minHeight: 48,
+                  background: 'rgba(245,158,11,0.08)',
+                  border: '1px solid rgba(245,158,11,0.25)',
+                  color: '#fbbf24',
+                  fontSize: 12,
+                  fontWeight: 700,
+                }}
+              >
                 🍲 Искать рецепт «{query}» — с продуктами и КБЖУ
               </button>
             )}
 
             {/* Как в MyFitnessPal/FatSecret: из выдачи всегда можно уйти в свою базу. */}
             {!showEmpty && (
-              <button type="button" onClick={() => openBase({ name: query })} aria-label="Добавить свой продукт в базу" className="nd-base-link"
-                style={{ width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8, padding: '12px 14px', borderRadius: 12, cursor: 'pointer', minHeight: 50,
-                  background: 'rgba(139,92,246,0.07)', border: '1px dashed rgba(139,92,246,0.35)', color: '#c4b5fd', fontSize: 12, fontWeight: 700 }}>
+              <button
+                type="button"
+                onClick={() => openBase({ name: query })}
+                aria-label="Добавить свой продукт в базу"
+                className="nd-base-link"
+                style={{
+                  width: '100%',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  gap: 8,
+                  padding: '12px 14px',
+                  borderRadius: 12,
+                  cursor: 'pointer',
+                  minHeight: 50,
+                  background: 'rgba(139,92,246,0.07)',
+                  border: '1px dashed rgba(139,92,246,0.35)',
+                  color: '#c4b5fd',
+                  fontSize: 12,
+                  fontWeight: 700,
+                }}
+              >
                 ➕ Не нашли нужное? Добавить продукт в базу
               </button>
             )}
@@ -1028,37 +2412,116 @@ export const AddFoodPanel: React.FC<AddFoodPanelProps> = ({
         {!hasQuery && (
           <>
             <div className="nd-tools" style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 8 }}>
-              <button type="button" onClick={onShowBarcode} aria-label="Штрих-код"
-                style={{ padding: '12px 6px', borderRadius: 14, fontSize: 11, cursor: 'pointer', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 6,
-                  background: showBarcode ? 'linear-gradient(135deg, rgba(0,230,138,0.18), rgba(0,200,160,0.08))' : 'rgba(255,255,255,0.03)',
+              <button
+                type="button"
+                onClick={onShowBarcode}
+                aria-label="Штрих-код"
+                style={{
+                  padding: '12px 6px',
+                  borderRadius: 14,
+                  fontSize: 11,
+                  cursor: 'pointer',
+                  display: 'flex',
+                  flexDirection: 'column',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  gap: 6,
+                  background: showBarcode
+                    ? 'linear-gradient(135deg, rgba(0,230,138,0.18), rgba(0,200,160,0.08))'
+                    : 'rgba(255,255,255,0.03)',
                   border: `1px solid ${showBarcode ? 'rgba(0,230,138,0.3)' : 'rgba(255,255,255,0.06)'}`,
-                  color: showBarcode ? '#00e68a' : 'rgba(255,255,255,0.85)', minHeight: 84, fontWeight: 700 }}>
+                  color: showBarcode ? '#00e68a' : 'rgba(255,255,255,0.85)',
+                  minHeight: 84,
+                  fontWeight: 700,
+                }}
+              >
                 <span style={{ fontSize: 24 }}>📱</span>
                 <span>Штрих-код</span>
               </button>
-              <label onClick={handlePhotoTile} style={{ padding: '12px 6px', borderRadius: 14, fontSize: 11, cursor: ocrFileLoading ? 'not-allowed' : 'pointer', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 6,
-                background: ocrFileLoading ? 'linear-gradient(135deg, rgba(0,230,138,0.18), rgba(0,200,160,0.08))' : 'rgba(139,92,246,0.06)',
-                border: `1px solid ${ocrFileLoading ? 'rgba(0,230,138,0.3)' : 'rgba(139,92,246,0.14)'}`,
-                color: ocrFileLoading ? '#00e68a' : 'rgba(255,255,255,0.9)', minHeight: 84, fontWeight: 700, pointerEvents: ocrFileLoading ? 'none' : 'auto' }}>
-                <input ref={ocrFileRef} type="file" accept="image/*" style={{ display: 'none' }}
-                  onChange={e => { const f = e.target.files?.[0] as File | undefined; e.currentTarget.value = ''; onOcrFile(f as any); }} />
+              <label
+                onClick={handlePhotoTile}
+                style={{
+                  padding: '12px 6px',
+                  borderRadius: 14,
+                  fontSize: 11,
+                  cursor: ocrFileLoading ? 'not-allowed' : 'pointer',
+                  display: 'flex',
+                  flexDirection: 'column',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  gap: 6,
+                  background: ocrFileLoading
+                    ? 'linear-gradient(135deg, rgba(0,230,138,0.18), rgba(0,200,160,0.08))'
+                    : 'rgba(139,92,246,0.06)',
+                  border: `1px solid ${ocrFileLoading ? 'rgba(0,230,138,0.3)' : 'rgba(139,92,246,0.14)'}`,
+                  color: ocrFileLoading ? '#00e68a' : 'rgba(255,255,255,0.9)',
+                  minHeight: 84,
+                  fontWeight: 700,
+                  pointerEvents: ocrFileLoading ? 'none' : 'auto',
+                }}
+              >
+                <input
+                  ref={ocrFileRef}
+                  type="file"
+                  accept="image/*"
+                  style={{ display: 'none' }}
+                  onChange={(e) => {
+                    const f = e.target.files?.[0] as File | undefined;
+                    e.currentTarget.value = '';
+                    onOcrFile(f as any);
+                  }}
+                />
                 <span style={{ fontSize: 24 }}>{ocrFileLoading ? '⏳' : '📸'}</span>
                 <span>{ocrFileLoading ? 'Сканируем…' : 'Фото'}</span>
               </label>
-              <button onClick={onShowOCR} aria-label="Текст"
-                style={{ padding: '12px 6px', borderRadius: 14, fontSize: 11, cursor: 'pointer', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 6,
-                  background: showOCR ? 'linear-gradient(135deg, rgba(59,130,246,0.18), rgba(59,130,246,0.08))' : 'rgba(255,255,255,0.03)',
+              <button
+                onClick={onShowOCR}
+                aria-label="Текст"
+                style={{
+                  padding: '12px 6px',
+                  borderRadius: 14,
+                  fontSize: 11,
+                  cursor: 'pointer',
+                  display: 'flex',
+                  flexDirection: 'column',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  gap: 6,
+                  background: showOCR
+                    ? 'linear-gradient(135deg, rgba(59,130,246,0.18), rgba(59,130,246,0.08))'
+                    : 'rgba(255,255,255,0.03)',
                   border: `1px solid ${showOCR ? 'rgba(59,130,246,0.3)' : 'rgba(255,255,255,0.06)'}`,
-                  color: showOCR ? '#60a5fa' : 'rgba(255,255,255,0.85)', minHeight: 84, fontWeight: 700 }}>
+                  color: showOCR ? '#60a5fa' : 'rgba(255,255,255,0.85)',
+                  minHeight: 84,
+                  fontWeight: 700,
+                }}
+              >
                 <span style={{ fontSize: 24 }}>📋</span>
                 <span>Текст</span>
               </button>
-              <button type="button" onClick={labelOpen ? onCloseLabelScan : onOpenLabelScan} aria-label="КБЖУ с упаковки камерой"
-                aria-expanded={labelOpen} className="nd-label-open"
-                style={{ padding: '12px 6px', borderRadius: 14, fontSize: 11, cursor: 'pointer', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 6,
+              <button
+                type="button"
+                onClick={labelOpen ? onCloseLabelScan : onOpenLabelScan}
+                aria-label="КБЖУ с упаковки камерой"
+                aria-expanded={labelOpen}
+                className="nd-label-open"
+                style={{
+                  padding: '12px 6px',
+                  borderRadius: 14,
+                  fontSize: 11,
+                  cursor: 'pointer',
+                  display: 'flex',
+                  flexDirection: 'column',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  gap: 6,
                   background: labelOpen ? 'rgba(0,230,138,0.16)' : 'rgba(0,230,138,0.05)',
                   border: `1px solid ${labelOpen ? 'rgba(0,230,138,0.35)' : 'rgba(0,230,138,0.16)'}`,
-                  color: labelOpen ? '#00e68a' : 'rgba(255,255,255,0.9)', minHeight: 84, fontWeight: 700 }}>
+                  color: labelOpen ? '#00e68a' : 'rgba(255,255,255,0.9)',
+                  minHeight: 84,
+                  fontWeight: 700,
+                }}
+              >
                 <span style={{ fontSize: 24 }}>🏷</span>
                 <span>С упаковки</span>
               </button>
@@ -1066,46 +2529,143 @@ export const AddFoodPanel: React.FC<AddFoodPanelProps> = ({
 
             {/* Рецепт — такой же способ внести еду, как продукт: в дневник
                 уходят название блюда и КБЖУ каждого продукта, а не только итог. */}
-            <button type="button" onClick={() => { setRecipeQuery(''); setRecipeOpen(true); }} aria-label="Добавить рецепт в дневник" className="nd-recipe-cta"
-              style={{ width: '100%', display: 'flex', alignItems: 'center', gap: 10, padding: '12px 14px', borderRadius: 14, cursor: 'pointer',
+            <button
+              type="button"
+              onClick={() => {
+                setRecipeQuery('');
+                setRecipeOpen(true);
+              }}
+              aria-label="Добавить рецепт в дневник"
+              className="nd-recipe-cta"
+              style={{
+                width: '100%',
+                display: 'flex',
+                alignItems: 'center',
+                gap: 10,
+                padding: '12px 14px',
+                borderRadius: 14,
+                cursor: 'pointer',
                 background: 'linear-gradient(135deg, rgba(245,158,11,0.16), rgba(234,88,12,0.06))',
-                border: '1px solid rgba(245,158,11,0.32)', color: '#fff', textAlign: 'left', minHeight: 62 }}>
-              <span style={{ width: 38, height: 38, borderRadius: 12, background: 'rgba(245,158,11,0.18)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 18, flexShrink: 0 }}>🍲</span>
+                border: '1px solid rgba(245,158,11,0.32)',
+                color: '#fff',
+                textAlign: 'left',
+                minHeight: 62,
+              }}
+            >
+              <span
+                style={{
+                  width: 38,
+                  height: 38,
+                  borderRadius: 12,
+                  background: 'rgba(245,158,11,0.18)',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  fontSize: 18,
+                  flexShrink: 0,
+                }}
+              >
+                🍲
+              </span>
               <span style={{ flex: 1, minWidth: 0 }}>
-                <span style={{ display: 'block', fontSize: 13, fontWeight: 800, color: '#fbbf24' }}>Добавить рецепт</span>
-                <span style={{ display: 'block', fontSize: 9.5, color: 'rgba(255,255,255,0.6)', marginTop: 2 }}>Блюдо целиком: продукты и КБЖУ каждого · база и «Мои рецепты»</span>
+                <span style={{ display: 'block', fontSize: 13, fontWeight: 800, color: '#fbbf24' }}>
+                  Добавить рецепт
+                </span>
+                <span style={{ display: 'block', fontSize: 9.5, color: 'rgba(255,255,255,0.6)', marginTop: 2 }}>
+                  Блюдо целиком: продукты и КБЖУ каждого · база и «Мои рецепты»
+                </span>
               </span>
               <span style={{ color: '#fbbf24', fontSize: 16, flexShrink: 0 }}>→</span>
             </button>
 
             {/* Главная точка входа в «свою базу»: не спрятана в разделе Кухня. */}
-            <button type="button" onClick={() => openBase()} aria-label="Открыть добавление продукта в базу" className="nd-base-cta"
-              style={{ width: '100%', display: 'flex', alignItems: 'center', gap: 10, padding: '12px 14px', borderRadius: 14, cursor: 'pointer',
+            <button
+              type="button"
+              onClick={() => openBase()}
+              aria-label="Открыть добавление продукта в базу"
+              className="nd-base-cta"
+              style={{
+                width: '100%',
+                display: 'flex',
+                alignItems: 'center',
+                gap: 10,
+                padding: '12px 14px',
+                borderRadius: 14,
+                cursor: 'pointer',
                 background: 'linear-gradient(135deg, rgba(139,92,246,0.14), rgba(109,40,217,0.06))',
-                border: '1px solid rgba(139,92,246,0.3)', color: '#fff', textAlign: 'left', minHeight: 62 }}>
-              <span style={{ width: 38, height: 38, borderRadius: 12, background: 'rgba(139,92,246,0.18)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 18, flexShrink: 0 }}>➕</span>
+                border: '1px solid rgba(139,92,246,0.3)',
+                color: '#fff',
+                textAlign: 'left',
+                minHeight: 62,
+              }}
+            >
+              <span
+                style={{
+                  width: 38,
+                  height: 38,
+                  borderRadius: 12,
+                  background: 'rgba(139,92,246,0.18)',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  fontSize: 18,
+                  flexShrink: 0,
+                }}
+              >
+                ➕
+              </span>
               <span style={{ flex: 1, minWidth: 0 }}>
-                <span style={{ display: 'block', fontSize: 13, fontWeight: 800, color: '#c4b5fd' }}>Добавить продукт в базу</span>
-                <span style={{ display: 'block', fontSize: 9.5, color: 'rgba(255,255,255,0.6)', marginTop: 2 }}>КБЖУ, марка, штрихкод — найдётся в поиске и сканере</span>
+                <span style={{ display: 'block', fontSize: 13, fontWeight: 800, color: '#c4b5fd' }}>
+                  Добавить продукт в базу
+                </span>
+                <span style={{ display: 'block', fontSize: 9.5, color: 'rgba(255,255,255,0.6)', marginTop: 2 }}>
+                  КБЖУ, марка, штрихкод — найдётся в поиске и сканере
+                </span>
               </span>
               <span style={{ color: '#c4b5fd', fontSize: 16, flexShrink: 0 }}>→</span>
             </button>
 
             <LabelNutritionPanel
-              open={labelOpen} loading={labelLoading} progress={labelProgress} hint={labelHint}
-              error={labelError} draft={labelDraft} rawText={labelRawText} barcodeLoading={labelBarcodeLoading}
-              onCamera={onLabelCamera} onGallery={onLabelGallery} onClose={onCloseLabelScan}
-              onFieldChange={onLabelFieldChange} onSaveToBase={onLabelSaveToBase}
-              onAddToDiary={onLabelAddToDiary} onScanBarcode={onLabelBarcodeScan}
+              open={labelOpen}
+              loading={labelLoading}
+              progress={labelProgress}
+              hint={labelHint}
+              error={labelError}
+              draft={labelDraft}
+              rawText={labelRawText}
+              barcodeLoading={labelBarcodeLoading}
+              onCamera={onLabelCamera}
+              onGallery={onLabelGallery}
+              onClose={onCloseLabelScan}
+              onFieldChange={onLabelFieldChange}
+              onSaveToBase={onLabelSaveToBase}
+              onAddToDiary={onLabelAddToDiary}
+              onScanBarcode={onLabelBarcodeScan}
             />
 
             {/* Популярные запросы — чтобы пустой поиск не был пустым экраном */}
             {history.length === 0 && (
               <div className="nd-popular" style={{ display: 'flex', gap: 6, flexWrap: 'wrap', alignItems: 'center' }}>
                 <span style={{ fontSize: 9, color: 'rgba(255,255,255,0.45)' }}>Часто ищут:</span>
-                {POPULAR_QUERIES.map(q => (
-                  <button key={q} onClick={() => onFoodSearchChange(q)} aria-label={`Искать ${q}`} className="nd-hist"
-                    style={{ padding: '9px 13px', borderRadius: 999, fontSize: 11, minHeight: 40, background: 'rgba(0,230,138,0.06)', border: '1px solid rgba(0,230,138,0.14)', color: '#86efac', cursor: 'pointer' }}>{q}</button>
+                {POPULAR_QUERIES.map((q) => (
+                  <button
+                    key={q}
+                    onClick={() => onFoodSearchChange(q)}
+                    aria-label={`Искать ${q}`}
+                    className="nd-hist"
+                    style={{
+                      padding: '9px 13px',
+                      borderRadius: 999,
+                      fontSize: 11,
+                      minHeight: 40,
+                      background: 'rgba(0,230,138,0.06)',
+                      border: '1px solid rgba(0,230,138,0.14)',
+                      color: '#86efac',
+                      cursor: 'pointer',
+                    }}
+                  >
+                    {q}
+                  </button>
                 ))}
               </div>
             )}
@@ -1113,127 +2673,457 @@ export const AddFoodPanel: React.FC<AddFoodPanelProps> = ({
             {history.length > 0 && (
               <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', alignItems: 'center' }}>
                 <span style={{ fontSize: 9, color: 'rgba(255,255,255,0.45)' }}>История:</span>
-                {history.map(h => (
-                  <button key={h} onClick={() => onFoodSearchChange(h)} className="nd-hist" style={{ padding: '10px 14px', borderRadius: 999, fontSize: 11, minHeight: 44, background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.06)', color: 'rgba(255,255,255,0.75)', cursor: 'pointer' }}>{h}</button>
+                {history.map((h) => (
+                  <button
+                    key={h}
+                    onClick={() => onFoodSearchChange(h)}
+                    className="nd-hist"
+                    style={{
+                      padding: '10px 14px',
+                      borderRadius: 999,
+                      fontSize: 11,
+                      minHeight: 44,
+                      background: 'rgba(255,255,255,0.04)',
+                      border: '1px solid rgba(255,255,255,0.06)',
+                      color: 'rgba(255,255,255,0.75)',
+                      cursor: 'pointer',
+                    }}
+                  >
+                    {h}
+                  </button>
                 ))}
-                <button onClick={() => { setHistory([]); try { localStorage.removeItem('he_search_history'); } catch {} }} aria-label="Очистить историю" style={{ fontSize: 10, color: 'rgba(255,255,255,0.4)', background: 'none', border: 'none', cursor: 'pointer' }}>✕</button>
+                <button
+                  onClick={() => {
+                    setHistory([]);
+                    try {
+                      localStorage.removeItem('he_search_history');
+                    } catch {}
+                  }}
+                  aria-label="Очистить историю"
+                  style={{
+                    fontSize: 10,
+                    color: 'rgba(255,255,255,0.4)',
+                    background: 'none',
+                    border: 'none',
+                    cursor: 'pointer',
+                  }}
+                >
+                  ✕
+                </button>
               </div>
             )}
 
-            <button onClick={() => setShowQuickAdd(v => !v)} style={{ width: '100%', padding: '11px 14px', borderRadius: 12, border: `1px solid ${showQuickAdd ? 'rgba(0,230,138,0.25)' : 'rgba(255,255,255,0.06)'}`, background: showQuickAdd ? 'rgba(0,230,138,0.10)' : 'rgba(255,255,255,0.03)', color: showQuickAdd ? '#00e68a' : 'rgba(255,255,255,0.85)', fontWeight: 700, fontSize: 12, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8 }}>
+            <button
+              onClick={() => setShowQuickAdd((v) => !v)}
+              style={{
+                width: '100%',
+                padding: '11px 14px',
+                borderRadius: 12,
+                border: `1px solid ${showQuickAdd ? 'rgba(0,230,138,0.25)' : 'rgba(255,255,255,0.06)'}`,
+                background: showQuickAdd ? 'rgba(0,230,138,0.10)' : 'rgba(255,255,255,0.03)',
+                color: showQuickAdd ? '#00e68a' : 'rgba(255,255,255,0.85)',
+                fontWeight: 700,
+                fontSize: 12,
+                cursor: 'pointer',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                gap: 8,
+              }}
+            >
               <span style={{ fontSize: 15 }}>⚡</span>
               <span>Быстрое добавление</span>
               <span style={{ marginLeft: 'auto', fontSize: 10, opacity: 0.7 }}>{showQuickAdd ? '▲' : '▼'}</span>
             </button>
             {showQuickAdd && (
-              <div style={{ padding: 10, borderRadius: 14, background: 'rgba(18,18,20,0.9)', border: '1px solid rgba(255,255,255,0.06)' }}>
+              <div
+                style={{
+                  padding: 10,
+                  borderRadius: 14,
+                  background: 'rgba(18,18,20,0.9)',
+                  border: '1px solid rgba(255,255,255,0.06)',
+                }}
+              >
                 <div className="nd-qtabs" style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginBottom: 10 }}>
                   {[
                     { id: 'fav', label: '⭐ Избранное', count: favoriteFoods.length },
                     { id: 'recent', label: '🔍 Запросы', count: history.length },
                     { id: 'last', label: '🆕 Последние', count: lastAdded.length },
                     { id: 'presets', label: '📦 Наборы', count: mealPresets.length },
-                  ].map(tab => (
-                    <button key={tab.id} onClick={() => setQuickTab(tab.id as any)} aria-pressed={quickTab === tab.id} data-active={quickTab === tab.id} className="nd-qtab" style={{ flex: '1 1 auto', padding: '9px 6px', borderRadius: 10, fontSize: 10, fontWeight: quickTab === tab.id ? 700 : 500, cursor: 'pointer', minHeight: 44, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 3, background: quickTab === tab.id ? 'rgba(0,230,138,0.14)' : 'rgba(255,255,255,0.03)', border: `1px solid ${quickTab === tab.id ? 'rgba(0,230,138,0.3)' : 'rgba(255,255,255,0.06)'}`, color: quickTab === tab.id ? '#00e68a' : 'rgba(255,255,255,0.65)' }}>
+                  ].map((tab) => (
+                    <button
+                      key={tab.id}
+                      onClick={() => setQuickTab(tab.id as any)}
+                      aria-pressed={quickTab === tab.id}
+                      data-active={quickTab === tab.id}
+                      className="nd-qtab"
+                      style={{
+                        flex: '1 1 auto',
+                        padding: '9px 6px',
+                        borderRadius: 10,
+                        fontSize: 10,
+                        fontWeight: quickTab === tab.id ? 700 : 500,
+                        cursor: 'pointer',
+                        minHeight: 44,
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        gap: 3,
+                        background: quickTab === tab.id ? 'rgba(0,230,138,0.14)' : 'rgba(255,255,255,0.03)',
+                        border: `1px solid ${quickTab === tab.id ? 'rgba(0,230,138,0.3)' : 'rgba(255,255,255,0.06)'}`,
+                        color: quickTab === tab.id ? '#00e68a' : 'rgba(255,255,255,0.65)',
+                      }}
+                    >
                       {tab.label}
-                      {tab.count > 0 && <span style={{ background: quickTab === tab.id ? '#00e68a' : 'rgba(255,255,255,0.08)', color: quickTab === tab.id ? '#000' : 'rgba(255,255,255,0.65)', padding: '1px 5px', borderRadius: 999, fontSize: 9, fontWeight: 700 }}>{tab.count}</span>}
+                      {tab.count > 0 && (
+                        <span
+                          style={{
+                            background: quickTab === tab.id ? '#00e68a' : 'rgba(255,255,255,0.08)',
+                            color: quickTab === tab.id ? '#000' : 'rgba(255,255,255,0.65)',
+                            padding: '1px 5px',
+                            borderRadius: 999,
+                            fontSize: 9,
+                            fontWeight: 700,
+                          }}
+                        >
+                          {tab.count}
+                        </span>
+                      )}
                     </button>
                   ))}
                 </div>
-                {quickTab === 'fav' && (
-                  favoriteFoods.length > 0 ? (
+                {quickTab === 'fav' &&
+                  (favoriteFoods.length > 0 ? (
                     <div style={{ display: 'grid', gap: 6 }}>
-                      {favoriteFoods.slice(0, 8).map(f => (
-                        <div key={f.id} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '8px 10px', borderRadius: 10, background: 'rgba(139,92,246,0.06)', border: '1px solid rgba(139,92,246,0.12)' }}>
-                          <span style={{ fontSize: 16, width: 24, textAlign: 'center' }}>{CAT_MAP_EMOJI[f.category || 'other'] || '📦'}</span>
+                      {favoriteFoods.slice(0, 8).map((f) => (
+                        <div
+                          key={f.id}
+                          style={{
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: 8,
+                            padding: '8px 10px',
+                            borderRadius: 10,
+                            background: 'rgba(139,92,246,0.06)',
+                            border: '1px solid rgba(139,92,246,0.12)',
+                          }}
+                        >
+                          <span style={{ fontSize: 16, width: 24, textAlign: 'center' }}>
+                            {CAT_MAP_EMOJI[f.category || 'other'] || '📦'}
+                          </span>
                           <div style={{ flex: 1, minWidth: 0 }}>
-                            <div style={{ fontSize: 11, fontWeight: 600, color: '#fff', overflowWrap: 'anywhere' }}>{f.name}</div>
-                            <div style={{ display: 'flex', gap: 6, fontSize: 9, color: 'rgba(255,255,255,0.55)', marginTop: 2, flexWrap: 'wrap' }}>
+                            <div style={{ fontSize: 11, fontWeight: 600, color: '#fff', overflowWrap: 'anywhere' }}>
+                              {f.name}
+                            </div>
+                            <div
+                              style={{
+                                display: 'flex',
+                                gap: 6,
+                                fontSize: 9,
+                                color: 'rgba(255,255,255,0.55)',
+                                marginTop: 2,
+                                flexWrap: 'wrap',
+                              }}
+                            >
                               <span style={{ color: '#00e68a', fontWeight: 700 }}>{f.kcal} ккал</span>
-                              <span>Б{fmt(f.protein)}</span><span>Ж{fmt(f.fat)}</span><span>У{fmt(f.carbs)}</span>
+                              <span>Б{fmt(f.protein)}</span>
+                              <span>Ж{fmt(f.fat)}</span>
+                              <span>У{fmt(f.carbs)}</span>
                             </div>
                           </div>
-                          <button onClick={() => queueFood(f)} aria-label="В очередь" className="nd-favadd" style={{ padding: '6px 12px', borderRadius: 10, border: 'none', background: 'linear-gradient(135deg,#8b5cf6,#7c3aed)', color: '#fff', fontSize: 12, fontWeight: 700, cursor: 'pointer', minHeight: 44, minWidth: 44 }}>＋</button>
-                          {onDirectAdd && <button onClick={() => onDirectAdd(f)} aria-label="Сразу в дневник" className="nd-favnow" style={{ padding: '6px 10px', borderRadius: 10, border: '1px solid rgba(0,230,138,0.2)', background: 'rgba(0,230,138,0.08)', color: '#00e68a', fontSize: 12, fontWeight: 700, cursor: 'pointer', minHeight: 44, minWidth: 44 }}>⚡</button>}
+                          <button
+                            onClick={() => queueFood(f)}
+                            aria-label="В очередь"
+                            className="nd-favadd"
+                            style={{
+                              padding: '6px 12px',
+                              borderRadius: 10,
+                              border: 'none',
+                              background: 'linear-gradient(135deg,#8b5cf6,#7c3aed)',
+                              color: '#fff',
+                              fontSize: 12,
+                              fontWeight: 700,
+                              cursor: 'pointer',
+                              minHeight: 44,
+                              minWidth: 44,
+                            }}
+                          >
+                            ＋
+                          </button>
+                          {onDirectAdd && (
+                            <button
+                              onClick={() => onDirectAdd(f)}
+                              aria-label="Сразу в дневник"
+                              className="nd-favnow"
+                              style={{
+                                padding: '6px 10px',
+                                borderRadius: 10,
+                                border: '1px solid rgba(0,230,138,0.2)',
+                                background: 'rgba(0,230,138,0.08)',
+                                color: '#00e68a',
+                                fontSize: 12,
+                                fontWeight: 700,
+                                cursor: 'pointer',
+                                minHeight: 44,
+                                minWidth: 44,
+                              }}
+                            >
+                              ⚡
+                            </button>
+                          )}
                         </div>
                       ))}
                     </div>
                   ) : (
-                    <div style={{ textAlign: 'center', padding: '14px', color: 'rgba(255,255,255,0.45)', fontSize: 11 }}>Нет избранного — добавляйте ⭐ из поиска</div>
-                  )
-                )}
-                {quickTab === 'recent' && (
-                  history.length > 0 ? (
+                    <div
+                      style={{ textAlign: 'center', padding: '14px', color: 'rgba(255,255,255,0.45)', fontSize: 11 }}
+                    >
+                      Нет избранного — добавляйте ⭐ из поиска
+                    </div>
+                  ))}
+                {quickTab === 'recent' &&
+                  (history.length > 0 ? (
                     <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
                       <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
-                        {history.map(h => {
+                        {history.map((h) => {
                           const food = findFood(h);
                           return (
-                            <button key={h} onClick={() => onFoodSearchChange(h)} style={{ padding: '7px 12px', borderRadius: 999, fontSize: 10, background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.06)', color: 'rgba(255,255,255,0.75)', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 6 }}>
+                            <button
+                              key={h}
+                              onClick={() => onFoodSearchChange(h)}
+                              style={{
+                                padding: '7px 12px',
+                                borderRadius: 999,
+                                fontSize: 10,
+                                background: 'rgba(255,255,255,0.04)',
+                                border: '1px solid rgba(255,255,255,0.06)',
+                                color: 'rgba(255,255,255,0.75)',
+                                cursor: 'pointer',
+                                display: 'flex',
+                                alignItems: 'center',
+                                gap: 6,
+                              }}
+                            >
                               <span>🕒</span> {h}
-                              {food && <span style={{ background: 'rgba(0,230,138,0.12)', color: '#00e68a', padding: '1px 6px', borderRadius: 999, fontSize: 9 }}>＋</span>}
+                              {food && (
+                                <span
+                                  style={{
+                                    background: 'rgba(0,230,138,0.12)',
+                                    color: '#00e68a',
+                                    padding: '1px 6px',
+                                    borderRadius: 999,
+                                    fontSize: 9,
+                                  }}
+                                >
+                                  ＋
+                                </span>
+                              )}
                             </button>
                           );
                         })}
                       </div>
                       <div style={{ height: 1, background: 'rgba(255,255,255,0.06)', margin: '4px 0' }} />
                       <div style={{ display: 'grid', gap: 6 }}>
-                        {history.slice(0, 4).map(h => {
+                        {history.slice(0, 4).map((h) => {
                           const f = findFood(h);
                           if (!f) return null;
                           return (
-                            <div key={h} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '8px 10px', borderRadius: 10, background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.04)' }}>
+                            <div
+                              key={h}
+                              style={{
+                                display: 'flex',
+                                alignItems: 'center',
+                                gap: 8,
+                                padding: '8px 10px',
+                                borderRadius: 10,
+                                background: 'rgba(255,255,255,0.02)',
+                                border: '1px solid rgba(255,255,255,0.04)',
+                              }}
+                            >
                               <span style={{ fontSize: 14 }}>{CAT_MAP_EMOJI[f.category || 'other'] || '📦'}</span>
-                              <span style={{ flex: 1, fontSize: 11, color: '#fff', fontWeight: 500, overflowWrap: 'anywhere' }}>{f.name}</span>
-                              <button onClick={() => queueFood(f)} aria-label="В очередь" className="nd-histadd" style={{ padding: '5px 10px', borderRadius: 8, background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.08)', color: '#fff', fontSize: 11, cursor: 'pointer', minHeight: 44 }}>＋ В очередь</button>
+                              <span
+                                style={{
+                                  flex: 1,
+                                  fontSize: 11,
+                                  color: '#fff',
+                                  fontWeight: 500,
+                                  overflowWrap: 'anywhere',
+                                }}
+                              >
+                                {f.name}
+                              </span>
+                              <button
+                                onClick={() => queueFood(f)}
+                                aria-label="В очередь"
+                                className="nd-histadd"
+                                style={{
+                                  padding: '5px 10px',
+                                  borderRadius: 8,
+                                  background: 'rgba(255,255,255,0.06)',
+                                  border: '1px solid rgba(255,255,255,0.08)',
+                                  color: '#fff',
+                                  fontSize: 11,
+                                  cursor: 'pointer',
+                                  minHeight: 44,
+                                }}
+                              >
+                                ＋ В очередь
+                              </button>
                             </div>
                           );
                         })}
                       </div>
                     </div>
                   ) : (
-                    <div style={{ textAlign: 'center', padding: '14px', color: 'rgba(255,255,255,0.45)', fontSize: 11 }}>История пуста — ваши поисковые запросы появятся здесь</div>
-                  )
-                )}
-                {quickTab === 'last' && (
-                  lastAdded.length > 0 ? (
+                    <div
+                      style={{ textAlign: 'center', padding: '14px', color: 'rgba(255,255,255,0.45)', fontSize: 11 }}
+                    >
+                      История пуста — ваши поисковые запросы появятся здесь
+                    </div>
+                  ))}
+                {quickTab === 'last' &&
+                  (lastAdded.length > 0 ? (
                     <div style={{ display: 'grid', gap: 6 }}>
                       {lastAdded.map((it: any, idx: number) => (
-                        <div key={idx} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '8px 10px', borderRadius: 10, background: 'rgba(0,230,138,0.05)', border: '1px solid rgba(0,230,138,0.12)' }}>
-                          <span style={{ fontSize: 16, width: 24, textAlign: 'center' }}>{CAT_MAP_EMOJI[it.category || 'other'] || '📦'}</span>
+                        <div
+                          key={idx}
+                          style={{
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: 8,
+                            padding: '8px 10px',
+                            borderRadius: 10,
+                            background: 'rgba(0,230,138,0.05)',
+                            border: '1px solid rgba(0,230,138,0.12)',
+                          }}
+                        >
+                          <span style={{ fontSize: 16, width: 24, textAlign: 'center' }}>
+                            {CAT_MAP_EMOJI[it.category || 'other'] || '📦'}
+                          </span>
                           <div style={{ flex: 1, minWidth: 0 }}>
-                            <div style={{ fontSize: 11, fontWeight: 600, color: '#fff', overflowWrap: 'anywhere' }}>{it.name}</div>
-                            <div style={{ display: 'flex', gap: 6, fontSize: 9, color: 'rgba(255,255,255,0.5)', marginTop: 2 }}>
+                            <div style={{ fontSize: 11, fontWeight: 600, color: '#fff', overflowWrap: 'anywhere' }}>
+                              {it.name}
+                            </div>
+                            <div
+                              style={{
+                                display: 'flex',
+                                gap: 6,
+                                fontSize: 9,
+                                color: 'rgba(255,255,255,0.5)',
+                                marginTop: 2,
+                              }}
+                            >
                               <span style={{ color: '#00e68a', fontWeight: 700 }}>{it.kcal} ккал</span>
-                              <span>{typeof it.qty === 'number' ? `${Math.round(it.qty)} г` : (it.qty || '100 г')}</span>
+                              <span>{typeof it.qty === 'number' ? `${Math.round(it.qty)} г` : it.qty || '100 г'}</span>
                             </div>
                           </div>
-                          <button onClick={() => queueFood({ id: it.foodId || it.name, name: it.name, kcal: it.kcal, protein: it.p || 0, fat: it.f || 0, carbs: it.c || 0, category: it.category } as any)} aria-label="Добавить последнее" className="nd-lastadd" style={{ padding: '6px 12px', borderRadius: 10, border: 'none', background: 'linear-gradient(135deg,#00e68a,#00c8a0)', color: '#000', fontSize: 12, fontWeight: 700, cursor: 'pointer', minHeight: 44, minWidth: 44 }}>＋</button>
+                          <button
+                            onClick={() =>
+                              queueFood({
+                                id: it.foodId || it.name,
+                                name: it.name,
+                                kcal: it.kcal,
+                                protein: it.p || 0,
+                                fat: it.f || 0,
+                                carbs: it.c || 0,
+                                category: it.category,
+                              } as any)
+                            }
+                            aria-label="Добавить последнее"
+                            className="nd-lastadd"
+                            style={{
+                              padding: '6px 12px',
+                              borderRadius: 10,
+                              border: 'none',
+                              background: 'linear-gradient(135deg,#00e68a,#00c8a0)',
+                              color: '#000',
+                              fontSize: 12,
+                              fontWeight: 700,
+                              cursor: 'pointer',
+                              minHeight: 44,
+                              minWidth: 44,
+                            }}
+                          >
+                            ＋
+                          </button>
                         </div>
                       ))}
                     </div>
                   ) : (
-                    <div style={{ textAlign: 'center', padding: '14px', color: 'rgba(255,255,255,0.45)', fontSize: 11 }}>Нет последних — добавь еду в дневник</div>
-                  )
-                )}
-                {quickTab === 'presets' && (
-                  mealPresets.length > 0 ? (
+                    <div
+                      style={{ textAlign: 'center', padding: '14px', color: 'rgba(255,255,255,0.45)', fontSize: 11 }}
+                    >
+                      Нет последних — добавь еду в дневник
+                    </div>
+                  ))}
+                {quickTab === 'presets' &&
+                  (mealPresets.length > 0 ? (
                     <div style={{ display: 'grid', gap: 6 }}>
                       {mealPresets.map((p, i) => (
-                        <div key={i} style={{ padding: '8px 10px', borderRadius: 10, background: 'rgba(0,230,138,0.05)', border: '1px solid rgba(0,230,138,0.12)', display: 'flex', alignItems: 'center', gap: 8 }}>
-                          <div style={{ width: 28, height: 28, borderRadius: 9, background: 'linear-gradient(135deg,#00e68a,#00c8a0)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 13, flexShrink: 0 }}>📦</div>
-                          <div style={{ flex: 1, minWidth: 0 }}>
-                            <div style={{ fontSize: 11, fontWeight: 700, color: '#fff', overflowWrap: 'anywhere' }}>{p.name}</div>
-                            <div style={{ fontSize: 9, color: 'rgba(255,255,255,0.55)' }}>{p.items?.length || 0} продуктов • {p.items?.reduce((s: any, it: any) => s + (it.kcal || 0), 0) || 0} ккал</div>
+                        <div
+                          key={i}
+                          style={{
+                            padding: '8px 10px',
+                            borderRadius: 10,
+                            background: 'rgba(0,230,138,0.05)',
+                            border: '1px solid rgba(0,230,138,0.12)',
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: 8,
+                          }}
+                        >
+                          <div
+                            style={{
+                              width: 28,
+                              height: 28,
+                              borderRadius: 9,
+                              background: 'linear-gradient(135deg,#00e68a,#00c8a0)',
+                              display: 'flex',
+                              alignItems: 'center',
+                              justifyContent: 'center',
+                              fontSize: 13,
+                              flexShrink: 0,
+                            }}
+                          >
+                            📦
                           </div>
-                          <button onClick={() => onAddPreset(p.items)} aria-label="Добавить набор" className="nd-presetadd" style={{ padding: '7px 14px', borderRadius: 10, border: 'none', background: 'linear-gradient(135deg,#00e68a,#00c8a0)', color: '#000', fontWeight: 700, fontSize: 12, cursor: 'pointer', minHeight: 44 }}>Добавить</button>
+                          <div style={{ flex: 1, minWidth: 0 }}>
+                            <div style={{ fontSize: 11, fontWeight: 700, color: '#fff', overflowWrap: 'anywhere' }}>
+                              {p.name}
+                            </div>
+                            <div style={{ fontSize: 9, color: 'rgba(255,255,255,0.55)' }}>
+                              {p.items?.length || 0} продуктов •{' '}
+                              {p.items?.reduce((s: any, it: any) => s + (it.kcal || 0), 0) || 0} ккал
+                            </div>
+                          </div>
+                          <button
+                            onClick={() => onAddPreset(p.items)}
+                            aria-label="Добавить набор"
+                            className="nd-presetadd"
+                            style={{
+                              padding: '7px 14px',
+                              borderRadius: 10,
+                              border: 'none',
+                              background: 'linear-gradient(135deg,#00e68a,#00c8a0)',
+                              color: '#000',
+                              fontWeight: 700,
+                              fontSize: 12,
+                              cursor: 'pointer',
+                              minHeight: 44,
+                            }}
+                          >
+                            Добавить
+                          </button>
                         </div>
                       ))}
                     </div>
                   ) : (
-                    <div style={{ textAlign: 'center', padding: '14px', color: 'rgba(255,255,255,0.45)', fontSize: 11 }}>Нет сохранённых наборов — собери продукты и сохрани как пресет</div>
-                  )
-                )}
+                    <div
+                      style={{ textAlign: 'center', padding: '14px', color: 'rgba(255,255,255,0.45)', fontSize: 11 }}
+                    >
+                      Нет сохранённых наборов — собери продукты и сохрани как пресет
+                    </div>
+                  ))}
               </div>
             )}
 
@@ -1243,28 +3133,125 @@ export const AddFoodPanel: React.FC<AddFoodPanelProps> = ({
 
         {/* Сырой текст — отдельная карточка, действие добавления прямо в ней */}
         {ocrText && !hasQuery && (
-          <details className="nd-ocr-raw"
+          <details
+            className="nd-ocr-raw"
             open={rawTextOpen ?? parsedItems.length === 0}
             onToggle={(e) => setRawTextOpen((e.currentTarget as HTMLDetailsElement).open)}
-            style={{ padding: '10px 12px', borderRadius: 14, background: 'rgba(59,130,246,0.05)', border: '1px solid rgba(59,130,246,0.16)', fontSize: 12 }}>
-            <summary style={{ cursor: 'pointer', color: 'rgba(255,255,255,0.85)', fontSize: 11, fontWeight: 700, display: 'flex', alignItems: 'center', gap: 6 }}>
+            style={{
+              padding: '10px 12px',
+              borderRadius: 14,
+              background: 'rgba(59,130,246,0.05)',
+              border: '1px solid rgba(59,130,246,0.16)',
+              fontSize: 12,
+            }}
+          >
+            <summary
+              style={{
+                cursor: 'pointer',
+                color: 'rgba(255,255,255,0.85)',
+                fontSize: 11,
+                fontWeight: 700,
+                display: 'flex',
+                alignItems: 'center',
+                gap: 6,
+              }}
+            >
               🧾 Текст со скриншота
-              <span style={{ fontSize: 9, fontWeight: 700, padding: '2px 7px', borderRadius: 999, background: 'rgba(59,130,246,0.14)', color: '#93c5fd' }}>
-                {ocrText.split(/\r?\n/).filter(l => l.trim()).length} стр. · {ocrText.length} симв.
+              <span
+                style={{
+                  fontSize: 9,
+                  fontWeight: 700,
+                  padding: '2px 7px',
+                  borderRadius: 999,
+                  background: 'rgba(59,130,246,0.14)',
+                  color: '#93c5fd',
+                }}
+              >
+                {ocrText.split(/\r?\n/).filter((l) => l.trim()).length} стр. · {ocrText.length} симв.
               </span>
             </summary>
-            <pre style={{ whiteSpace: 'pre-wrap', wordBreak: 'break-word', marginTop: 8, marginBottom: 8, padding: 10, borderRadius: 10, background: '#141417', color: 'rgba(255,255,255,0.72)', fontSize: 11, lineHeight: 1.45, maxHeight: 160, overflowY: 'auto', border: '1px solid rgba(255,255,255,0.05)' }}>{ocrText.slice(0, 1500)}</pre>
+            <pre
+              style={{
+                whiteSpace: 'pre-wrap',
+                wordBreak: 'break-word',
+                marginTop: 8,
+                marginBottom: 8,
+                padding: 10,
+                borderRadius: 10,
+                background: '#141417',
+                color: 'rgba(255,255,255,0.72)',
+                fontSize: 11,
+                lineHeight: 1.45,
+                maxHeight: 160,
+                overflowY: 'auto',
+                border: '1px solid rgba(255,255,255,0.05)',
+              }}
+            >
+              {ocrText.slice(0, 1500)}
+            </pre>
             <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
-              <button onClick={() => { try { void navigator.clipboard?.writeText(ocrText); } catch { /* нет буфера */ } }} aria-label="Копировать текст"
-                style={{ flex: 1, minWidth: 100, padding: '10px', borderRadius: 10, border: '1px solid rgba(255,255,255,0.08)', background: 'rgba(255,255,255,0.04)', color: 'rgba(255,255,255,0.75)', fontSize: 11, fontWeight: 700, cursor: 'pointer', minHeight: 44 }}>
+              <button
+                onClick={() => {
+                  try {
+                    void navigator.clipboard?.writeText(ocrText);
+                  } catch {
+                    /* нет буфера */
+                  }
+                }}
+                aria-label="Копировать текст"
+                style={{
+                  flex: 1,
+                  minWidth: 100,
+                  padding: '10px',
+                  borderRadius: 10,
+                  border: '1px solid rgba(255,255,255,0.08)',
+                  background: 'rgba(255,255,255,0.04)',
+                  color: 'rgba(255,255,255,0.75)',
+                  fontSize: 11,
+                  fontWeight: 700,
+                  cursor: 'pointer',
+                  minHeight: 44,
+                }}
+              >
                 📋 Копировать
               </button>
-              <button onClick={onOcrSubmit} aria-label="Разобрать заново"
-                style={{ flex: 1, minWidth: 100, padding: '10px', borderRadius: 10, border: '1px solid rgba(59,130,246,0.22)', background: 'rgba(59,130,246,0.08)', color: '#93c5fd', fontSize: 11, fontWeight: 700, cursor: 'pointer', minHeight: 44 }}>
+              <button
+                onClick={onOcrSubmit}
+                aria-label="Разобрать заново"
+                style={{
+                  flex: 1,
+                  minWidth: 100,
+                  padding: '10px',
+                  borderRadius: 10,
+                  border: '1px solid rgba(59,130,246,0.22)',
+                  background: 'rgba(59,130,246,0.08)',
+                  color: '#93c5fd',
+                  fontSize: 11,
+                  fontWeight: 700,
+                  cursor: 'pointer',
+                  minHeight: 44,
+                }}
+              >
                 🔁 Разобрать
               </button>
-              <button onClick={onSaveItems} disabled={parsedItems.length === 0} aria-label="Добавить в дневник"
-                style={{ flex: 1.4, minWidth: 110, padding: '10px', borderRadius: 10, border: 'none', background: parsedItems.length ? 'linear-gradient(135deg,#00e68a,#00c8a0)' : 'rgba(255,255,255,0.06)', color: parsedItems.length ? '#000' : 'rgba(255,255,255,0.4)', fontSize: 11, fontWeight: 800, cursor: parsedItems.length ? 'pointer' : 'not-allowed', minHeight: 44 }}>
+              <button
+                onClick={onSaveItems}
+                disabled={parsedItems.length === 0}
+                aria-label="Добавить в дневник"
+                style={{
+                  flex: 1.4,
+                  minWidth: 110,
+                  padding: '10px',
+                  borderRadius: 10,
+                  border: 'none',
+                  background: parsedItems.length ? 'linear-gradient(135deg,#00e68a,#00c8a0)' : 'rgba(255,255,255,0.06)',
+                  color: parsedItems.length ? '#000' : 'rgba(255,255,255,0.4)',
+                  fontSize: 11,
+                  fontWeight: 800,
+                  cursor: parsedItems.length ? 'pointer' : 'not-allowed',
+                  minHeight: 44,
+                }}
+              >
                 ➕ Добавить
               </button>
             </div>
@@ -1272,22 +3259,68 @@ export const AddFoodPanel: React.FC<AddFoodPanelProps> = ({
         )}
 
         {/* Своя еда — всегда доступна внизу */}
-        <button onClick={onToggleCustomFood} aria-label="Своя еда" className="nd-cfood-toggle"
-          style={{ width: '100%', padding: '11px', borderRadius: 12, fontSize: 12, cursor: 'pointer',
+        <button
+          onClick={onToggleCustomFood}
+          aria-label="Своя еда"
+          className="nd-cfood-toggle"
+          style={{
+            width: '100%',
+            padding: '11px',
+            borderRadius: 12,
+            fontSize: 12,
+            cursor: 'pointer',
             background: showCustomFood ? 'rgba(139,92,246,0.12)' : 'rgba(255,255,255,0.03)',
             border: `1px solid ${showCustomFood ? 'rgba(139,92,246,0.25)' : 'rgba(255,255,255,0.06)'}`,
-            color: showCustomFood ? '#a78bfa' : 'rgba(255,255,255,0.85)', minHeight: 46, fontWeight: 700,
-            display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6 }}>
-          <span style={{ width: 22, height: 22, borderRadius: 8, background: 'rgba(139,92,246,0.12)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 11 }}>🍎</span>
+            color: showCustomFood ? '#a78bfa' : 'rgba(255,255,255,0.85)',
+            minHeight: 46,
+            fontWeight: 700,
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            gap: 6,
+          }}
+        >
+          <span
+            style={{
+              width: 22,
+              height: 22,
+              borderRadius: 8,
+              background: 'rgba(139,92,246,0.12)',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              fontSize: 11,
+            }}
+          >
+            🍎
+          </span>
           {showCustomFood ? '✕ Скрыть' : 'Своя еда (ввести вручную)'}
         </button>
 
         {showCustomFood && (
-          <div className="nd-cfood-panel" style={{ padding: 12, borderRadius: 14, background: '#202023', border: '1px solid rgba(139,92,246,0.15)' }}>
-            <input value={customFoodName} onChange={e => onCustomFoodNameChange(e.target.value)} placeholder="Название"
-              aria-label="Название своей еды" className="nd-cfood-name"
-              style={{ width: '100%', padding: '10px 12px', borderRadius: 10, background: '#18181b',
-                border: '1px solid rgba(255,255,255,0.06)', color: '#fff', fontSize: 16, marginBottom: 8, boxSizing: 'border-box', minHeight: 48 }} />
+          <div
+            className="nd-cfood-panel"
+            style={{ padding: 12, borderRadius: 14, background: '#202023', border: '1px solid rgba(139,92,246,0.15)' }}
+          >
+            <input
+              value={customFoodName}
+              onChange={(e) => onCustomFoodNameChange(e.target.value)}
+              placeholder="Название"
+              aria-label="Название своей еды"
+              className="nd-cfood-name"
+              style={{
+                width: '100%',
+                padding: '10px 12px',
+                borderRadius: 10,
+                background: '#18181b',
+                border: '1px solid rgba(255,255,255,0.06)',
+                color: '#fff',
+                fontSize: 16,
+                marginBottom: 8,
+                boxSizing: 'border-box',
+                minHeight: 48,
+              }}
+            />
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 6 }}>
               {[
                 { l: 'Ккал', v: customFoodKcal, f: 'customFoodKcal' },
@@ -1296,17 +3329,48 @@ export const AddFoodPanel: React.FC<AddFoodPanelProps> = ({
                 { l: 'Угл.', v: customFoodC, f: 'customFoodC' },
               ].map((x, i) => (
                 <div key={i}>
-                  <label style={{ fontSize: 10, color: 'rgba(255,255,255,0.7)', marginBottom: 2, display: 'block' }}>{x.l}</label>
-                  <input type="number" value={x.v} onChange={e => onCustomFoodFieldChange(x.f, e.target.value)}
-                    aria-label={x.l} className="nd-cfood-num"
-                    style={{ width: '100%', padding: '8px', borderRadius: 8, background: '#18181b',
-                      border: '1px solid rgba(255,255,255,0.06)', color: '#fff', fontSize: 16, boxSizing: 'border-box', minHeight: 44 }} />
+                  <label style={{ fontSize: 10, color: 'rgba(255,255,255,0.7)', marginBottom: 2, display: 'block' }}>
+                    {x.l}
+                  </label>
+                  <input
+                    type="number"
+                    value={x.v}
+                    onChange={(e) => onCustomFoodFieldChange(x.f, e.target.value)}
+                    aria-label={x.l}
+                    className="nd-cfood-num"
+                    style={{
+                      width: '100%',
+                      padding: '8px',
+                      borderRadius: 8,
+                      background: '#18181b',
+                      border: '1px solid rgba(255,255,255,0.06)',
+                      color: '#fff',
+                      fontSize: 16,
+                      boxSizing: 'border-box',
+                      minHeight: 44,
+                    }}
+                  />
                 </div>
               ))}
             </div>
-            <button onClick={onAddCustomFood} aria-label="Добавить свою еду" className="nd-cfood-add" style={{ width: '100%', marginTop: 8, padding: '10px', borderRadius: 10,
-              border: 'none', cursor: 'pointer', background: 'linear-gradient(135deg,#00e68a,#00c8a0)',
-              color: '#000', fontWeight: 700, fontSize: 12, minHeight: 48 }}>
+            <button
+              onClick={onAddCustomFood}
+              aria-label="Добавить свою еду"
+              className="nd-cfood-add"
+              style={{
+                width: '100%',
+                marginTop: 8,
+                padding: '10px',
+                borderRadius: 10,
+                border: 'none',
+                cursor: 'pointer',
+                background: 'linear-gradient(135deg,#00e68a,#00c8a0)',
+                color: '#000',
+                fontWeight: 700,
+                fontSize: 12,
+                minHeight: 48,
+              }}
+            >
               + Добавить
             </button>
           </div>
@@ -1317,7 +3381,18 @@ export const AddFoodPanel: React.FC<AddFoodPanelProps> = ({
         <BarcodeScanner
           onProductFound={onBarcodeProduct}
           onClose={onCloseBarcode}
-          onLabelScan={() => { onCloseBarcode(); onOpenLabelScan(); }}
+          // «＋ В очередь»: продукт сразу в очередь дневника с порцией из карточки,
+          // сканер остаётся открытым — второй товар без повторного входа.
+          onQuickAdd={(product, grams) => queueFood(productToFoodItem(product) as any, grams ?? 100)}
+          // «Указать вес…» открывает «Сколько грамм?» вместо молчаливых 100 г.
+          onPortionRequest={(product) => {
+            onCloseBarcode();
+            openPortion(productToFoodItem(product) as any);
+          }}
+          onLabelScan={() => {
+            onCloseBarcode();
+            onOpenLabelScan();
+          }}
         />
       )}
 
@@ -1335,23 +3410,59 @@ export const AddFoodPanel: React.FC<AddFoodPanelProps> = ({
       <AddToBaseModal
         open={baseOpen}
         initial={baseInitial}
-        onClose={() => { setBaseOpen(false); setBaseInitial(null); }}
+        onClose={() => {
+          setBaseOpen(false);
+          setBaseInitial(null);
+        }}
       />
 
       <input ref={ocrCameraRef} type="file" accept="image/*" style={{ display: 'none' }} onChange={() => {}} />
 
       {/* ── Нижняя строка добавления: один раз и навсегда внизу листа ── */}
       {parsedItems.length > 0 && (
-        <div className="nd-ocr-actions" style={{ position: 'sticky', bottom: 'var(--tabbar-lift, calc(var(--nav-height, 76px) + max(env(safe-area-inset-bottom, 0px), 28px) + 18px))', zIndex: 22, flexShrink: 0, display: 'flex', alignItems: 'center', gap: 10, padding: '8px 12px calc(8px + max(env(safe-area-inset-bottom, 0px), 12px))', background: 'linear-gradient(180deg, rgba(24,24,27,0.98), #18181b)', borderTop: '1px solid rgba(0,230,138,0.18)', boxShadow: '0 -6px 20px rgba(0,0,0,0.35)' }}>
+        <div
+          className="nd-ocr-actions"
+          style={{
+            position: 'sticky',
+            bottom:
+              'var(--tabbar-lift, calc(var(--nav-height, 76px) + max(env(safe-area-inset-bottom, 0px), 28px) + 18px))',
+            zIndex: 22,
+            flexShrink: 0,
+            display: 'flex',
+            alignItems: 'center',
+            gap: 10,
+            padding: '8px 12px calc(8px + max(env(safe-area-inset-bottom, 0px), 12px))',
+            background: 'linear-gradient(180deg, rgba(24,24,27,0.98), #18181b)',
+            borderTop: '1px solid rgba(0,230,138,0.18)',
+            boxShadow: '0 -6px 20px rgba(0,0,0,0.35)',
+          }}
+        >
           <div style={{ flexShrink: 0, display: 'flex', flexDirection: 'column', lineHeight: 1.25 }}>
-            <span style={{ fontSize: 11, fontWeight: 800, color: '#00e68a', fontVariantNumeric: 'tabular-nums' }}>{queueKcal} ккал</span>
-            <span style={{ fontSize: 9, color: 'rgba(255,255,255,0.55)' }}>{parsedItems.length} поз. · {mealType || 'без приёма'}</span>
+            <span style={{ fontSize: 11, fontWeight: 800, color: '#00e68a', fontVariantNumeric: 'tabular-nums' }}>
+              {queueKcal} ккал
+            </span>
+            <span style={{ fontSize: 9, color: 'rgba(255,255,255,0.55)' }}>
+              {parsedItems.length} поз. · {mealType || 'без приёма'}
+            </span>
           </div>
-          <button onClick={onSaveItems} aria-label="Сохранить" className="nd-ocr-add"
-            style={{ flex: 1, padding: '12px', borderRadius: 10, border: 'none', cursor: 'pointer',
+          <button
+            onClick={onSaveItems}
+            aria-label="Сохранить"
+            className="nd-ocr-add"
+            style={{
+              flex: 1,
+              padding: '12px',
+              borderRadius: 10,
+              border: 'none',
+              cursor: 'pointer',
               background: 'linear-gradient(135deg,#00e68a,#00c8a0)',
-              color: '#000', fontWeight: 800, fontSize: 13, minHeight: 48,
-              boxShadow: '0 4px 16px rgba(0,230,138,0.22)' }}>
+              color: '#000',
+              fontWeight: 800,
+              fontSize: 13,
+              minHeight: 48,
+              boxShadow: '0 4px 16px rgba(0,230,138,0.22)',
+            }}
+          >
             💾 Добавить {parsedItems.length} поз. в дневник
           </button>
         </div>

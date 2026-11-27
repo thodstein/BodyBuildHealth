@@ -50,11 +50,17 @@ describe('Сканер штрихкодов: локальные продукты
       fiber: 0, category: 'dairy', servingSize: '100 г', barcode: '4601234567890', source: 'label_photo',
     });
     const found: Array<{ name: string }> = [];
-    const { getByLabelText, getByText } = render(<BarcodeScanner onProductFound={p => found.push(p)} onClose={() => {}} />);
+    const { container, getByLabelText, getByText } = render(<BarcodeScanner onProductFound={p => found.push(p)} onClose={() => {}} />);
     fireEvent.change(getByLabelText('Штрихкод'), { target: { value: '4601234567890' } });
     fireEvent.click(getByText('Найти по штрихкоду'));
-    await waitFor(() => expect(found).toHaveLength(1));
-    expect(found[0].name).toBe('Творог с упаковки');
+    // Свой продукт находится до сети, но в дневник уходит только по явному
+    // действию: сначала карточка, иначе второй скан требует заново открывать сканер.
+    await waitFor(() => expect(container.querySelector('.nd-scanfound')?.textContent).toContain('Творог с упаковки'));
+    expect(found).toHaveLength(0);
     expect(searchByBarcode).not.toHaveBeenCalled();
+    // «Указать вес…» — прежний путь в дневник (граммы выбирает пользователь).
+    fireEvent.click(getByLabelText('Указать вес продукта'));
+    expect(found).toHaveLength(1);
+    expect(found[0].name).toBe('Творог с упаковки');
   });
 });

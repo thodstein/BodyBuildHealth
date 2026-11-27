@@ -69,14 +69,28 @@ describe('Сканер АПК: нативный путь', () => {
   it('нативный скан доводит код до продукта из shared-базы + пишет recent', async () => {
     vi.mocked(scanNativeBarcode).mockResolvedValueOnce({ status: 'scanned', code: '4600000000000' });
     const found: unknown[] = [];
-    const { container } = render(<BarcodeScanner onProductFound={(p) => found.push(p)} onClose={() => {}} />);
+    const queued: unknown[] = [];
+    const { container } = render(
+      <BarcodeScanner onProductFound={(p) => found.push(p)} onClose={() => {}} onQuickAdd={(p) => queued.push(p)} />,
+    );
     const btn = container.querySelector('.nd-scannative') as HTMLElement;
     fireEvent.click(btn);
-    await waitFor(() => expect(found.length).toBe(1), { timeout: 8000 });
-    expect((found[0] as { name: string }).name).toBe('Общая каша');
-    expect(saveSharedBarcode).toHaveBeenCalled();
+    // Найденное из shared-базы показывается карточкой: в дневник без явного
+    // действия не уходит (иначе второй товар — снова открывать сканер).
+    await waitFor(() => expect(container.querySelector('.nd-scanfound')?.textContent).toContain('Общая каша'), { timeout: 8000 });
+    expect(found).toHaveLength(0);
+    // Недавние пишутся уже на найденное — до выбора «в очередь / вес».
     const recent = JSON.parse(localStorage.getItem('he_barcode_recent_v1') || '[]');
     expect(recent[0]?.barcode).toBe('4600000000000');
+    expect(recent[0]?.name).toBe('Общая каша');
+    expect(saveSharedBarcode).toHaveBeenCalled();
+    // «＋ 100 г в очередь» — продукт уходит родителю, модалка остаётся открытой.
+    fireEvent.click(container.querySelector('.nd-scanquick') as HTMLElement);
+    expect(queued).toHaveLength(1);
+    expect((queued[0] as { name: string }).name).toBe('Общая каша');
+    expect(found).toHaveLength(0);
+    expect(container.querySelector('.nd-scanfound')).toBeNull();
+    expect(container.querySelector('.nd-scanadded')?.textContent).toContain('Общая каша');
   });
 
   it('отказ в камере → ошибка + кнопка настроек', async () => {

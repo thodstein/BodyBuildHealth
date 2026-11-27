@@ -30,7 +30,10 @@ const noop = vi.fn();
 describe('nutrition-diary-pro hooks', () => {
   it('MacroSummary: сетка nd-macros + 4 плитки + остаток', () => {
     const { container } = render(
-      <MacroSummary dayTotals={{ kcal: 2000, p: 150, f: 60, c: 250 }} targets={{ kcal: 2500, protein: 160, fats: 70, carbs: 300 }} />
+      <MacroSummary
+        dayTotals={{ kcal: 2000, p: 150, f: 60, c: 250 }}
+        targets={{ kcal: 2500, protein: 160, fats: 70, carbs: 300 }}
+      />,
     );
     expect(container.querySelector('.nd-macros')).not.toBeNull();
     expect(container.querySelectorAll('.nd-macro')).toHaveLength(4);
@@ -39,14 +42,17 @@ describe('nutrition-diary-pro hooks', () => {
 
   it('MacroSummary: перебор ставит data-over', () => {
     const { container } = render(
-      <MacroSummary dayTotals={{ kcal: 3000, p: 200, f: 100, c: 400 }} targets={{ kcal: 2500, protein: 160, fats: 70, carbs: 300 }} />
+      <MacroSummary
+        dayTotals={{ kcal: 3000, p: 200, f: 100, c: 400 }}
+        targets={{ kcal: 2500, protein: 160, fats: 70, carbs: 300 }}
+      />,
     );
     expect(container.querySelector('.nd-macro-remain')?.getAttribute('data-over')).toBe('true');
   });
 
   it('WeekDaySelector: лента + 7 дней + выбранный data-selected', () => {
     const { container } = render(
-      <WeekDaySelector weekDays={WEEK} selectedDate="2026-09-09" onSelectDate={noop} diaryData={{}} />
+      <WeekDaySelector weekDays={WEEK} selectedDate="2026-09-09" onSelectDate={noop} diaryData={{}} />,
     );
     expect(container.querySelector('.nd-week')).not.toBeNull();
     expect(container.querySelectorAll('.nd-weekday')).toHaveLength(7);
@@ -58,7 +64,7 @@ describe('nutrition-diary-pro hooks', () => {
   it('WeekDaySelector: клик по дню зовёт onSelectDate', () => {
     const onSelect = vi.fn();
     const { container } = render(
-      <WeekDaySelector weekDays={WEEK} selectedDate="2026-09-09" onSelectDate={onSelect} diaryData={{}} />
+      <WeekDaySelector weekDays={WEEK} selectedDate="2026-09-09" onSelectDate={onSelect} diaryData={{}} />,
     );
     const days = container.querySelectorAll('.nd-weekday');
     fireEvent.click(days[0]);
@@ -67,9 +73,7 @@ describe('nutrition-diary-pro hooks', () => {
 
   it('WeekDaySelector: стрелки сдвигают неделю на ±7 локальных дней', () => {
     const onSelect = vi.fn();
-    render(
-      <WeekDaySelector weekDays={WEEK} selectedDate="2026-09-09" onSelectDate={onSelect} diaryData={{}} />
-    );
+    render(<WeekDaySelector weekDays={WEEK} selectedDate="2026-09-09" onSelectDate={onSelect} diaryData={{}} />);
     fireEvent.click(screen.getByLabelText('Пред. неделя'));
     expect(onSelect).toHaveBeenCalledWith('2026-09-02');
     fireEvent.click(screen.getByLabelText('След. неделя'));
@@ -79,7 +83,7 @@ describe('nutrition-diary-pro hooks', () => {
   it('WeekDaySelector: Enter/Space по дню зовёт onSelectDate', () => {
     const onSelect = vi.fn();
     const { container } = render(
-      <WeekDaySelector weekDays={WEEK} selectedDate="2026-09-09" onSelectDate={onSelect} diaryData={{}} />
+      <WeekDaySelector weekDays={WEEK} selectedDate="2026-09-09" onSelectDate={onSelect} diaryData={{}} />,
     );
     const days = container.querySelectorAll('.nd-weekday');
     fireEvent.keyDown(days[1], { key: 'Enter' });
@@ -94,7 +98,14 @@ describe('nutrition-diary-pro hooks', () => {
       { name: 'Рис', qty: '100 г', kcal: 130, p: 2.7, f: 0.3, c: 28 },
     ];
     const { container } = render(
-      <MealCard mealName="Обед" items={items} onEditItem={noop} onDeleteItem={noop} onCopyMeal={noop} onSavePreset={noop} />
+      <MealCard
+        mealName="Обед"
+        items={items}
+        onEditItem={noop}
+        onDeleteItem={noop}
+        onCopyMeal={noop}
+        onSavePreset={noop}
+      />,
     );
     expect(container.querySelector('.nd-mealcard')).not.toBeNull();
     expect(container.querySelectorAll('.nd-mealitem')).toHaveLength(2);
@@ -105,14 +116,37 @@ describe('nutrition-diary-pro hooks', () => {
 
   it('DayMealsList: пусто — nd-dayempty; с данными — nd-dayactions', () => {
     const { container, rerender } = render(
-      <DayMealsList dayMeals={{}} onEditItem={noop} onDeleteItem={noop} onCopyMeal={noop} onSavePreset={noop}
-        onImportFromPlan={noop} onClearDay={noop} onFillMicros={noop} selectedDate="2026-09-09" copySource={null} onPasteMeal={noop} onCancelCopy={noop} />
+      <DayMealsList
+        dayMeals={{}}
+        onEditItem={noop}
+        onDeleteItem={noop}
+        onCopyMeal={noop}
+        onSavePreset={noop}
+        onImportFromPlan={noop}
+        onClearDay={noop}
+        onFillMicros={noop}
+        selectedDate="2026-09-09"
+        copySource={null}
+        onPasteMeal={noop}
+        onCancelCopy={noop}
+      />,
     );
     expect(container.querySelector('.nd-dayempty')).not.toBeNull();
     rerender(
-      <DayMealsList dayMeals={{ 'Завтрак': [{ name: 'Яйца', qty: '100 г', kcal: 150, p: 12, f: 10, c: 1 }] }}
-        onEditItem={noop} onDeleteItem={noop} onCopyMeal={noop} onSavePreset={noop}
-        onImportFromPlan={noop} onClearDay={noop} onFillMicros={noop} selectedDate="2026-09-09" copySource={null} onPasteMeal={noop} onCancelCopy={noop} />
+      <DayMealsList
+        dayMeals={{ Завтрак: [{ name: 'Яйца', qty: '100 г', kcal: 150, p: 12, f: 10, c: 1 }] }}
+        onEditItem={noop}
+        onDeleteItem={noop}
+        onCopyMeal={noop}
+        onSavePreset={noop}
+        onImportFromPlan={noop}
+        onClearDay={noop}
+        onFillMicros={noop}
+        selectedDate="2026-09-09"
+        copySource={null}
+        onPasteMeal={noop}
+        onCancelCopy={noop}
+      />,
     );
     expect(container.querySelector('.nd-dayactions')).not.toBeNull();
     expect(container.querySelector('.nd-daycount')).not.toBeNull();
@@ -122,13 +156,31 @@ describe('nutrition-diary-pro hooks', () => {
 
   it('QualityInsights: пусто — null; с данными — nd-quality/nd-mood/nd-patterns', () => {
     const { container } = render(
-      <QualityInsights mealQuality={null} selectedDate="2026-09-09" dayMeals={{}}
-        foodPatterns={{}} foodTriggers={{}} onSavePattern={noop} onSaveTrigger={noop} mealMood={{}} onSaveMealMood={noop} />
+      <QualityInsights
+        mealQuality={null}
+        selectedDate="2026-09-09"
+        dayMeals={{}}
+        foodPatterns={{}}
+        foodTriggers={{}}
+        onSavePattern={noop}
+        onSaveTrigger={noop}
+        mealMood={{}}
+        onSaveMealMood={noop}
+      />,
     );
     expect(container.firstChild).toBeNull();
     const { container: full } = render(
-      <QualityInsights mealQuality={null} selectedDate="2026-09-09" dayMeals={{ 'Обед': [] }}
-        foodPatterns={{}} foodTriggers={{}} onSavePattern={noop} onSaveTrigger={noop} mealMood={{}} onSaveMealMood={noop} />
+      <QualityInsights
+        mealQuality={null}
+        selectedDate="2026-09-09"
+        dayMeals={{ Обед: [] }}
+        foodPatterns={{}}
+        foodTriggers={{}}
+        onSavePattern={noop}
+        onSaveTrigger={noop}
+        mealMood={{}}
+        onSaveMealMood={noop}
+      />,
     );
     expect(full.querySelector('.nd-quality')).not.toBeNull();
     expect(full.querySelector('.nd-mood')).not.toBeNull();
@@ -138,17 +190,22 @@ describe('nutrition-diary-pro hooks', () => {
 
   it('NutritionDiaryCharts: корень + гейджи + топ-хук', () => {
     const dayMeals = {
-      'Завтрак': [{ name: 'Яйца', qty: '100 г', kcal: 150, p: 12, f: 10, c: 1 }],
-      'Обед': [{ name: 'Гречка', qty: '100 г', kcal: 130, p: 4, f: 1, c: 27 }],
+      Завтрак: [{ name: 'Яйца', qty: '100 г', kcal: 150, p: 12, f: 10, c: 1 }],
+      Обед: [{ name: 'Гречка', qty: '100 г', kcal: 130, p: 4, f: 1, c: 27 }],
     };
     const diaryData = {
-      '2026-09-08': { meals: { 'Обед': [{ name: 'Гречка', kcal: 130, p: 4, f: 1, c: 27 }] } },
+      '2026-09-08': { meals: { Обед: [{ name: 'Гречка', kcal: 130, p: 4, f: 1, c: 27 }] } },
       '2026-09-09': { meals: dayMeals },
     };
     const { container } = render(
-      <NutritionDiaryCharts dayMeals={dayMeals} dayTotals={{ kcal: 280, p: 16, f: 11, c: 28 }}
+      <NutritionDiaryCharts
+        dayMeals={dayMeals}
+        dayTotals={{ kcal: 280, p: 16, f: 11, c: 28 }}
         targets={{ kcal: 2500, protein: 160, fats: 70, carbs: 300 }}
-        diaryData={diaryData} selectedDate="2026-09-09" refreshKey={0} />
+        diaryData={diaryData}
+        selectedDate="2026-09-09"
+        refreshKey={0}
+      />,
     );
     expect(container.querySelector('.nd-charts')).not.toBeNull();
     expect(container.querySelector('.nd-donutleg')).not.toBeNull();
@@ -159,8 +216,13 @@ describe('nutrition-diary-pro hooks', () => {
 
   it('NutritionDiaryCharts: пусто — null', () => {
     const { container } = render(
-      <NutritionDiaryCharts dayMeals={{}} dayTotals={{ kcal: 0, p: 0, f: 0, c: 0 }}
-        diaryData={{}} selectedDate="2026-09-09" refreshKey={0} />
+      <NutritionDiaryCharts
+        dayMeals={{}}
+        dayTotals={{ kcal: 0, p: 0, f: 0, c: 0 }}
+        diaryData={{}}
+        selectedDate="2026-09-09"
+        refreshKey={0}
+      />,
     );
     expect(container.firstChild).toBeNull();
   });
@@ -168,9 +230,7 @@ describe('nutrition-diary-pro hooks', () => {
   it('StorageErrorBanner: пусто — null; с ошибкой — nd-storeerr', () => {
     const { container } = render(<StorageErrorBanner error={null} onDismiss={noop} />);
     expect(container.firstChild).toBeNull();
-    const { container: full } = render(
-      <StorageErrorBanner error="Тестовая ошибка квоты" onDismiss={noop} />
-    );
+    const { container: full } = render(<StorageErrorBanner error="Тестовая ошибка квоты" onDismiss={noop} />);
     expect(full.querySelector('.nd-storeerr')).not.toBeNull();
     expect(full.querySelector('.nd-storedismiss')).not.toBeNull();
     expect(full.querySelector('[role="alert"]')).not.toBeNull();
@@ -187,7 +247,7 @@ describe('nutrition-diary-pro hooks', () => {
 
   it('WeekDaySelector: номера и имена дней из локального парсинга', () => {
     const { container } = render(
-      <WeekDaySelector weekDays={WEEK} selectedDate="2026-09-09" onSelectDate={noop} diaryData={{}} />
+      <WeekDaySelector weekDays={WEEK} selectedDate="2026-09-09" onSelectDate={noop} diaryData={{}} />,
     );
     const names = ['Пн', 'Вт', 'Ср', 'Чт', 'Пт', 'Сб', 'Вс'];
     const days = container.querySelectorAll('.nd-weekday');
@@ -200,8 +260,12 @@ describe('nutrition-diary-pro hooks', () => {
 
   it('WeekView: сводка + 4 стат-тайла + 7 строк', () => {
     const { container } = render(
-      <WeekView diaryData={{}} targets={{ kcal: 2500, protein: 160, fats: 70, carbs: 300 }}
-        selectedDate="2026-09-09" onSelectDate={noop} />
+      <WeekView
+        diaryData={{}}
+        targets={{ kcal: 2500, protein: 160, fats: 70, carbs: 300 }}
+        selectedDate="2026-09-09"
+        onSelectDate={noop}
+      />,
     );
     expect(container.querySelector('.nd-weekview')).not.toBeNull();
     expect(container.querySelector('.nd-weeksum')).not.toBeNull();
@@ -210,11 +274,36 @@ describe('nutrition-diary-pro hooks', () => {
     expect(container.querySelectorAll('.nd-dayrow')).toHaveLength(7);
   });
 
+  it('WeekView: перебор цели не маскируется — 125 % видно как 125 %, а не «100 %»', () => {
+    const { container } = render(
+      <WeekView
+        diaryData={{
+          '2026-09-09': {
+            meals: {
+              Завтрак: [{ name: 'Овсянка', kcal: 2500, p: 160, f: 70, c: 300, qty: 100 }],
+            },
+          },
+        }}
+        targets={{ kcal: 2000, protein: 160, fats: 70, carbs: 300 }}
+        selectedDate="2026-09-09"
+        onSelectDate={noop}
+      />,
+    );
+    const tile = container.querySelectorAll('.nd-weekstat')[0] as HTMLElement;
+    expect(tile.textContent).toContain('125% от цели');
+    // Полоса по-прежнему не вылезает за 0..100 %, но цвет честно красный.
+    expect(tile.style.border).toContain('rgba(239, 68, 68');
+  });
+
   it('WeekView: навигация ±7 локальных дней + шевроны + пустая подсказка', () => {
     const onSelect = vi.fn();
     const { container } = render(
-      <WeekView diaryData={{}} targets={{ kcal: 2500, protein: 160, fats: 70, carbs: 300 }}
-        selectedDate="2026-09-09" onSelectDate={onSelect} />
+      <WeekView
+        diaryData={{}}
+        targets={{ kcal: 2500, protein: 160, fats: 70, carbs: 300 }}
+        selectedDate="2026-09-09"
+        onSelectDate={onSelect}
+      />,
     );
     expect(container.querySelector('.nd-weeknav')).not.toBeNull();
     expect(container.querySelector('.nd-weekempty')).not.toBeNull();
@@ -254,7 +343,7 @@ describe('nutrition-diary-pro hooks', () => {
     const { container } = render(
       <DiarySection id="meals" icon="🍽" title="Приёмы пищи" sub="2026-09-09" color="#60a5fa" count="3 поз.">
         <div>тело</div>
-      </DiarySection>
+      </DiarySection>,
     );
     expect(container.querySelector('.nd-section')).not.toBeNull();
     expect(container.querySelector('.nd-sec-meals')).not.toBeNull();
@@ -267,16 +356,21 @@ describe('nutrition-diary-pro hooks', () => {
 
   it('NutritionDiaryCharts: мини-гейджи жиров/углеводов + 4 спарклайна', () => {
     const dayMeals = {
-      'Завтрак': [{ name: 'Яйца', qty: '100 г', kcal: 150, p: 12, f: 10, c: 1 }],
+      Завтрак: [{ name: 'Яйца', qty: '100 г', kcal: 150, p: 12, f: 10, c: 1 }],
     };
     const diaryData = {
-      '2026-09-08': { meals: { 'Обед': [{ name: 'Гречка', kcal: 130, p: 4, f: 1, c: 27 }] } },
+      '2026-09-08': { meals: { Обед: [{ name: 'Гречка', kcal: 130, p: 4, f: 1, c: 27 }] } },
       '2026-09-09': { meals: dayMeals },
     };
     const { container } = render(
-      <NutritionDiaryCharts dayMeals={dayMeals} dayTotals={{ kcal: 280, p: 16, f: 11, c: 28 }}
+      <NutritionDiaryCharts
+        dayMeals={dayMeals}
+        dayTotals={{ kcal: 280, p: 16, f: 11, c: 28 }}
         targets={{ kcal: 2500, protein: 160, fats: 70, carbs: 300 }}
-        diaryData={diaryData} selectedDate="2026-09-09" refreshKey={0} />
+        diaryData={diaryData}
+        selectedDate="2026-09-09"
+        refreshKey={0}
+      />,
     );
     // большие гейджи — ровно 2 (Ккал/Белки), жиры/углеводы — мини
     expect(container.querySelectorAll('.nd-gauge')).toHaveLength(2);

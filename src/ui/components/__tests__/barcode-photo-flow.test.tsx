@@ -11,7 +11,11 @@ vi.mock('../../../core/native-bridge', () => ({
     uri: 'file:///temporary/food-label.jpg',
     format: 'png',
   })),
-  pickBarcodePhoto: vi.fn(async () => ({ uri: 'file:///temporary/food-label.jpg', nativePath: 'file:///temporary/food-label.jpg', format: 'jpg' })),
+  pickBarcodePhoto: vi.fn(async () => ({
+    uri: 'file:///temporary/food-label.jpg',
+    nativePath: 'file:///temporary/food-label.jpg',
+    format: 'jpg',
+  })),
   scanNativeBarcodeImage: vi.fn(async () => null),
   persistBarcodePhoto: vi.fn(async () => 'file:///temporary/food-label.jpg'),
   deleteTemporaryBarcodePhoto: vi.fn(async () => undefined),
@@ -21,9 +25,19 @@ vi.mock('../../../engines/openfoodfacts.engine', async (importOriginal) => {
   const orig = await importOriginal<typeof import('../../../engines/openfoodfacts.engine')>();
   return {
     ...orig,
-    searchByBarcode: vi.fn(async (bc: string) => bc === '4601234567890' ? ({
-      id: bc, barcode: bc, name: 'Тестовый йогурт', kcal: 60, protein: 3, fat: 2, carbs: 5,
-    }) : null),
+    searchByBarcode: vi.fn(async (bc: string) =>
+      bc === '4601234567890'
+        ? {
+            id: bc,
+            barcode: bc,
+            name: 'Тестовый йогурт',
+            kcal: 60,
+            protein: 3,
+            fat: 2,
+            carbs: 5,
+          }
+        : null,
+    ),
   };
 });
 
@@ -48,9 +62,7 @@ describe('Фото-путь штрихкода (АПК)', () => {
     };
     vi.mocked(scanNativeBarcodeImage).mockResolvedValueOnce('4601234567890');
     const found: unknown[] = [];
-    const { container } = render(
-      <BarcodeScanner onProductFound={(p) => found.push(p)} onClose={() => {}} />,
-    );
+    const { container } = render(<BarcodeScanner onProductFound={(p) => found.push(p)} onClose={() => {}} />);
     const camera = Array.from(container.querySelectorAll('.nd-scanmode')).find(
       (b) => b.textContent === 'Камера',
     ) as HTMLElement;
@@ -58,26 +70,39 @@ describe('Фото-путь штрихкода (АПК)', () => {
     const photo = container.querySelector('.nd-scanphoto') as HTMLElement;
     expect(photo).not.toBeNull();
     fireEvent.click(photo);
+    // Новый контракт (второй товар без повторного открытия сканера): найденное
+    // показывается карточкой, в дневник уходит по явному действию.
     await waitFor(
       () => {
         expect(scanNativeBarcodeImage).toHaveBeenCalled();
-        expect(found.length).toBe(1);
+        expect(container.querySelector('.nd-scanfound')).not.toBeNull();
       },
       { timeout: 8000 },
     );
+    expect(found.length).toBe(0);
+    fireEvent.click(container.querySelector('.nd-scanportion') as HTMLElement);
+    await waitFor(() => expect(found.length).toBe(1));
     expect((found[0] as { name: string }).name).toBe('Тестовый йогурт');
   });
 
   it('использует native ML Kit для file:// image и не декодирует через WebView', async () => {
     (window as unknown as { Capacitor?: unknown }).Capacitor = { isNativePlatform: () => true };
-    vi.mocked(pickBarcodePhoto).mockResolvedValueOnce({ uri: 'content://food/label.jpg', nativePath: 'content://food/label.jpg', format: 'jpeg' });
+    vi.mocked(pickBarcodePhoto).mockResolvedValueOnce({
+      uri: 'content://food/label.jpg',
+      nativePath: 'content://food/label.jpg',
+      format: 'jpeg',
+    });
     vi.mocked(scanNativeBarcodeImage).mockResolvedValueOnce('4601234567890');
     const found: unknown[] = [];
-    const { container } = render(<BarcodeScanner onProductFound={p => found.push(p)} onClose={() => {}} />);
-    fireEvent.click(Array.from(container.querySelectorAll('.nd-scanmode')).find(b => b.textContent === 'Камера') as HTMLElement);
+    const { container } = render(<BarcodeScanner onProductFound={(p) => found.push(p)} onClose={() => {}} />);
+    fireEvent.click(
+      Array.from(container.querySelectorAll('.nd-scanmode')).find((b) => b.textContent === 'Камера') as HTMLElement,
+    );
     fireEvent.click(container.querySelector('.nd-scanphoto') as HTMLElement);
-    await waitFor(() => expect(found).toHaveLength(1));
+    await waitFor(() => expect(container.querySelector('.nd-scanfound')).not.toBeNull(), { timeout: 8000 });
     expect(scanNativeBarcodeImage).toHaveBeenCalledWith('content://food/label.jpg');
     expect(scanNativeBarcodeImage).toHaveBeenCalledTimes(1);
+    fireEvent.click(container.querySelector('.nd-scanportion') as HTMLElement);
+    await waitFor(() => expect(found).toHaveLength(1));
   });
 });
