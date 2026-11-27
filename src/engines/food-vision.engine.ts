@@ -18,7 +18,7 @@
  * `VITE_FOOD_VISION_URL`; без него движок честно говорит «выключено», и
  * приложение остаётся на офлайн-OCR.
  */
-import { readFileAsArrayBuffer } from '../core/ocr-engine';
+import { prepareImageForServer, readFileAsArrayBuffer } from '../core/ocr-engine';
 import { isCapacitorNative } from '../core/app-platform';
 import {
   fillMissingMicros,
@@ -430,15 +430,21 @@ async function prepareVisionImage(file: File, highRes: boolean): Promise<{ base6
       bitmap?.close?.();
     }
   }
-  // createImageBitmap/canvas недоступны (jsdom, очень старый WebView): шлём
-  // оригинал и проверяем фактический размер. Тело > 4.5 МБ платформа режет
-  // своим 413 без CORS — в WebView это выглядит как «нет сети», поэтому про
-  // размер сообщаем сами.
-  const fallbackBase64 = await blobToBase64(file);
+  // createImageBitmap недоступен (jsdom, очень старый WebView): сжимаем
+  // штатным путём OCR-слоя, но с разрешением под задачу — этикетке нужны
+  // пиксели, иначе «1,5 г» превращается в «15 г».
+  const prepared = await prepareImageForServer(
+    file,
+    highRes ? { maxSide: VISION_PASSES[0].maxSide, maxPixels: VISION_PASSES[0].maxPixels } : undefined,
+  );
+  const fallbackBase64 = await blobToBase64(prepared);
+  // prepareImageForServer может вернуть исходный файл как есть: тело > 4.5 МБ
+  // платформа режет своим 413 без CORS, и в WebView это выглядит как «нет
+  // сети». Отдаём понятную ошибку вместо неё.
   if (fallbackBase64.length > VISION_BASE64_BUDGET) {
     throw new Error('фото слишком большое для распознавания — сделайте снимок меньшего размера');
   }
-  return { base64: fallbackBase64, mimeType: file.type || 'image/jpeg' };
+  return { base64: fallbackBase64, mimeType: prepared.type || file.type || 'image/jpeg' };
 }
 
 export interface RecognizeFoodPhotoOptions {
