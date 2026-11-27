@@ -87,9 +87,24 @@ describe('arm-weekly-checkin: тренд', () => {
     expect(t.energyWarn).toBe(true);
     expect(t.notes.join(' ')).toContain('Боль локтя');
   });
-  it('единичная запись боли — без painWarn (честно, нужна динамика)', () => {
-    const t = armCheckinTrend([mk({ week: 1, dateIso: '2026-09-01', elbowPain010: 7 })]);
-    expect(t.painWarn).toBe(true); // одна запись = её же среднее ≥4 — сигнал есть
-    expect(t.painAvgLast2).toBe(7);
+  it('единичная запись боли — без painWarn (было→стало: slice(-2) из одного давал true)', () => {
+    const t = armCheckinTrend([mk({ week: 1, dateIso: '2026-09-01', elbowPain010: 8 })]);
+    expect(t.painWarn).toBe(false); // одна неделя ≥4 — ещё не сигнал разгрузки
+    expect(t.painAvgLast2).toBe(8);
+  });
+  it('две разные недели с болью ≥4 → painWarn', () => {
+    const t = armCheckinTrend([
+      mk({ week: 1, dateIso: '2026-09-01', elbowPain010: 8 }),
+      mk({ week: 2, dateIso: '2026-09-08', elbowPain010: 5 }),
+    ]);
+    expect(t.painWarn).toBe(true);
+    expect(t.notes.join(' ')).toContain('две недели');
+  });
+  it('боль ≥4 в одной и той же неделе дважды → painWarn=false', () => {
+    const t = armCheckinTrend([
+      mk({ week: 1, dateIso: '2026-09-01', elbowPain010: 8 }),
+      mk({ week: 1, dateIso: '2026-09-02', elbowPain010: 8 }),
+    ]);
+    expect(t.painWarn).toBe(false);
   });
 });

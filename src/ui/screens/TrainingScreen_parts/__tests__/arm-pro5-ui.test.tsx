@@ -10,12 +10,18 @@ import { applyToPlanner, clearPlannerApply } from '../planner-bridge';
 
 beforeEach(() => {
   localStorage.clear();
-  try { clearPlannerApply(); } catch { /* noop */ }
+  try {
+    clearPlannerApply();
+  } catch {
+    /* noop */
+  }
 });
 
 function goSplit(container: Element) {
   fireEvent.click(screen.getByRole('button', { name: '4 Сплит и цикл' }));
-  const head = screen.getAllByRole('button', { name: /Именной цикл/ }).find((b) => b.getAttribute('aria-expanded') != null);
+  const head = screen
+    .getAllByRole('button', { name: /Именной цикл/ })
+    .find((b) => b.getAttribute('aria-expanded') != null);
   expect(head).toBeTruthy();
   if (head && head.getAttribute('aria-expanded') === 'false') fireEvent.click(head);
   return container;
@@ -52,7 +58,8 @@ describe('Arm PRO-5 UI (P7)', () => {
   });
 });
 
-describe('Arm PRO-5 UI (P2 hub rules)', () => {  it('соревы удалены: нет правил-2026 и LMS-канона', () => {
+describe('Arm PRO-5 UI (P2 hub rules)', () => {
+  it('соревы удалены: нет правил-2026 и LMS-канона', () => {
     const { container } = render(<ArmliftingDiagnosticsHub />);
     expect(container.querySelector('[data-arm="lift-rule-2026"]')).toBeNull();
     expect(container.querySelector('[data-arm="lift-rules-2026"]')).toBeNull();
@@ -68,7 +75,8 @@ describe('Arm PRO-5 UI (P2 hub rules)', () => {  it('соревы удалены
   });
 });
 
-describe('Arm PRO-5 UI (controls + blocked)', () => {  it('контролы PRO-5 видны в именном цикле', () => {
+describe('Arm PRO-5 UI (controls + blocked)', () => {
+  it('контролы PRO-5 видны в именном цикле', () => {
     const { container } = render(<ArmAutoConstructor />);
     goSplit(container);
     expect(screen.getByRole('switch', { name: 'PRO-5: RIR по StrengthLog' })).toBeTruthy();
@@ -118,6 +126,10 @@ describe('Arm PRO-5 UI (controls + blocked)', () => {  it('контролы PRO-
     fireEvent.click(screen.getByRole('button', { name: /Веса и качество/ }));
     expect(c1.container.querySelector("[data-arm='gates']")?.textContent).toContain('Холод без разминки');
     c1.unmount();
+    // 28.11.2026: конструктор теперь восстанавливает сохранённый план после
+    // перезагрузки (P0), поэтому второй сценарий должен стартовать с чистого
+    // хранилища — иначе флаги оси придут из первого плана.
+    localStorage.clear();
     const c2 = render(<ArmAutoConstructor />);
     goSplit(c2.container);
     fireEvent.click(screen.getAllByRole('switch', { name: 'Ось humerus-2026' })[0]);
@@ -149,11 +161,18 @@ describe('Arm PRO-5 bridge (ось/warmup из хаба)', () => {
     expect(screen.getByRole('switch', { name: 'Скрут корпуса в атаку' }).getAttribute('aria-checked')).toBe('true');
     expect(screen.getByRole('switch', { name: 'Запястье позади плеча' }).getAttribute('aria-checked')).toBe('true');
     expect(screen.getByRole('switch', { name: 'Холод без разминки' }).getAttribute('aria-checked')).toBe('true');
-    expect(screen.getByRole('switch', { name: /разминка 10–15 мин выполнена/ }).getAttribute('aria-checked')).toBe('true');
+    expect(screen.getByRole('switch', { name: /разминка 10–15 мин выполнена/ }).getAttribute('aria-checked')).toBe(
+      'true',
+    );
   });
 
   it('без armAxisCheck — свитчи не трогаем', () => {
-    applyToPlanner({ kind: 'weakpoints', label: 'Арм диагностика', data: { groups: ['wrist_flexors'] }, source: 'intellectual' });
+    applyToPlanner({
+      kind: 'weakpoints',
+      label: 'Арм диагностика',
+      data: { groups: ['wrist_flexors'] },
+      source: 'intellectual',
+    });
     const { container } = render(<ArmAutoConstructor />);
     goSplit(container);
     expect(screen.getAllByRole('switch', { name: 'Ось humerus-2026' })[0].getAttribute('aria-checked')).toBe('false');

@@ -116,13 +116,19 @@ export function armCheckinTrend(entries: ArmWeeklyCheckin[], opts?: { targetWeig
     }
   }
 
-  const pains = list.filter((c) => Number.isFinite(Number(c.elbowPain010))).slice(-2) as Array<ArmWeeklyCheckin & { elbowPain010: number }>;
+  const pains = list.filter((c) => Number.isFinite(Number(c.elbowPain010))) as Array<ArmWeeklyCheckin & { elbowPain010: number }>;
   if (pains.length) {
-    out.painAvgLast2 = Math.round((pains.reduce((a, c) => a + c.elbowPain010, 0) / pains.length) * 10) / 10;
-    out.painWarn = out.painAvgLast2 >= 4;
+    const lastTwo = pains.slice(-2);
+    out.painAvgLast2 = Math.round((lastTwo.reduce((a, c) => a + c.elbowPain010, 0) / lastTwo.length) * 10) / 10;
+    // Боль ≥4 должна подтвердиться двумя РАЗНЫМИ неделями (поле week): один чек-ин
+    // с болью 8 — это ещё не «две недели», иначе ложная разгрузка (было: slice(-2) из одного).
+    const highWeeks = new Set(lastTwo.filter((c) => c.elbowPain010 >= 4).map((c) => Number(c.week)));
+    out.painWarn = highWeeks.size >= 2;
     notes.push(out.painWarn
       ? `⛔ Боль локтя ${out.painAvgLast2}/10 две недели — разгрузка и контроль (PMM).`
-      : `Боль локтя ${out.painAvgLast2}/10 — контроль в норме.`);
+      : highWeeks.size === 1
+        ? `Боль локтя ${out.painAvgLast2}/10 — одна неделя ≥4, для сигнала разгрузки нужна вторая.`
+        : `Боль локтя ${out.painAvgLast2}/10 — контроль в норме.`);
   }
   const energies = list.filter((c) => Number.isFinite(Number(c.energy010)));
   if (energies.length) {

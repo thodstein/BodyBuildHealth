@@ -5,6 +5,7 @@
 import { ARM_SPLIT_PATTERNS, type SplitPattern } from './arm-split-patterns';
 import { ruCount, RU_MUSCLES } from '../ru-plural';
 import { TAG_MUSCLES_ARM } from './arm-day-types';
+import { ARM_MUSCLES } from './arm-types';
 import { normLevel } from '../volume-landmarks.engine';
 
 export type ArmGoal = 'strength' | 'peaking' | 'hypertrophy' | 'endurance' | 'maintenance';
@@ -50,26 +51,34 @@ export interface ArmSplitReport {
   lines: string[];
 }
 
-const REPORT_MUSCLES = ['side_pressure', 'rising', 'pronation', 'supination', 'cup', 'biceps', 'triceps', 'wrist_flexors', 'shoulders', 'back'];
+// 28.11.2026 было→стало: список держал ключи, которых нет в TAG_MUSCLES_ARM
+// (rising/pronation/supination/cup/biceps/triceps/shoulders/back) — freq по ним всегда
+// 0, и строка «Частота» теряла реальные мышцы. Теперь канон ARM_MUSCLES: любая мышца
+// сплита (TAG_MUSCLES_ARM) в отчёт попадает.
+const REPORT_MUSCLES: readonly string[] = ARM_MUSCLES;
 
 export function armSplitReport(r: ArmRankedPattern, level: string): ArmSplitReport {
   const freq = r.pattern ? muscleFreq(r.pattern) : {};
   const cap = r.maxSessionMuscles ?? (r.pattern ? splitMaxSessionMuscles(r.pattern) : 0);
   const lvlCap = r.levelCapacity ?? levelSessionCapacity(level);
   const over = cap > lvlCap;
-  const parts = REPORT_MUSCLES
-    .filter(m => (freq[m] ?? 0) > 0)
+  const parts = REPORT_MUSCLES.filter((m) => (freq[m] ?? 0) > 0)
     .sort((a, b) => (freq[b] ?? 0) - (freq[a] ?? 0))
     .slice(0, 4)
-    .map(m => `${m} ×${Math.round((freq[m] ?? 0) * 10) / 10}/нед`);
+    .map((m) => `${m} ×${Math.round((freq[m] ?? 0) * 10) / 10}/нед`);
   const lines: string[] = [];
   if (parts.length > 0) lines.push(`Частота: ${parts.join(' · ')}`);
   lines.push(
     over
       ? `Ёмкость дня: ${ruCount(cap, RU_MUSCLES)} > вашей ${lvlCap} (уровень ${level}) — сессия может выйти давной, стимул размоется`
-      : `Ёмкость дня: ${ruCount(cap, RU_MUSCLES)} ≤ вашей ${lvlCap} (уровень ${level}) — нагрузка распределится`
+      : `Ёмкость дня: ${ruCount(cap, RU_MUSCLES)} ≤ вашей ${lvlCap} (уровень ${level}) — нагрузка распределится`,
   );
-  return { splitName: r.pattern?.name ?? '', capacity: { maxSessionMuscles: cap, levelCapacity: lvlCap, over }, freq, lines };
+  return {
+    splitName: r.pattern?.name ?? '',
+    capacity: { maxSessionMuscles: cap, levelCapacity: lvlCap, over },
+    freq,
+    lines,
+  };
 }
 
 /**
@@ -111,7 +120,7 @@ function muscleFreq(p: SplitPattern): Record<string, number> {
   for (const [tag, count] of Object.entries(tagCounts)) {
     const muscles = TAG_MUSCLES_ARM[tag] || [tag];
     for (const m of muscles) {
-      freq[m] = (freq[m] || 0) + count * 7 / p.rotationDays;
+      freq[m] = (freq[m] || 0) + (count * 7) / p.rotationDays;
     }
   }
   return freq;
@@ -130,19 +139,35 @@ export function rankArmSplits(input: ArmSelectorInput): ArmRankedPattern[] {
     const warnings: string[] = [];
 
     // level
-    if (p.level.includes(lvl)) { score += 30; rationale.push(`уровень ${lvl} подходит`); }
-    else if (p.level.some(l => l.toLowerCase() === lvl)) { score += 30; rationale.push(`уровень ${lvl} подходит`); }
-    else { score -= 15; warnings.push(`уровень ${lvl} вне ${p.level.join('/')}`); }
+    // 28.11.2026 было→стало: `else if (p.level.some(l => l.toLowerCase() === lvl))` был
+    // недостижим — lvl уже lower-case через normLevel, и первая ветка includes(lvl)
+    // проверяет то же самое. Мёртвая ветвь удалена, поведение не изменилось.
+    if (p.level.includes(lvl)) {
+      score += 30;
+      rationale.push(`уровень ${lvl} подходит`);
+    } else {
+      score -= 15;
+      warnings.push(`уровень ${lvl} вне ${p.level.join('/')}`);
+    }
 
     // daysPerWeek
     if (input.daysPerWeek != null) {
-      const eff = p.sessionsPerRotation * 7 / p.rotationDays;
+      const eff = (p.sessionsPerRotation * 7) / p.rotationDays;
       const over = eff - input.daysPerWeek;
       const abs = Math.abs(over);
-      if (abs < 0.6) { score += 25; rationale.push(`дней ${eff.toFixed(1)} ~ ${input.daysPerWeek}`); }
-      else if (abs <= 1.2) { score += 10; rationale.push(`дней ${eff.toFixed(1)} близко к ${input.daysPerWeek}`); }
-      else if (abs <= 2) { score -= 5; warnings.push(`дней ${eff.toFixed(1)} далеко от ${input.daysPerWeek}`); }
-      else { score -= 15; warnings.push(`дней ${eff.toFixed(1)} сильно мимо ${input.daysPerWeek}`); }
+      if (abs < 0.6) {
+        score += 25;
+        rationale.push(`дней ${eff.toFixed(1)} ~ ${input.daysPerWeek}`);
+      } else if (abs <= 1.2) {
+        score += 10;
+        rationale.push(`дней ${eff.toFixed(1)} близко к ${input.daysPerWeek}`);
+      } else if (abs <= 2) {
+        score -= 5;
+        warnings.push(`дней ${eff.toFixed(1)} далеко от ${input.daysPerWeek}`);
+      } else {
+        score -= 15;
+        warnings.push(`дней ${eff.toFixed(1)} сильно мимо ${input.daysPerWeek}`);
+      }
     }
 
     // ёмкость дня (26.10.2026): перебор мышц в одном дне при вашем уровне = давняя
@@ -150,43 +175,85 @@ export function rankArmSplits(input: ArmSelectorInput): ArmRankedPattern[] {
     const capacity = levelSessionCapacity(lvl);
     const maxMuscles = splitMaxSessionMuscles(p);
     if (maxMuscles > capacity + 2) {
-      score -= 18; warnings.push(`день несёт ${ruCount(maxMuscles, RU_MUSCLES)} — при уровне ${lvl} ёмкость ~${capacity}: сессия слишком плотная (расплывчатый стимул)`);
+      score -= 18;
+      warnings.push(
+        `день несёт ${ruCount(maxMuscles, RU_MUSCLES)} — при уровне ${lvl} ёмкость ~${capacity}: сессия слишком плотная (расплывчатый стимул)`,
+      );
     } else if (maxMuscles > capacity) {
-      score -= 8; warnings.push(`день несёт ${ruCount(maxMuscles, RU_MUSCLES)} при ёмкости ~${capacity} — плотновато для ${lvl}`);
+      score -= 8;
+      warnings.push(`день несёт ${ruCount(maxMuscles, RU_MUSCLES)} при ёмкости ~${capacity} — плотновато для ${lvl}`);
     } else if (maxMuscles <= capacity - 2) {
-      score += 8; rationale.push(`день ${ruCount(maxMuscles, RU_MUSCLES)} — с запасом для доборов`);
+      score += 8;
+      rationale.push(`день ${ruCount(maxMuscles, RU_MUSCLES)} — с запасом для доборов`);
     } else {
-      score += 4; rationale.push(`день ${ruCount(maxMuscles, RU_MUSCLES)} ~ ёмкость ${capacity} (${lvl})`);
+      score += 4;
+      rationale.push(`день ${ruCount(maxMuscles, RU_MUSCLES)} ~ ёмкость ${capacity} (${lvl})`);
     }
 
     // goal bias
     if (goal === 'strength' || goal === 'peaking') {
-      if (p.id.includes('arm_5') || p.id.includes('arm_4')) { score += 10; rationale.push('тяж-дни для силы'); }
+      if (p.id.includes('arm_5') || p.id.includes('arm_4')) {
+        score += 10;
+        rationale.push('тяж-дни для силы');
+      }
       if (p.id.includes('grip_')) {
-        if (discipline === 'armlifting') { score += 12; rationale.push('хват-сплит для армлифтинга'); }
-        else { score -= 5; warnings.push('хват-сплит при armwrestling'); }
+        if (discipline === 'armlifting') {
+          score += 12;
+          rationale.push('хват-сплит для армлифтинга');
+        } else {
+          score -= 5;
+          warnings.push('хват-сплит при armwrestling');
+        }
       }
     } else if (goal === 'hypertrophy') {
-      if (p.id.includes('arm_3') || p.id.includes('arm_4')) { score += 8; rationale.push('объём для массы'); }
+      if (p.id.includes('arm_3') || p.id.includes('arm_4')) {
+        score += 8;
+        rationale.push('объём для массы');
+      }
     } else if (goal === 'endurance') {
-      if (p.schedule.some(s => s.character === 'памп')) { score += 8; rationale.push('памп для выносливости'); }
+      if (p.schedule.some((s) => s.character === 'памп')) {
+        score += 8;
+        rationale.push('памп для выносливости');
+      }
     }
 
     // technique
     if (technique === 'hook') {
-      if (['TableHeavy','Hammer','TableSupination'].some(t => p.schedule.some(s => s.sessionTag === t))) { score += 8; rationale.push('hook → молот/супинация есть'); }
+      if (['TableHeavy', 'Hammer', 'TableSupination'].some((t) => p.schedule.some((s) => s.sessionTag === t))) {
+        score += 8;
+        rationale.push('hook → молот/супинация есть');
+      }
     } else if (technique === 'toproll') {
-      if (['TableHeavy','TablePronation','GripHeavy'].some(t => p.schedule.some(s => s.sessionTag === t))) { score += 8; rationale.push('toproll → пронация/хват есть'); }
+      if (['TableHeavy', 'TablePronation', 'GripHeavy'].some((t) => p.schedule.some((s) => s.sessionTag === t))) {
+        score += 8;
+        rationale.push('toproll → пронация/хват есть');
+      }
     } else if (technique === 'press') {
       // 26.10.2026: тега 'SidePress' в сплитах нет (боковое живёт в 'Support' и
       // TableHeavy) — условие держалось только на ветке 'Support'.
-      if (p.schedule.some(s => s.sessionTag === 'Support' || s.sessionTag === 'TableHeavy' || s.sessionTag === 'TableTech')) { score += 8; rationale.push('press → боковое есть'); }
+      if (
+        p.schedule.some(
+          (s) => s.sessionTag === 'Support' || s.sessionTag === 'TableHeavy' || s.sessionTag === 'TableTech',
+        )
+      ) {
+        score += 8;
+        rationale.push('press → боковое есть');
+      }
     }
 
     // discipline
-    if (discipline === 'armwrestling' && p.id.startsWith('grip_')) { score -= 10; warnings.push('grip-сплит не для армрестлинга'); }
-    if (discipline === 'armlifting' && p.id.startsWith('arm_2')) { score -= 5; warnings.push('стол-сплит не для армлифтинга'); }
-    if (discipline === 'hybrid' && p.id === 'hybrid_4_arm_pl') { score += 12; rationale.push('гибрид-сплит'); }
+    if (discipline === 'armwrestling' && p.id.startsWith('grip_')) {
+      score -= 10;
+      warnings.push('grip-сплит не для армрестлинга');
+    }
+    if (discipline === 'armlifting' && p.id.startsWith('arm_2')) {
+      score -= 5;
+      warnings.push('стол-сплит не для армлифтинга');
+    }
+    if (discipline === 'hybrid' && p.id === 'hybrid_4_arm_pl') {
+      score += 12;
+      rationale.push('гибрид-сплит');
+    }
 
     // gripFocus
     // 26.10.2026 было→стало: бонусы pinch/crush были недостижимы — ни один id сплита
@@ -202,8 +269,13 @@ export function rankArmSplits(input: ArmSelectorInput): ArmRankedPattern[] {
       };
       const wanted = gripMuscles[gf];
       if (wanted) {
-        const hasMuscle = p.schedule.some((s) => wanted.some((m) => (TAG_MUSCLES_ARM[s.sessionTag || ''] || []).includes(m)));
-        if (hasMuscle) { score += 8; rationale.push(`${gf} хват`); }
+        const hasMuscle = p.schedule.some((s) =>
+          wanted.some((m) => (TAG_MUSCLES_ARM[s.sessionTag || ''] || []).includes(m)),
+        );
+        if (hasMuscle) {
+          score += 8;
+          rationale.push(`${gf} хват`);
+        }
       }
     }
 
@@ -211,7 +283,10 @@ export function rankArmSplits(input: ArmSelectorInput): ArmRankedPattern[] {
     // стабилизаторы плеча — сплит с shoulder_stab в расписании получает бонус.
     if (input.shoulderRisk) {
       const hasShoulder = p.schedule.some((s) => (TAG_MUSCLES_ARM[s.sessionTag || ''] || []).includes('shoulder_stab'));
-      if (hasShoulder) { score += 10; rationale.push('shoulder_stab в сплите — баланс ротаторов (ER:IR)'); }
+      if (hasShoulder) {
+        score += 10;
+        rationale.push('shoulder_stab в сплите — баланс ротаторов (ER:IR)');
+      }
     }
 
     // weakPoints boost (granular → canonical via lower)
@@ -219,7 +294,10 @@ export function rankArmSplits(input: ArmSelectorInput): ArmRankedPattern[] {
       const freq = muscleFreq(p);
       for (const wp of input.weakPoints) {
         const key = wp.toLowerCase();
-        if (freq[key] && freq[key] >= 1.5) { score += 6; rationale.push(`слабое ${wp} часто в сплите`); }
+        if (freq[key] && freq[key] >= 1.5) {
+          score += 6;
+          rationale.push(`слабое ${wp} часто в сплите`);
+        }
       }
     }
 
@@ -228,39 +306,52 @@ export function rankArmSplits(input: ArmSelectorInput): ArmRankedPattern[] {
       const freq = muscleFreq(p);
       for (const d of input.donorMuscles) {
         const key = d.toLowerCase();
-        if (freq[key] && freq[key] >= 2) { score -= 8; warnings.push(`донор ${d} часто встречается — штраф`); }
+        if (freq[key] && freq[key] >= 2) {
+          score -= 8;
+          warnings.push(`донор ${d} часто встречается — штраф`);
+        }
       }
     }
 
     // equipment
     if (input.equipment && input.equipment.length > 0) {
-      const hasTable = input.equipment.some(e => /стол|table/i.test(e));
-      const hasGrip = input.equipment.some(e => /grip|хват|hub|pinch/i.test(e));
-      if (!hasTable && p.schedule.some(s => s.sessionTag?.toLowerCase().includes('table'))) {
-        score -= 12; warnings.push('нет стола, но сплит требует стол');
+      const hasTable = input.equipment.some((e) => /стол|table/i.test(e));
+      const hasGrip = input.equipment.some((e) => /grip|хват|hub|pinch/i.test(e));
+      if (!hasTable && p.schedule.some((s) => s.sessionTag?.toLowerCase().includes('table'))) {
+        score -= 12;
+        warnings.push('нет стола, но сплит требует стол');
       }
       if (!hasGrip && p.id.startsWith('grip_')) {
-        score -= 12; warnings.push('нет хвата-оборудования');
+        score -= 12;
+        warnings.push('нет хвата-оборудования');
       }
     }
 
     // injuries
     if (input.injuries && input.injuries.length > 0) {
-      const injured = new Set(input.injuries.filter(i => i.exclude).map(i => i.muscle.toLowerCase()));
+      const injured = new Set(input.injuries.filter((i) => i.exclude).map((i) => i.muscle.toLowerCase()));
       const freq = muscleFreq(p);
       for (const im of injured) {
-        if (freq[im] && freq[im] > 0) { score -= 20; warnings.push(`травма ${im} — сплит нагружает`); }
+        if (freq[im] && freq[im] > 0) {
+          score -= 20;
+          warnings.push(`травма ${im} — сплит нагружает`);
+        }
         // 26.10.2026: 'SidePress' не существует как тег сплита — штраф был недостижим.
         // Боковое давление входит в TAG_MUSCLES_ARM тегов Support/TableHeavy.
-        if (im === 'side_pressure' && p.schedule.some(s => (TAG_MUSCLES_ARM[s.sessionTag || ''] || []).includes('side_pressure'))) {
-          score -= 25; warnings.push('side_pressure травма + side сплит');
+        if (
+          im === 'side_pressure' &&
+          p.schedule.some((s) => (TAG_MUSCLES_ARM[s.sessionTag || ''] || []).includes('side_pressure'))
+        ) {
+          score -= 25;
+          warnings.push('side_pressure травма + side сплит');
         }
       }
     }
 
     // specialization: FullArm не дефолт
     if (input.specialization && p.id === 'arm_2_table_support') {
-      score -= 6; warnings.push('специализация → 2× недостаточно');
+      score -= 6;
+      warnings.push('специализация → 2× недостаточно');
     }
 
     out.push({ pattern: p, score, rationale, warnings, maxSessionMuscles: maxMuscles, levelCapacity: capacity });

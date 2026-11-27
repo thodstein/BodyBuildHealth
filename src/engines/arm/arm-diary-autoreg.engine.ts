@@ -5,7 +5,6 @@
  * sRPE + боль (0-10) + VBT-потеря → множитель объёма, сдвиг RIR, замены.
  * Боль ≥4 в локте/запястье: side → изометрия, pron heavy → pulses.
  */
-import { ruCount, RU_DAYS } from '../ru-plural';
 
 export interface ArmDiaryDay {
   dateIso: string;
@@ -75,7 +74,9 @@ export function autoregArmFromDiary(days: ArmDiaryDay[]): ArmAutoregResult {
   if (rirShift > 0) notes.push(`RIR+${rirShift}`);
   if (replaceSideWithIso) notes.push('Side → изометрия');
   if (replaceHeavyPronWithPulses) notes.push('Pron heavy → pulses');
-  if (extraRestDays > 0) notes.push(`+${ruCount(extraRestDays, RU_DAYS)} отдыха`);
+  // 28.11.2026 было→стало: строка «+N дней отдыха» обещала действие, которого никто не
+  // применял (arm-pro-integration переносит только volumeMult/rirShift/replace*) —
+  // notes больше не обещает отдых. Поле extraRestDays остаётся в результате для UI/типов.
   return {
     volumeMult: Math.round(volumeMult * 100) / 100,
     rirShift,

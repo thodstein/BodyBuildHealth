@@ -24,14 +24,21 @@ export function taperStateFor(phaseMap: Record<number, string>, weeks: number): 
       if (ph === 'deload' || ph === 'peaking') tailStart = w;
       else break;
     }
-  } catch { tailStart = weeks + 1; }
+  } catch {
+    tailStart = weeks + 1;
+  }
   const tailPhases: string[] = [];
   for (let w = tailStart; w <= weeks; w++) tailPhases.push(String(phaseMap[w] || ''));
   return { tailStart, hasTail: tailStart <= weeks, tailPhases };
 }
 
 /** Хвостовая неделя идёт полным объёмом (режет только кривая финализатора)? */
-export function isCycleTaperActive(state: ArmTaperState, phase: string, week: number, taperPreset: string | null): boolean {
+export function isCycleTaperActive(
+  state: ArmTaperState,
+  phase: string,
+  week: number,
+  taperPreset: string | null,
+): boolean {
   return taperPreset != null && (phase === 'deload' || phase === 'peaking') && week >= state.tailStart;
 }
 
@@ -75,24 +82,29 @@ export function acwrMultFor(input: {
   if (withLoad.length < 8) return { mult: 1, ratio: null, zone: 'none', note: null };
   const DAY = 86400000;
   const toMs = (iso: string) => Date.parse(`${iso}T00:00:00Z`);
-  const distinctDays = (list: Array<{ iso: string | null }>): number => new Set(list.map((x) => x.iso).filter((x): x is string => !!x)).size;
   // 26.10.2026 было→стало: «острая» неделя = последние 7 ЗАПИСЕЙ массива. Продюсер
   // (loadSRPESessions) отдаёт порядок вставки — запись, исправленная задним числом,
   // попадала в острую неделю → ложный danger и лишняя разгрузка первой недели.
   // Теперь окна считаются по ДАТАМ: 7 дней и 28 дней от последней записи.
   // Легаси-вход без дат — прежнее поведение (порядок массива).
+  // 28.11.2026 было→стало: окна делились на число ТРЕНИРОВОЧНЫХ ДНЕЙ (distinctDays) —
+  // рост частоты 3→7 сессий/нед при той же нагрузке давал ratio≈1 и «ok», хотя
+  // недельный объём вырос вдвое. Канон проекта (arm-acwr.computeArmPerMuscleACWR):
+  // acute = Σ за 7 КАЛЕНДАРНЫХ дней / 7, chronic = Σ за 28 календарных дней / 28.
   const hasDates = withLoad.some((x) => x.iso != null);
   let acute: number[], chronic: number[], acuteDays: number, chronicDays: number;
   if (hasDates) {
-    const sorted = [...withLoad].sort((a, b) => (a.iso && b.iso ? toMs(a.iso) - toMs(b.iso) : withLoad.indexOf(a) - withLoad.indexOf(b)));
+    const sorted = [...withLoad].sort((a, b) =>
+      a.iso && b.iso ? toMs(a.iso) - toMs(b.iso) : withLoad.indexOf(a) - withLoad.indexOf(b),
+    );
     const latest = Math.max(...sorted.map((x) => (x.iso ? toMs(x.iso) : 0)));
     const acuteList = sorted.filter((x) => x.iso != null && toMs(x.iso) > latest - 7 * DAY);
     const chronicList = sorted.filter((x) => x.iso != null && toMs(x.iso) > latest - 28 * DAY);
     if (acuteList.length === 0 || chronicList.length === 0) return { mult: 1, ratio: null, zone: 'none', note: null };
     acute = acuteList.map((x) => x.load);
     chronic = chronicList.map((x) => x.load);
-    acuteDays = Math.max(1, distinctDays(acuteList));
-    chronicDays = Math.max(1, distinctDays(chronicList));
+    acuteDays = 7; // календарное окно: 7 дней от последней записи
+    chronicDays = 28; // календарное окно: 28 дней от последней записи
   } else {
     acute = withLoad.slice(-7).map((x) => x.load);
     chronic = withLoad.map((x) => x.load);
@@ -101,17 +113,62 @@ export function acwrMultFor(input: {
   }
   const avg = (a: number[], days: number) => a.reduce((s, v) => s + v, 0) / Math.max(1, days);
   const ratio = Math.round((avg(acute, acuteDays) / Math.max(1, avg(chronic, chronicDays))) * 100) / 100;
-  if (ratio >= 1.5) return { mult: 0.65, ratio, zone: 'danger', note: `ACWR ${ratio} danger — объём ×0.65, RIR+2, делоад (дневник sRPE).` };
+  if (ratio >= 1.5)
+    return {
+      mult: 0.65,
+      ratio,
+      zone: 'danger',
+      note: `ACWR ${ratio} danger — объём ×0.65, RIR+2, делоад (дневник sRPE).`,
+    };
   if (ratio >= 1.3) return { mult: 0.85, ratio, zone: 'caution', note: `ACWR ${ratio} caution — объём ×0.85, RIR+1.` };
   return { mult: 1, ratio, zone: 'ok', note: null };
 }
 
 /** Честная пометка PED: известные id идут через adaptForPEDs, неизвестные — без boost. */
 const KNOWN_PED_SUBSTR = [
-  'test', 'tren', 'deca', 'nand', 'bold', 'eq_', 'primo', 'mast', 'drosta', 'stan', 'oxan',
-  'anavar', 'winst', 'dbol', 'methan', 'tbol', 'turin', 'anadrol', 'oxy', 'sust', 'enan', 'cyp',
-  'prop', 'gh_', 'hgh', 'soma', 'igf', 'mgf', 'ins', 'mk_', 'ghrp', 'ghrh', 'sarm', 'osta', 'lpd',
-  'dhb', 'trest', 'superdrol', 's23', 'yk11', 'sr9009', 'gw50', 'hcg',
+  'test',
+  'tren',
+  'deca',
+  'nand',
+  'bold',
+  'eq_',
+  'primo',
+  'mast',
+  'drosta',
+  'stan',
+  'oxan',
+  'anavar',
+  'winst',
+  'dbol',
+  'methan',
+  'tbol',
+  'turin',
+  'anadrol',
+  'oxy',
+  'sust',
+  'enan',
+  'cyp',
+  'prop',
+  'gh_',
+  'hgh',
+  'soma',
+  'igf',
+  'mgf',
+  'ins',
+  'mk_',
+  'ghrp',
+  'ghrh',
+  'sarm',
+  'osta',
+  'lpd',
+  'dhb',
+  'trest',
+  'superdrol',
+  's23',
+  'yk11',
+  'sr9009',
+  'gw50',
+  'hcg',
 ];
 
 export function pedHonestyNote(pedDoses: Record<string, number> | undefined): string | null {
@@ -156,7 +213,12 @@ const ALLOWED_SG: Record<string, string[]> = {
 };
 
 export function foreignPoolWarnings(
-  weeks: Array<{ week: number; sessions: Array<{ exercises: Array<{ muscle: string; name: string; substitutionGroup?: string; movementPattern?: unknown }> }> }>,
+  weeks: Array<{
+    week: number;
+    sessions: Array<{
+      exercises: Array<{ muscle: string; name: string; substitutionGroup?: string; movementPattern?: unknown }>;
+    }>;
+  }>,
 ): string[] {
   const out: string[] = [];
   for (const wk of weeks) {
@@ -167,7 +229,10 @@ export function foreignPoolWarnings(
         const sg = String(ex.substitutionGroup || '').toLowerCase();
         const mp = String(ex.movementPattern || '').toLowerCase();
         const ok = allowed.some((s) => sg === s || sg.includes(s) || mp.includes(s));
-        if (!ok) out.push(`Н${wk.week} ${ex.muscle}: «${ex.name}» вне своей группы (${sg || '—'}) — пул-фолбэк, проверьте замену.`);
+        if (!ok)
+          out.push(
+            `Н${wk.week} ${ex.muscle}: «${ex.name}» вне своей группы (${sg || '—'}) — пул-фолбэк, проверьте замену.`,
+          );
       }
     }
   }

@@ -31,6 +31,11 @@ describe('arm-competition-prep (эпик H)', () => {
     expect(prepPhaseForWeeksOut(6)).toBe('strength');
     expect(prepPhaseForWeeksOut(12)).toBe('base');
   });
+  it('weeksUntilStart: date-only в локальном календаре, не зависит от TZ-смещения', () => {
+    // было→стало: new Date('YYYY-MM-DD') = UTC-полночь, в UTC+X давало +1 неделю.
+    expect(weeksUntilStart('2026-01-01', '2026-01-15')).toBe(2);
+    expect(weeksUntilStart('2026-01-15', '2026-01-01')).toBe(1); // прошлое → срочный пик
+  });
   it('ноги-якорь: 3 упражнения', () => {
     const b = legsAnchorBlock('intermediate');
     expect(b.length).toBe(3);

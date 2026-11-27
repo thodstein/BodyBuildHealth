@@ -116,7 +116,11 @@ export function ArmVideoTracker({ onCycles }: { onCycles?: (cycles: VideoTrackCy
     const d = dragRef.current;
     dragRef.current = null;
     if (!d) return;
-    const span = Math.round(Math.abs(d.x1 - d.x0) * 10) / 10;
+    // drag в CSS-пикселях, а кадры/трек — в битмапе 160×90, растянутом до 260px:
+    // без пересчёта pxPerCm завышался ~1.6×. Переводим в координаты битмапа.
+    const rect = e.currentTarget.getBoundingClientRect();
+    const scale = e.currentTarget.width / Math.max(1, rect.width);
+    const span = Math.round(Math.abs(d.x1 - d.x0) * scale * 10) / 10;
     setDragSpanPx(span > 2 ? span : null);
     if (span <= 2) setStatus('Отрезок слишком короткий — проведите drag по известному размеру');
   };

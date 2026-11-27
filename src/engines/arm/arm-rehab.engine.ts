@@ -48,31 +48,41 @@ function normInjury(v: unknown): RehabInjury {
 
 const PHASES: RehabPhase[] = [
   {
-    phase: 0, title: 'Иммобилизация + врач', weeks: '0–2 нед',
+    phase: 0,
+    title: 'Иммобилизация + врач',
+    weeks: '0–2 нед',
     allowed: ['Покой', 'Холод 0.5–2ч при подозрении', 'Пальцы здоровой руки — лёгкие движения'],
     forbidden: ['Любая борьба', 'нагрузка травмированной', 'прогрев через боль'],
     criteriaToNext: 'Диагноз (рентген при подозрении перелома) + спад острой боли.',
   },
   {
-    phase: 1, title: 'Passive ROM', weeks: '2–6 нед',
+    phase: 1,
+    title: 'Passive ROM',
+    weeks: '2–6 нед',
     allowed: ['Пассивные движения', 'rice-bucket лёгкий', 'band без сопротивления'],
     forbidden: ['Нагрузка с весом', 'пронация/супинация под нагрузкой', 'спарринг'],
     criteriaToNext: 'Full ROM без боли + union по снимку (для перелома).',
   },
   {
-    phase: 2, title: 'Light pron/sup + iso', weeks: '6–10 нед',
+    phase: 2,
+    title: 'Light pron/sup + iso',
+    weeks: '6–10 нед',
     allowed: ['Лёгкие пронация/супинация', 'изометрия 10с RPE≤6', 'экстензоры band'],
     forbidden: ['Side pressure динамика', 'максимумы', 'ремень', 'спарринг 100%'],
     criteriaToNext: '2 недели без боли при лёгкой нагрузке.',
   },
   {
-    phase: 3, title: 'Loaded grip', weeks: '10–14 нед',
+    phase: 3,
+    title: 'Loaded grip',
+    weeks: '10–14 нед',
     allowed: ['Fat Gripz лёгкий', 'wrist curl 15–20 RPE6', 'table техника 50%'],
     forbidden: ['Стресс-синглы 100–125%', 'соревнования', 'тяжёлый side'],
     criteriaToNext: 'Сила ≥80% здоровой стороны, боль 0.',
   },
   {
-    phase: 4, title: 'Return-to-pull', weeks: '14–16+ нед',
+    phase: 4,
+    title: 'Return-to-pull',
+    weeks: '14–16+ нед',
     allowed: ['Полный стол 70% → 100% за 3 недели', 'спарринг 70% → 90%', 'тест-старт'],
     forbidden: ['Красная линия в первую неделю', 'игнор боли'],
     criteriaToNext: 'Контрольный спарринг без боли + full ROM.',
@@ -96,24 +106,34 @@ export function buildRehabPlan(input: RehabInput = {}): RehabPlan {
   }
   // Аудит 2026-10: red-flags были универсальными — при тендините запястья показывался
   // «Spiral humerus часто требует операции». Теперь общий пул + специфика травмы.
+  // 28.11.2026 было→стало: ключ 'elbow' не совпадал ни с одним значением normInjury
+  // ('elbow_tendon' | 'ucl' | 'biceps') — red-flags локтя не показывались НИКОГДА.
+  // Тот же текст переиспользован под тремя реальными ключами (без новых мед-утверждений).
+  const elbowFlags = [
+    'UCL/медиальный эпикондил: острая боль при хвате — врач до любой нагрузки.',
+    'Онемение мизинца/безымянного — нерв, стоп.',
+  ];
   const redFlags: Record<string, string[]> = {
     humerus: [
       'Spiral humerus часто требует операции + пластина — не «перетерпеть».',
       'Деформация/отёк/онемение (radial nerve!) — немедленно к врачу + рентген.',
     ],
-    elbow: [
-      'UCL/медиальный эпикондил: острая боль при хвате — врач до любой нагрузки.',
-      'Онемение мизинца/безымянного — нерв, стоп.',
-    ],
-    wrist: [
-      'Тендинит: утренняя боль >5 — стоп, объём ×0.5.',
-      'Онемение пальцев — нерв/проводка, врач.',
-    ],
+    elbow_tendon: elbowFlags,
+    ucl: elbowFlags,
+    biceps: elbowFlags,
+    wrist: ['Тендинит: утренняя боль >5 — стоп, объём ×0.5.', 'Онемение пальцев — нерв/проводка, врач.'],
   };
   const general = [
     'Повторная острая боль на фазе — откат на фазу назад + врач при >недели.',
     'Деформация/отёк/онемение (radial nerve!) — немедленно к врачу + рентген.',
   ];
   const note = `${injury}: фаза ${phase} (${PHASES[phase].title}) — ${PHASES[phase].weeks}. Union + full ROM — критерии, не сроки.`;
-  return { injury, phase, phases: PHASES, current: PHASES[phase], redFlags: [...(redFlags[injury] || []), ...general], note };
+  return {
+    injury,
+    phase,
+    phases: PHASES,
+    current: PHASES[phase],
+    redFlags: [...(redFlags[injury] || []), ...general],
+    note,
+  };
 }

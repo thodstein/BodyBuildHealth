@@ -60,6 +60,15 @@ describe('W-AL движок: вердикт по снарядам', () => {
     expect(r.rows[0].internal).toBe(true);
     expect(r.rows[0].scorePct).toBe(69.7);
   });
+  it('CoC 0 = Trainer — валидный уровень, строка CoC в отчёте (было→стало: num() >0 отбрасывал)', () => {
+    expect(cocLevelToPct(0)).toBe(35.7); // COC_ORDINAL_KG.trainer 45.4 / No.3 127.0
+    const r = buildArmliftingReport({ cocLevel: 0, sex: 'male' });
+    const coc = r.rows.find((x) => x.implement === 'coc_gripper');
+    expect(coc).toBeTruthy();
+    expect(coc!.display).toContain('Trainer');
+    expect(coc!.internal).toBe(true);
+    expect(coc!.scorePct).toBe(35.7);
+  });
   it('Pinch 15 с → 100 (внутренний ориентир)', () => {
     const r = buildArmliftingReport({ pinchSec: 15, sex: 'male' });
     expect(r.rows[0].scorePct).toBe(100);

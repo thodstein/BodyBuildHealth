@@ -1,10 +1,11 @@
 /**
  * arm-tendon-fuel.engine.ts — TOP T6a: tendon-топливо (тайминг, не рацион).
  *
- * Источник: StrengthLog (коллаген 15г + VitC за 30–60 мин до нагрузки —
- * синтез коллагена связок; белок 2.2 г/кг для арм). Рацион — reuse
- * IndividualPlan, здесь только престол-тайминг + гидратация.
- * Чистый модуль.
+ * Источник: Shaw G et al., Am J Clin Nutr 2017;105(1):136–143 (PMID 27852613) —
+ * 15 г желатина с витамином C за ~1 ч до интермиттирующей нагрузки удваивали
+ * PINP (синтез коллагена I). Точная доза витамина C в абстракте не указана —
+ * 200 мг ниже верхнего безопасного уровня и помечены как практическая доза,
+ * а не как цифра из исследования. Белок 2.2 г/кг — практика StrengthLog для арм.
  */
 
 export interface TendonFuelInput {
@@ -31,7 +32,7 @@ export function buildTendonFuel(input: TendonFuelInput = {}): TendonFuelPlan {
   const proteinTargetG = Math.round(bwSafe * ppkSafe);
   const hydrationL = Math.round((bwSafe * 0.04 + (input.tableSession ? 0.5 : 0)) * 10) / 10;
   const checklist = [
-    'Коллаген 15г + VitC 200мг за 30–60 мин до стола/тяжёлого хвата.',
+    'Коллаген/желатин 15 г + витамин C за ~60 мин до стола/тяжёлого хвата (Shaw 2017, PMID 27852613).',
     `Белок ${proteinTargetG}г/день (${ppkSafe} г/кг) — синтез связок идёт на профиците белка.`,
     `Вода ≈${hydrationL}л/день (+0.5л в день стола).`,
   ];

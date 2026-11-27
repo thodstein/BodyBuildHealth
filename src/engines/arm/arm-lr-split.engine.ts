@@ -28,41 +28,74 @@ export interface LrSplit {
 }
 
 export function lrAsymmetryPct(leftKg: number, rightKg: number): number | null {
+  const raw = lrAsymmetryRawPct(leftKg, rightKg);
+  return raw == null ? null : Math.round(raw);
+}
+
+/**
+ * Сырая асимметрия без округления — для порогов. 28.11.2026 было→стало: порог
+ * 7%/12% сравнивался с ОКРУГЛЁННЫМ целым (6.6→7 включало добивку, 11.6→12 давало
+ * CRITICAL и 2×/нед). Округление теперь только в выводе (`asymmetryPct`/note).
+ */
+function lrAsymmetryRawPct(leftKg: number, rightKg: number): number | null {
   const l = Number(leftKg);
   const r = Number(rightKg);
   if (!Number.isFinite(l) || !Number.isFinite(r) || l <= 0 || r <= 0) return null;
   const mx = Math.max(l, r);
-  return Math.round(((mx - Math.min(l, r)) / mx) * 100);
+  return ((mx - Math.min(l, r)) / mx) * 100;
 }
 
 export function planLrSplit(input: LrSplitInput = {}): LrSplit {
   const base = Math.max(4, Math.round(Number(input.baseSets ?? 10) || 10));
   const mrv = Math.max(base, Math.round(Number(input.mrvSets ?? 16) || 16));
-  const pct = lrAsymmetryPct(Number(input.leftKg ?? NaN), Number(input.rightKg ?? NaN));
-  if (pct == null) {
-    return { asymmetryPct: null, weakArm: null, weakSets: base, strongSets: base, weakFreq: 1, withinMrv: true, note: 'Нет L/R данных — симметричный план.' };
+  const rawPct = lrAsymmetryRawPct(Number(input.leftKg ?? NaN), Number(input.rightKg ?? NaN));
+  if (rawPct == null) {
+    return {
+      asymmetryPct: null,
+      weakArm: null,
+      weakSets: base,
+      strongSets: base,
+      weakFreq: 1,
+      withinMrv: true,
+      note: 'Нет L/R данных — симметричный план.',
+    };
   }
-  const weakArm = Number(input.leftKg) < Number(input.rightKg) ? 'left' : Number(input.rightKg) < Number(input.leftKg) ? 'right' : null;
-  if (weakArm == null || pct < 7) {
-    return { asymmetryPct: pct, weakArm, weakSets: base, strongSets: base, weakFreq: 1, withinMrv: true, note: `Асимметрия ${pct}% <7% — допуск, симметрия.` };
+  const pct = Math.round(rawPct); // только для вывода
+  const weakArm =
+    Number(input.leftKg) < Number(input.rightKg)
+      ? 'left'
+      : Number(input.rightKg) < Number(input.leftKg)
+        ? 'right'
+        : null;
+  if (weakArm == null || rawPct < 7) {
+    return {
+      asymmetryPct: pct,
+      weakArm,
+      weakSets: base,
+      strongSets: base,
+      weakFreq: 1,
+      withinMrv: true,
+      note: `Асимметрия ${pct}% <7% — допуск, симметрия.`,
+    };
   }
-  const bonus = pct >= 12 ? 1.25 : 1.15;
+  const bonus = rawPct >= 12 ? 1.25 : 1.15;
   const weakSets = Math.min(mrv, Math.round(base * bonus));
   // 26.10.2026 было→стало: сильная рука = `pct >= 12 ? base : base` (тавтология) и
   // `withinMrv: weakSets <= mrv` всегда true (weakSets уже клампнута). Поле не несло
   // информации. Теперь «в MRV» проверяет СУММУ слабой+сильной против MRV, а сильная
   // рука честно снижается на поддержании (−10%) при ≥12%.
-  const strongSets = pct >= 12 ? Math.max(2, Math.round(base * 0.9)) : base;
+  const strongSets = rawPct >= 12 ? Math.max(2, Math.round(base * 0.9)) : base;
   const total = weakSets + strongSets;
   return {
     asymmetryPct: pct,
     weakArm,
     weakSets,
     strongSets,
-    weakFreq: pct >= 12 ? 2 : 1,
+    weakFreq: rawPct >= 12 ? 2 : 1,
     withinMrv: total <= mrv,
-    note: pct >= 12
-      ? `Асимметрия ${pct}% ≥12% CRITICAL: слабая (${weakArm}) +25% ${ruCount(weakSets, RU_SETS)} 2×/нед, сильная maintenance ${strongSets} (сумма ${total}${total <= mrv ? ' ≤' : ' ПРЕВЫШАЕТ'} MRV ${mrv}${total <= mrv ? '' : ' — снижьте базу'}).`
-      : `Асимметрия ${pct}% ≥7%: слабая (${weakArm}) +15% ${ruCount(weakSets, RU_SETS)} 1×/нед добивка.`,
+    note:
+      rawPct >= 12
+        ? `Асимметрия ${pct}% ≥12% CRITICAL: слабая (${weakArm}) +25% ${ruCount(weakSets, RU_SETS)} 2×/нед, сильная maintenance ${strongSets} (сумма ${total}${total <= mrv ? ' ≤' : ' ПРЕВЫШАЕТ'} MRV ${mrv}${total <= mrv ? '' : ' — снижьте базу'}).`
+        : `Асимметрия ${pct}% ≥7%: слабая (${weakArm}) +15% ${ruCount(weakSets, RU_SETS)} 1×/нед добивка.`,
   };
 }

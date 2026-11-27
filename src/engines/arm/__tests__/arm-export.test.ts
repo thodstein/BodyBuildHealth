@@ -1,6 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import { buildArmPlan } from '../arm-builder.engine';
 import { finalizeArmPlan } from '../arm-finalize.engine';
+import { PLATFORM_WR } from '../arm-platform.engine';
 import {
   armPlanExportBlockReasons,
   ArmPlanExportBlockedError,
@@ -20,12 +21,34 @@ describe('arm-export', () => {
     expect(html).toContain(plan.pattern.name);
     expect(html).toContain('Неделя 1');
     expect(html).toContain('PRO:');
+    // было→стало: WR RT берётся из канона PLATFORM_WR, а не из зашитых 130.5/77.2.
+    const rt = PLATFORM_WR.rolling_thunder;
+    expect(html).toContain(`WR Rolling Thunder M ${rt.maleKg} / F ${rt.femaleKg}`);
+    expect(html).not.toContain('F 77.2');
   });
   it('ics contains VCALENDAR and events', () => {
     const ics = buildArmIcs(plan, '2026-09-01');
     expect(ics).toContain('BEGIN:VCALENDAR');
     expect(ics).toContain('DTSTART');
     expect(ics).toContain('Арм Н1');
+  });
+  it('ICS: day 8 (LegsCore) прижимается к 7-му дню недели, UID сохраняет day', () => {
+    const base: any = plan.weeks[0].sessions[0];
+    const p: any = {
+      ...plan,
+      weeks: [{
+        ...plan.weeks[0],
+        sessions: [
+          { ...base, day: 7, sessionTag: 'A', exercises: [] },
+          { ...base, day: 8, sessionTag: 'LegsCore', exercises: [] },
+        ],
+      }],
+    };
+    const ics = buildArmIcs(p, '2026-09-01');
+    const d7 = ics.match(/UID:arm-1-7@bbhealth\r\nDTSTART:(\d{8})T/);
+    const d8 = ics.match(/UID:arm-1-8@bbhealth\r\nDTSTART:(\d{8})T/);
+    expect(d7?.[1]).toBeTruthy();
+    expect(d8?.[1]).toBe(d7?.[1]); // clamp 1..7, а не восьмой день
   });
   it('ics escaping', () => {
     const ics = buildArmIcs(plan);

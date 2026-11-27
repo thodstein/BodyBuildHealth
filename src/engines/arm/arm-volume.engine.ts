@@ -28,9 +28,10 @@ export function computeArmRecoveryScore(input: ArmRecoveryInput): number {
     // 90 мс терял 6 очков за 60 мс, то есть за свою норму. Теперь очки снимаются только по
     // отклонению от ЛИЧНОЙ базы (Plews 2013 PMID 23535808); без базы шкала не трогается.
     // Шкала ниже конвертится в множитель объёма через recoveryScoreToMult — это не «просто текст».
-    const sig = (input.hrvBaseline != null || input.hrvBaselineZ != null)
-      ? { hrvMs: input.hrvMs, hrvBaseline: input.hrvBaseline, hrvBaselineZ: input.hrvBaselineZ }
-      : hrvSignalFromStore(input.hrvMs);
+    const sig =
+      input.hrvBaseline != null || input.hrvBaselineZ != null
+        ? { hrvMs: input.hrvMs, hrvBaseline: input.hrvBaseline, hrvBaselineZ: input.hrvBaselineZ }
+        : hrvSignalFromStore(input.hrvMs);
     const hrvMult = hrvRecoveryMult(sig).mult;
     if (hrvMult <= 0.85) score -= 12;
     else if (hrvMult < 1) score -= 6;
@@ -67,7 +68,8 @@ export function computeArmBudget(input: {
   level?: string;
   tendonLoad?: number;
 }): number {
-  const base = input.level === 'enhanced' ? 22 : input.level === 'advanced' ? 18 : input.level === 'intermediate' ? 15 : 12;
+  const base =
+    input.level === 'enhanced' ? 22 : input.level === 'advanced' ? 18 : input.level === 'intermediate' ? 15 : 12;
   let mult = 1;
   if (input.recoveryMult) mult *= input.recoveryMult;
   if (input.labMult) mult *= Math.max(0.6, Math.min(1.4, input.labMult));
@@ -98,22 +100,26 @@ export function sessionLimitsForArm(input: {
   const disc = (input.discipline || 'armwrestling').toLowerCase();
   // armlifting — тяжёлый CNS (хват), лимиты жёстче чем armwrestling
   let maxEx = enhanced ? 8 : 6;
-  let maxSets = enhanced ? 14 : 10;
   if (disc === 'armlifting') {
     maxEx = enhanced ? 6 : 5;
-    maxSets = enhanced ? 12 : 8;
   } else if (disc === 'hybrid') {
     maxEx = enhanced ? 7 : 6;
-    maxSets = enhanced ? 13 : 9;
   }
   // PRO F: TableTech несёт 7 мышц (risers/pron/sup/shoulder/wrist/radial/thumb) — кап 7
   if (!enhanced && disc === 'armwrestling' && (input.sessionTag || '') === 'TableTech') {
     maxEx = 7;
-    maxSets = 12;
   }
   if (input.recoveryMult && input.recoveryMult < 0.8) {
     maxEx = Math.max(4, maxEx - 1);
-    maxSets = Math.max(6, maxSets - 2);
+  }
+  // 26.10.2026 было→стало: `maxSets` был 8–14, но НИКТО его не читал, а план
+  // спокойно набирал 20–30 сетов за сессию. При этом 10 сетов физически не
+  // покрывают недельные MEV (сумма MEV ≈ 107/нед) — лимит был не методикой,
+  // а забытой константой. Теперь это потолок по ВРЕМЕНИ сессии (4 сета на
+  // позицию), а объём мышцы ограничивает MRV, не сессия.
+  let maxSets = maxEx * 4;
+  if (input.recoveryMult && input.recoveryMult < 0.8) {
+    maxSets = Math.max(6, maxSets - 4);
   }
   return { maxExercises: maxEx, maxSets };
 }
@@ -134,16 +140,46 @@ export function perExerciseCap(muscle: string, level?: string): number {
 
 /** Indirect вклады (расширены до 12, как BB 15). */
 export const ARM_INDIRECT: Record<string, Array<{ muscle: string; factor: number }>> = {
-  hammer_curl: [{ muscle: 'wrist_flexors', factor: 0.3 }, { muscle: 'brachioradialis', factor: 0.2 }],
-  reverse_curl: [{ muscle: 'wrist_extensors', factor: 0.25 }, { muscle: 'brachialis', factor: 0.15 }],
-  pronation: [{ muscle: 'wrist_flexors', factor: 0.2 }, { muscle: 'brachioradialis', factor: 0.3 }],
-  supination: [{ muscle: 'biceps_long', factor: 0.2 }, { muscle: 'brachialis', factor: 0.25 }],
-  back_drag: [{ muscle: 'biceps_long', factor: 0.3 }, { muscle: 'brachialis', factor: 0.2 }],
-  side_press: [{ muscle: 'shoulder_stab', factor: 0.3 }, { muscle: 'core_anchor', factor: 0.2 }],
-  cupping: [{ muscle: 'risers', factor: 0.2 }, { muscle: 'thumb', factor: 0.15 }],
-  rising: [{ muscle: 'wrist_flexors', factor: 0.15 }, { muscle: 'thumb', factor: 0.25 }],
-  grip_support: [{ muscle: 'wrist_flexors', factor: 0.2 }, { muscle: 'thumb', factor: 0.1 }],
-  grip_pinch: [{ muscle: 'thumb', factor: 0.3 }, { muscle: 'risers', factor: 0.2 }],
+  hammer_curl: [
+    { muscle: 'wrist_flexors', factor: 0.3 },
+    { muscle: 'brachioradialis', factor: 0.2 },
+  ],
+  reverse_curl: [
+    { muscle: 'wrist_extensors', factor: 0.25 },
+    { muscle: 'brachialis', factor: 0.15 },
+  ],
+  pronation: [
+    { muscle: 'wrist_flexors', factor: 0.2 },
+    { muscle: 'brachioradialis', factor: 0.3 },
+  ],
+  supination: [
+    { muscle: 'biceps_long', factor: 0.2 },
+    { muscle: 'brachialis', factor: 0.25 },
+  ],
+  back_drag: [
+    { muscle: 'biceps_long', factor: 0.3 },
+    { muscle: 'brachialis', factor: 0.2 },
+  ],
+  side_press: [
+    { muscle: 'shoulder_stab', factor: 0.3 },
+    { muscle: 'core_anchor', factor: 0.2 },
+  ],
+  cupping: [
+    { muscle: 'risers', factor: 0.2 },
+    { muscle: 'thumb', factor: 0.15 },
+  ],
+  rising: [
+    { muscle: 'wrist_flexors', factor: 0.15 },
+    { muscle: 'thumb', factor: 0.25 },
+  ],
+  grip_support: [
+    { muscle: 'wrist_flexors', factor: 0.2 },
+    { muscle: 'thumb', factor: 0.1 },
+  ],
+  grip_pinch: [
+    { muscle: 'thumb', factor: 0.3 },
+    { muscle: 'risers', factor: 0.2 },
+  ],
   grip_crush: [{ muscle: 'brachioradialis', factor: 0.15 }],
   ulnar_deviation: [{ muscle: 'wrist_flexors', factor: 0.15 }],
 };
@@ -176,6 +212,35 @@ export function aggregateArmVolume(
         if (isArmTendonMuscle(m)) out[m].tendonSets += ex.sets;
       }
     }
+  }
+  return out;
+}
+
+/**
+ * Недельный объём плана: direct + indirect (через ARM_INDIRECT) + tendon.
+ * ЕДИНЫЙ источник для builder/finalize/snapshot/injection.
+ *
+ * 26.10.2026: до этого четыре места считали `effectiveSets += ex.sets`, т.е.
+ * «эффективный» объём был равен прямому, а КОСВЕННАЯ нагрузка (компаунды,
+ * hammer→wrist, pinch→thumb) не попадала в снимок вообще. Отчёт при этом
+ * считал её через aggregateArmVolume — один и тот же план имел две разные
+ * цифры эффективного объёма (UI занижал, отчёт завышал).
+ */
+export function armWeeklyVolumeFor(
+  weeks: Array<{ sessions: Array<{ exercises: Array<{ muscle: string; sets: number; movementPattern?: string }> }> }>,
+): Record<string, { directSets: number; effectiveSets: number; tendonSets: number; fatigueWeightedSets: number }> {
+  const agg = aggregateArmVolume(weeks);
+  const out: Record<
+    string,
+    { directSets: number; effectiveSets: number; tendonSets: number; fatigueWeightedSets: number }
+  > = {};
+  for (const [muscle, v] of Object.entries(agg)) {
+    out[muscle] = {
+      directSets: v.directSets,
+      effectiveSets: v.effectiveSets,
+      tendonSets: v.tendonSets,
+      fatigueWeightedSets: v.effectiveSets,
+    };
   }
   return out;
 }

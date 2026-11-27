@@ -16,18 +16,27 @@ import { ArmPickBlock } from './arm-hub-pick';
 import { ArmVideoTracker } from './arm-video-tracker';
 import { ruCount, RU_SETS } from '../../../engines/ru-plural';
 
-/** PRO-3 P8: позиционный чек-лист — локальный стейт ритуала (не персистится: проверка «сегодня»).
+/** PRO-3 P8: позиционный чек-лист — локальный стейт ритуала (персистится в he_arm_humerus_checks).
  * PRO-5 №5: провалы дублируются в he_arm_humerus_checks — мост в конструктор (ось/warmup). */
 const HUMERUS_CHECKS_KEY = 'he_arm_humerus_checks';
+function loadHumerusFailed(): string[] {
+  try {
+    if (typeof localStorage === 'undefined') return [];
+    const j = JSON.parse(localStorage.getItem(HUMERUS_CHECKS_KEY) || 'null');
+    const ids = new Set(HUMERUS_CHECKS.map((c) => c.id));
+    return Array.isArray(j?.failed) ? j.failed.filter((x: unknown): x is string => typeof x === 'string' && ids.has(x)) : [];
+  } catch { return []; }
+}
 function HumerusChecklist() {
-  const [failed, setFailed] = React.useState<string[]>([]);
+  // Аудит 2026-11: провалы писались в localStorage, но при ремаунте таба снова были «✓» —
+  // инициализируем из сохранённого; пишем только на действие (mount не должен врать мосту).
+  const [failed, setFailed] = React.useState<string[]>(loadHumerusFailed);
   const toggle = (id: string) => setFailed((p) => {
     const next = p.includes(id) ? p.filter((x) => x !== id) : [...p, id];
     try {
       // `touchedAt` — МОМЕНТ ВО ВРЕМЕНИ, а не календарный день, поэтому здесь
       // UTC-таймстемп без среза: контракт канона различает «календарную дату»
       // (только из core/local-date) и «событие» (updatedAt/touchedAt — UTC).
-      // Ключ write-only (читателей нет), так что смена формы безопасна.
       if (typeof localStorage !== 'undefined') localStorage.setItem(HUMERUS_CHECKS_KEY, JSON.stringify({ failed: next, touchedAt: new Date().toISOString() }));
     } catch { /* noop */ }
     return next;
@@ -112,7 +121,7 @@ export function HubPressureTab({ H }: { H: any }) {
       </AdSec>
       <AdGrid cols="2">
       <AdSec title="Humerus (side)">
-        <div className="ad-muted">{mockGuard.humerus.length? mockGuard.humerus.join(' · ') : '✓ Нет риска: side ≤3, RIR≥2, прогрессия ≤10%/нед'}</div>
+        <div className="ad-muted">{mockGuard.mock ? 'предпросмотр на макете (реального плана нет): ' : ''}{mockGuard.humerus.length? mockGuard.humerus.join(' · ') : '✓ Нет риска: side ≤3, RIR≥2, прогрессия ≤10%/нед'}</div>
         <div className="ad-muted">Гвард плана: side &gt;6 первые 4 нед / &gt;9 / +10%/нед — детали во вкладке P0</div>
       </AdSec>
       {/* 26.10.2026: живое видео за столом (оффлайн) — трек кисти → тип траектории */}

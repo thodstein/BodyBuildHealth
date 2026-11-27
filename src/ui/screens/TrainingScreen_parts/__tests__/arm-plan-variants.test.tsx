@@ -47,7 +47,8 @@ describe('Arm plan variants', () => {
     expect(loadArmVariants().length).toBe(0);
   });
 
-  it('кап 10: одиннадцатый вытесняет старый', () => {    build();
+  it('кап 10: одиннадцатый вытесняет старый', () => {
+    build();
     fireEvent.click(screen.getByRole('button', { name: /Варианты плана/ }));
     for (let i = 0; i < 11; i++) {
       fireEvent.change(screen.getByLabelText('Название варианта'), { target: { value: `V${i}` } });
@@ -63,13 +64,38 @@ describe('Arm plan variants', () => {
     build();
     fireEvent.click(screen.getByRole('button', { name: /Варианты плана/ }));
     const input = screen.getByLabelText('Импорт варианта JSON') as HTMLInputElement;
-    const good = new File([JSON.stringify({ name: 'Из файла', plan: { pattern: { id: 'p', name: 'P' }, weeks: [] } })], 'plan.json', { type: 'application/json' });
+    const good = new File(
+      [JSON.stringify({ name: 'Из файла', plan: { pattern: { id: 'p', name: 'P' }, weeks: [] } })],
+      'plan.json',
+      { type: 'application/json' },
+    );
     fireEvent.change(input, { target: { files: [good] } });
     await screen.findByText('📥 Импортирован: Из файла');
     expect(loadArmVariants().some((v) => v.name === 'Из файла')).toBe(true);
     const bad = new File(['{oops'], 'bad.json', { type: 'application/json' });
     fireEvent.change(input, { target: { files: [bad] } });
     await screen.findByText('⚠ Битый JSON-файл');
+  });
+
+  it('план переживает перезагрузку: lazy-восстановление he_arm_last_plan (аудит 2026-11)', () => {
+    const first = render(<ArmAutoConstructor />);
+    fireEvent.click(screen.getByRole('button', { name: '4 Сплит и цикл' }));
+    fireEvent.click(screen.getByText('⚡ Собрать план'));
+    expect(document.querySelector("[data-arm='week-pills']")).not.toBeNull();
+    expect(localStorage.getItem('he_arm_last_plan')).toBeTruthy();
+    first.unmount();
+    // Имитация перезагрузки: localStorage не чистим, компонент монтируем заново.
+    render(<ArmAutoConstructor />);
+    fireEvent.click(screen.getByRole('button', { name: '5 План' }));
+    expect(document.querySelector("[data-arm='week-pills']")).not.toBeNull();
+    expect(document.body.textContent).toContain('План —');
+  });
+
+  it('битый he_arm_last_plan не роняет монтирование — честный «План не собран»', () => {
+    localStorage.setItem('he_arm_last_plan', '{oops');
+    render(<ArmAutoConstructor />);
+    fireEvent.click(screen.getByRole('button', { name: '5 План' }));
+    expect(document.body.textContent).toContain('План не собран');
   });
 
   it('compareArmVariants: недели/сеты/дельты по мышцам', () => {
@@ -90,16 +116,37 @@ describe('Arm plan variants', () => {
   it('compareArmVariants: веса, RIR и состав упражнений (PRO-7)', () => {
     const mk = (opts: { name: string; weight: number; rir: number }) => ({
       pattern: { id: 'p', name: 'P' },
-      weeks: [{ week: 1, phase: 'accumulation', sessions: [{ exercises: [{ muscle: 'wrist_flexors', sets: 4, name: opts.name, rir: opts.rir, workSets: [{ weight: opts.weight, reps: 5, rir: opts.rir }] }] }] }],
+      weeks: [
+        {
+          week: 1,
+          phase: 'accumulation',
+          sessions: [
+            {
+              exercises: [
+                {
+                  muscle: 'wrist_flexors',
+                  sets: 4,
+                  name: opts.name,
+                  rir: opts.rir,
+                  workSets: [{ weight: opts.weight, reps: 5, rir: opts.rir }],
+                },
+              ],
+            },
+          ],
+        },
+      ],
     });
-    const d = compareArmVariants(mk({ name: 'Жим', weight: 40, rir: 2 }), mk({ name: 'Жим гантели', weight: 30, rir: 3 }))!;
+    const d = compareArmVariants(
+      mk({ name: 'Жим', weight: 40, rir: 2 }),
+      mk({ name: 'Жим гантели', weight: 30, rir: 3 }),
+    )!;
     expect(d.exRows).toHaveLength(2);
-    expect(d.exRows.some(r => r.name === 'Жим' && r.status === 'только A')).toBe(true);
-    expect(d.exRows.some(r => r.name === 'Жим гантели' && r.status === 'только B')).toBe(true);
+    expect(d.exRows.some((r) => r.name === 'Жим' && r.status === 'только A')).toBe(true);
+    expect(d.exRows.some((r) => r.name === 'Жим гантели' && r.status === 'только B')).toBe(true);
     const same = compareArmVariants(mk({ name: 'Жим', weight: 40, rir: 2 }), mk({ name: 'Жим', weight: 40, rir: 2 }))!;
     expect(same.weightRows).toEqual([]);
     expect(same.rirRows).toEqual([]);
-    expect(same.exRows.every(r => r.status === 'в обоих')).toBe(true);
+    expect(same.exRows.every((r) => r.status === 'в обоих')).toBe(true);
   });
 
   it('UI: выбор двух вариантов показывает дельты', () => {

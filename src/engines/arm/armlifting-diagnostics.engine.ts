@@ -134,7 +134,9 @@ function lvlOf(pct: number | null): ArmliftRow['level'] {
  */
 export function cocLevelToPct(level: number): number | null {
   if (!Number.isFinite(level) || level < 0) return null;
-  const key = String(level);
+  // Уровень 0 = Trainer (см. ArmliftInput.cocLevel): в COC_ORDINAL_KG ключ —
+  // 'trainer', а не '0'; берём существующую константу, вес не дублируем.
+  const key = level === 0 ? 'trainer' : String(level);
   const kg = COC_ORDINAL_KG[key];
   if (kg == null) {
     // Нецелая ступень между опубликованными — честная оценка интерполяцией.
@@ -358,14 +360,16 @@ export function buildArmliftingReport(input: ArmliftInput): ArmliftingReport {
       note: 'норма 15 с (внутренний ориентир, в avgWR не входит)',
     });
   }
-  const coc = num(input.cocLevel);
+  // cocLevel: 0 — валидный Trainer (см. ArmliftInput), поэтому не num() (>0 отбросил бы).
+  const cocRaw = input.cocLevel;
+  const coc = cocRaw != null && Number.isFinite(Number(cocRaw)) && Number(cocRaw) >= 0 ? Number(cocRaw) : null;
   if (coc != null) {
     const pct = cocLevelToPct(coc);
     rows.push({
       implement: 'coc_gripper', label: IMPLEMENT_LABEL.coc_gripper,
-      display: `№${coc}`, scorePct: pct, internal: true,
+      display: coc === 0 ? 'Trainer (0)' : `№${coc}`, scorePct: pct, internal: true,
       level: lvlOf(pct), attempts: [],
-      note: `ступени IronMind (No.3 = 280 lb ≈ 127 кг — плоскость сертификации); poundage-оценка, не замер`,
+      note: `ступени IronMind (0 = Trainer · No.3 = 280 lb ≈ 127 кг — плоскость сертификации); poundage-оценка, не замер`,
     });
   }
   // Silver Bullet — время отдельно (A3 + добивка: опорные времена IronMoney/APL)

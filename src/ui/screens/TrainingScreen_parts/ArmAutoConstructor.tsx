@@ -15,11 +15,25 @@ import { buildArmSchedule } from '../../../engines/arm/arm-specialization.engine
 import { armPlanSnapshotId, refreshArmPlanSnapshot } from '../../../engines/arm/arm-plan-snapshot.engine';
 import { buildArmPrintHtml, buildArmIcs, buildArmPlanCsv } from '../../../engines/arm/arm-export.engine';
 import { ARM_SPLIT_PATTERNS } from '../../../engines/arm/arm-split-patterns';
-import { ARM_MUSCLE_RU, ARM_MUSCLES, type ArmSpecializationBlock, type ArmWeeklyCheckin } from '../../../engines/arm/arm-types';
-import { loadArmCheckins, saveArmCheckin, removeArmCheckin, armCheckinTrend } from '../../../engines/arm/arm-weekly-checkin.engine';
+import {
+  ARM_MUSCLE_RU,
+  ARM_MUSCLES,
+  type ArmSpecializationBlock,
+  type ArmWeeklyCheckin,
+} from '../../../engines/arm/arm-types';
+import {
+  loadArmCheckins,
+  saveArmCheckin,
+  removeArmCheckin,
+  armCheckinTrend,
+} from '../../../engines/arm/arm-weekly-checkin.engine';
 import { injectArmCorrections, specTargetSetsByPlanWeek } from '../../../engines/arm/arm-diagnostics-injection.engine';
 import { bridgeDoseFromPayload } from '../../../engines/arm/arm-correction-dose.engine';
-import { injectArmliftCorrections, applyArmliftSpecWave, type ArmliftInjectionItem } from '../../../engines/arm/armlift-injection.engine';
+import {
+  injectArmliftCorrections,
+  applyArmliftSpecWave,
+  type ArmliftInjectionItem,
+} from '../../../engines/arm/armlift-injection.engine';
 import { buildWafStartCard, WafParaClass } from '../../../engines/arm/arm-waf.engine';
 import { WAF_FOULS, WAF_FOULS_OUT_AFTER } from '../../../engines/arm/arm-start-strap.engine';
 import { buildSupermatchPlan } from '../../../engines/arm/arm-supermatch.engine';
@@ -49,14 +63,34 @@ import { loadArmAnnotations, armAnnotationLines } from '../../../engines/arm/arm
 import { ArmAnnotationsPanel } from './arm-annotations-panel';
 import { ArmRulebookPanel } from './arm-rulebook-panel';
 import { saveAnnualTrainingPlan } from '../../../engines/annual-training/annual-training-storage';
-import { annualPlanFromMacro, setAnnualBlockConfig, buildAnnualPlan } from '../../../engines/annual-training/block-builders.engine';
-import { PLATFORM_WR, planAttempts, platformWrFor, platformIsInternal, loadPlatformLog, savePlatformLogEntry } from '../../../engines/arm/arm-platform.engine';
-import { parseArmResultJson, parseArmResultCsv, applyArmResultImport } from '../../../engines/arm/arm-result-import.engine';
+import {
+  annualPlanFromMacro,
+  setAnnualBlockConfig,
+  buildAnnualPlan,
+} from '../../../engines/annual-training/block-builders.engine';
+import {
+  PLATFORM_WR,
+  planAttempts,
+  platformWrFor,
+  platformIsInternal,
+  loadPlatformLog,
+  savePlatformLogEntry,
+} from '../../../engines/arm/arm-platform.engine';
+import {
+  parseArmResultJson,
+  parseArmResultCsv,
+  applyArmResultImport,
+} from '../../../engines/arm/arm-result-import.engine';
 import { assessArmReadiness } from '../../../engines/arm/arm-readiness.engine';
 import { resolveArmReturnToLoad } from '../../../engines/arm/arm-return-to-load.engine';
 import { loadSRPESessions } from '../../../engines/pro/srpe-store';
 import { acuteChronicRatio, toDailyLoads } from '../../../engines/pro/training-load.engine';
-import { loadForceTrials, buildWeeklyStats, fatigueTrend, forceTrend } from '../../../engines/arm/arm-force-history.store';
+import {
+  loadForceTrials,
+  buildWeeklyStats,
+  fatigueTrend,
+  forceTrend,
+} from '../../../engines/arm/arm-force-history.store';
 import { ARM_WEAK_POINTS, type ArmWeakPoint } from '../../../engines/arm/arm-biomechanics.engine';
 import { auditArmPlan, worstArmPoint } from '../../../engines/arm/arm-plan-audit.engine';
 import { ArmTechniqueCard } from './ArmTechniqueCard';
@@ -68,10 +102,25 @@ import { applyArmMobilityToProfile, clearArmMobilityFromProfile } from '../../..
 import { subscribePlannerApply, getPlannerApply } from './planner-bridge';
 import './arm-design.css';
 import {
-  CARD, SMALL, BTN, BTN_GHOST, H, IN,
-  bbCardChrome, bbIconTile, bbCardTitle, bbCardBadge,
-  PlannerNestedCardContext, PLANNER_SUBCARD, plannerTitleText,
-  PlannerStepNav, usePlannerStepScroll, PLANNER_HEAD_BAR, PLANNER_HEAD_TITLE, PLANNER_FLASH, PLANNER_STEP_NAV_WRAP,
+  CARD,
+  SMALL,
+  BTN,
+  BTN_GHOST,
+  H,
+  IN,
+  bbCardChrome,
+  bbIconTile,
+  bbCardTitle,
+  bbCardBadge,
+  PlannerNestedCardContext,
+  PLANNER_SUBCARD,
+  plannerTitleText,
+  PlannerStepNav,
+  usePlannerStepScroll,
+  PLANNER_HEAD_BAR,
+  PLANNER_HEAD_TITLE,
+  PLANNER_FLASH,
+  PLANNER_STEP_NAV_WRAP,
 } from './training-ui';
 import { buzzPlanner } from './planner-ui';
 import { AdSwitch, AdSheetSelect } from './arm-design-system';
@@ -80,19 +129,31 @@ import { ensureArmApkStyles } from './arm-apk-loader';
 import { ruCount, RU_SETS, RU_BLOCKS } from '../../../engines/ru-plural';
 
 /* ── Единый плотный каркас: Ad* — тонкие обёртки над китом training-ui
-  * (BB-авто — эталон). DOM-контракты 1-в-1: классы .ad-* + data-arm хуки +
-  * строки + aria. Визуал карточек — ровно кит ББ-авто (bbCardChrome: радиус
-  * 14, кромка акцента 2px сверху, тайл 26px, заголовок 12.5/800), а не
-  * локальная копия со стеклом и радиусом 12 — иначе «одинаковые» планировщики
-  * расходились. Скрытое = collapsed-тело нулевой высоты (grid 0fr / opacity 0,
-  * без display:none): пустот нет, контент остаётся в DOM для скринридеров и
-  * тестовых запросов. ── */
+ * (BB-авто — эталон). DOM-контракты 1-в-1: классы .ad-* + data-arm хуки +
+ * строки + aria. Визуал карточек — ровно кит ББ-авто (bbCardChrome: радиус
+ * 14, кромка акцента 2px сверху, тайл 26px, заголовок 12.5/800), а не
+ * локальная копия со стеклом и радиусом 12 — иначе «одинаковые» планировщики
+ * расходились. Скрытое = collapsed-тело нулевой высоты (grid 0fr / opacity 0,
+ * без display:none): пустот нет, контент остаётся в DOM для скринридеров и
+ * тестовых запросов. ── */
 
 /** Акценты секций — палитра ББ-авто (одна набор, чтобы планы читались одинаково). */
 const AD_ACCENT = {
-  params: '#a855f7', weak: '#f59e0b', ped: '#ec4899', max: '#22d3ee', waf: '#60a5fa',
-  grip: '#3b82f6', split: '#a855f7', axis: '#f472b6', plan: '#00e68a', ready: '#f59e0b',
-  weights: '#22d3ee', platform: '#a78bfa', export: '#60a5fa', year: '#a78bfa', total: '#00e68a',
+  params: '#a855f7',
+  weak: '#f59e0b',
+  ped: '#ec4899',
+  max: '#22d3ee',
+  waf: '#60a5fa',
+  grip: '#3b82f6',
+  split: '#a855f7',
+  axis: '#f472b6',
+  plan: '#00e68a',
+  ready: '#f59e0b',
+  weights: '#22d3ee',
+  platform: '#a78bfa',
+  export: '#60a5fa',
+  year: '#a78bfa',
+  total: '#00e68a',
 } as const;
 
 type AdStepDef = { id: string; label: string };
@@ -107,16 +168,53 @@ function splitIconTitle(title: React.ReactNode): { icon?: string; text: React.Re
 /** Корень шага. Отступы и ширину даёт хост окна конструктора (.tp-cbody) —
  *  ровно как в ББ-авто, поэтому своего maxWidth/padding здесь нет. */
 function AdRoot({ rootClass, children }: { rootClass: string; children: React.ReactNode }) {
-  React.useEffect(() => { ensureArmApkStyles(); }, []);
+  React.useEffect(() => {
+    ensureArmApkStyles();
+  }, []);
   // Отступы и ширину даёт хост окна конструктора (.tp-cbody) — как в ББ-авто.
-  return <div className={isNativeApp() ? `${rootClass} arm-apk ad-wrap planner-root` : `${rootClass} ad-wrap planner-root`} style={{ display: 'flex', flexDirection: 'column', gap: 8, width: '100%', minWidth: 0, maxWidth: '100%' }}>{children}</div>;
+  return (
+    <div
+      className={isNativeApp() ? `${rootClass} arm-apk ad-wrap planner-root` : `${rootClass} ad-wrap planner-root`}
+      style={{ display: 'flex', flexDirection: 'column', gap: 8, width: '100%', minWidth: 0, maxWidth: '100%' }}
+    >
+      {children}
+    </div>
+  );
 }
 /** Обёртка шага — без собственной рамки: шаг состоит из карточек кита (AdSec),
  *  ровно как в ББ-авто (раньше AdCard + AdSec давали «двойные» карточки). */
 function AdCard({ className, children, style, ...rest }: React.HTMLAttributes<HTMLDivElement>) {
-  return <div className={className ? `ad-card ${className}` : 'ad-card'} style={{ display: 'flex', flexDirection: 'column', gap: 8, ...style }} {...rest}>{children}</div>;
+  return (
+    <div
+      className={className ? `ad-card ${className}` : 'ad-card'}
+      style={{ display: 'flex', flexDirection: 'column', gap: 8, ...style }}
+      {...rest}
+    >
+      {children}
+    </div>
+  );
 }
-function AdSec({ title, hint, children, hook, collapsible, defaultOpen, summary, status, accent = AD_ACCENT.params }: { title: React.ReactNode; hint?: React.ReactNode; children: React.ReactNode; hook?: string; collapsible?: boolean; defaultOpen?: boolean; summary?: React.ReactNode; status?: 'ok' | 'warn'; accent?: string }) {
+function AdSec({
+  title,
+  hint,
+  children,
+  hook,
+  collapsible,
+  defaultOpen,
+  summary,
+  status,
+  accent = AD_ACCENT.params,
+}: {
+  title: React.ReactNode;
+  hint?: React.ReactNode;
+  children: React.ReactNode;
+  hook?: string;
+  collapsible?: boolean;
+  defaultOpen?: boolean;
+  summary?: React.ReactNode;
+  status?: 'ok' | 'warn';
+  accent?: string;
+}) {
   // Вторичное по умолчанию закрыто (BB-эталон PlannerFold); первичное — открыто.
   const [open, setOpen] = React.useState(defaultOpen ?? !collapsible);
   const { icon, text } = splitIconTitle(title);
@@ -127,75 +225,293 @@ function AdSec({ title, hint, children, hook, collapsible, defaultOpen, summary,
   const ownTitle = plannerTitleText(text);
   const hideDupTitle = nested && ownTitle !== '' && ownTitle === parentTitle;
   const chrome: React.CSSProperties = nested ? PLANNER_SUBCARD : { ...bbCardChrome(accent), marginBottom: 0 };
-  const dot = status ? <span className="ad-dot" data-s={status} aria-hidden style={{ width: 8, height: 8, borderRadius: 99, background: status === 'ok' ? '#00e68a' : '#f59e0b', display: 'inline-block', marginRight: 6 }} /> : null;
+  const dot = status ? (
+    <span
+      className="ad-dot"
+      data-s={status}
+      aria-hidden
+      style={{
+        width: 8,
+        height: 8,
+        borderRadius: 99,
+        background: status === 'ok' ? '#00e68a' : '#f59e0b',
+        display: 'inline-block',
+        marginRight: 6,
+      }}
+    />
+  ) : null;
   const head = (
     <>
-      {icon && !hideDupTitle ? <span className="ad-sec-ic" aria-hidden style={bbIconTile(accent)}>{icon}</span> : null}
+      {icon && !hideDupTitle ? (
+        <span className="ad-sec-ic" aria-hidden style={bbIconTile(accent)}>
+          {icon}
+        </span>
+      ) : null}
       {dot}
-      {!hideDupTitle ? <span className="ad-sec-t" style={{ ...bbCardTitle, flex: 1, margin: 0 }}>{text}</span> : null}
-      {!open && summary ? <span className="ad-sec-sum" style={bbCardBadge(accent)}>{summary}</span> : null}
+      {!hideDupTitle ? (
+        <span className="ad-sec-t" style={{ ...bbCardTitle, flex: 1, margin: 0 }}>
+          {text}
+        </span>
+      ) : null}
+      {!open && summary ? (
+        <span className="ad-sec-sum" style={bbCardBadge(accent)}>
+          {summary}
+        </span>
+      ) : null}
     </>
   );
-  const bodyStyle: React.CSSProperties = { marginTop: open ? 8 : 0, ...(open ? {} : { display: 'grid', gridTemplateRows: '0fr', opacity: 0, pointerEvents: 'none' as const }) };
+  const bodyStyle: React.CSSProperties = {
+    marginTop: open ? 8 : 0,
+    ...(open ? {} : { display: 'grid', gridTemplateRows: '0fr', opacity: 0, pointerEvents: 'none' as const }),
+  };
   if (!collapsible) {
     return (
-      <div className="ad-sec" {...(hook ? { 'data-arm': hook } : {})} style={{ ...chrome, display: 'flex', flexDirection: 'column' }}>
-        {(icon || dot || !hideDupTitle) ? <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap', marginBottom: 8 }}>{head}</div> : null}
-        {hint ? <div className="ad-sec-hint" style={{ fontSize: 10.5, color: '#fff', lineHeight: 1.45, marginBottom: 8 }}>{hint}</div> : null}
-        <PlannerNestedCardContext.Provider value={ownTitle || parentTitle || ''}>{children}</PlannerNestedCardContext.Provider>
+      <div
+        className="ad-sec"
+        {...(hook ? { 'data-arm': hook } : {})}
+        style={{ ...chrome, display: 'flex', flexDirection: 'column' }}
+      >
+        {icon || dot || !hideDupTitle ? (
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap', marginBottom: 8 }}>{head}</div>
+        ) : null}
+        {hint ? (
+          <div className="ad-sec-hint" style={{ fontSize: 10.5, color: '#fff', lineHeight: 1.45, marginBottom: 8 }}>
+            {hint}
+          </div>
+        ) : null}
+        <PlannerNestedCardContext.Provider value={ownTitle || parentTitle || ''}>
+          {children}
+        </PlannerNestedCardContext.Provider>
       </div>
     );
   }
   return (
-    <div className="ad-sec" {...(hook ? { 'data-arm': hook } : {})} style={{ ...chrome, display: 'flex', flexDirection: 'column' }}>
+    <div
+      className="ad-sec"
+      {...(hook ? { 'data-arm': hook } : {})}
+      style={{ ...chrome, display: 'flex', flexDirection: 'column' }}
+    >
       <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
-        <button type="button" className="ad-sec-head" aria-expanded={open} onClick={() => { buzzPlanner(); setOpen((o) => !o); }} style={{ width: '100%', display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap', padding: 0, cursor: 'pointer', background: 'transparent', border: 'none', color: '#fff', textAlign: 'left', fontFamily: 'inherit', minHeight: 28 }}>
+        <button
+          type="button"
+          className="ad-sec-head"
+          aria-expanded={open}
+          onClick={() => {
+            buzzPlanner();
+            setOpen((o) => !o);
+          }}
+          style={{
+            width: '100%',
+            display: 'flex',
+            alignItems: 'center',
+            gap: 8,
+            flexWrap: 'wrap',
+            padding: 0,
+            cursor: 'pointer',
+            background: 'transparent',
+            border: 'none',
+            color: '#fff',
+            textAlign: 'left',
+            fontFamily: 'inherit',
+            minHeight: 28,
+          }}
+        >
           {head}
-          <span className="ad-sec-chev" aria-hidden style={{ marginLeft: 'auto', fontSize: 11, color: '#fff', display: 'inline-block', transform: open ? 'rotate(180deg)' : 'rotate(0deg)', transition: 'transform .2s' }}>▾</span>
+          <span
+            className="ad-sec-chev"
+            aria-hidden
+            style={{
+              marginLeft: 'auto',
+              fontSize: 11,
+              color: '#fff',
+              display: 'inline-block',
+              transform: open ? 'rotate(180deg)' : 'rotate(0deg)',
+              transition: 'transform .2s',
+            }}
+          >
+            ▾
+          </span>
         </button>
       </div>
-      {hint && open ? <div className="ad-sec-hint" style={{ fontSize: 10.5, color: '#fff', lineHeight: 1.45, marginTop: 6 }}>{hint}</div> : null}
+      {hint && open ? (
+        <div className="ad-sec-hint" style={{ fontSize: 10.5, color: '#fff', lineHeight: 1.45, marginTop: 6 }}>
+          {hint}
+        </div>
+      ) : null}
       <div className="ad-sec-body" data-collapsed={!open} style={bodyStyle}>
         <div style={open ? undefined : { minHeight: 0, overflow: 'hidden' }}>
-          <PlannerNestedCardContext.Provider value={ownTitle || parentTitle || ''}>{children}</PlannerNestedCardContext.Provider>
+          <PlannerNestedCardContext.Provider value={ownTitle || parentTitle || ''}>
+            {children}
+          </PlannerNestedCardContext.Provider>
         </div>
       </div>
     </div>
   );
 }
 function AdGrid({ cols, children }: { cols: '2' | '3' | 'auto' | 'auto-sm'; children: React.ReactNode }) {
-  return <div className="ad-grid" data-cols={cols} style={{ display: 'grid', gap: 6, gridTemplateColumns: cols === '3' ? 'repeat(auto-fit, minmax(150px, 1fr))' : cols === '2' ? 'repeat(auto-fit, minmax(180px, 1fr))' : '1fr' }}>{children}</div>;
+  return (
+    <div
+      className="ad-grid"
+      data-cols={cols}
+      style={{
+        display: 'grid',
+        gap: 6,
+        gridTemplateColumns:
+          cols === '3'
+            ? 'repeat(auto-fit, minmax(150px, 1fr))'
+            : cols === '2'
+              ? 'repeat(auto-fit, minmax(180px, 1fr))'
+              : '1fr',
+      }}
+    >
+      {children}
+    </div>
+  );
 }
 function AdField({ label, children }: { label: React.ReactNode; children: React.ReactNode }) {
   const styled = React.Children.map(children, (ch) => {
-    if (React.isValidElement(ch) && (ch.type === 'input' || ch.type === 'select')) return React.cloneElement(ch as React.ReactElement<any>, { style: { ...(ch.props as any).style, ...IN, width: '100%' } });
+    if (React.isValidElement(ch) && (ch.type === 'input' || ch.type === 'select'))
+      return React.cloneElement(ch as React.ReactElement<any>, {
+        style: { ...(ch.props as any).style, ...IN, width: '100%' },
+      });
     return ch;
   });
-  return <label className="ad-field" style={{ display: 'flex', flexDirection: 'column', gap: 4, fontSize: 11, fontWeight: 700, color: '#fff' }}><span className="ad-fl">{label}</span>{styled}</label>;
+  return (
+    <label
+      className="ad-field"
+      style={{ display: 'flex', flexDirection: 'column', gap: 4, fontSize: 11, fontWeight: 700, color: '#fff' }}
+    >
+      <span className="ad-fl">{label}</span>
+      {styled}
+    </label>
+  );
 }
 
-function AdChip({ active, children, onClick, ...rest }: React.ButtonHTMLAttributes<HTMLButtonElement> & { active?: boolean }) {
-  return <button className="ad-chip" data-active={!!active} aria-pressed={!!active} onClick={onClick} style={{ padding: '8px 12px', borderRadius: 999, fontSize: 11, fontWeight: !!active ? 800 : 500, cursor: 'pointer', minHeight: 44, border: !!active ? '1px solid #00e68a' : '1px solid rgba(255,255,255,0.1)', background: !!active ? 'linear-gradient(135deg,#00e68a 0%, #00c8a0 100%)' : 'rgba(255,255,255,0.04)', color: !!active ? '#06281c' : '#fff' }} {...rest}>{children}</button>;
+function AdChip({
+  active,
+  children,
+  onClick,
+  ...rest
+}: React.ButtonHTMLAttributes<HTMLButtonElement> & { active?: boolean }) {
+  return (
+    <button
+      className="ad-chip"
+      data-active={!!active}
+      aria-pressed={!!active}
+      onClick={onClick}
+      style={{
+        padding: '8px 12px',
+        borderRadius: 999,
+        fontSize: 11,
+        fontWeight: !!active ? 800 : 500,
+        cursor: 'pointer',
+        minHeight: 44,
+        border: !!active ? '1px solid #00e68a' : '1px solid rgba(255,255,255,0.1)',
+        background: !!active ? 'linear-gradient(135deg,#00e68a 0%, #00c8a0 100%)' : 'rgba(255,255,255,0.04)',
+        color: !!active ? '#06281c' : '#fff',
+      }}
+      {...rest}
+    >
+      {children}
+    </button>
+  );
 }
-function AdBtn({ variant = 'primary', block, hero, children, onClick, ...rest }: React.ButtonHTMLAttributes<HTMLButtonElement> & { variant?: 'primary' | 'ghost' | 'amber' | 'danger' | 'dark'; block?: boolean; hero?: boolean }) {
+function AdBtn({
+  variant = 'primary',
+  block,
+  hero,
+  children,
+  onClick,
+  ...rest
+}: React.ButtonHTMLAttributes<HTMLButtonElement> & {
+  variant?: 'primary' | 'ghost' | 'amber' | 'danger' | 'dark';
+  block?: boolean;
+  hero?: boolean;
+}) {
   const st = variant === 'primary' ? BTN : BTN_GHOST;
-  return <button className={`ad-btn${block ? ' ad-btn-block' : ''}${hero ? ' ad-btn-hero' : ''}`} data-variant={variant} onClick={onClick} style={{ ...st, ...(block ? { width: '100%' } : {}), ...(hero ? { fontSize: 14, padding: '14px 16px' } : {}) }} {...rest}>{children}</button>;
+  return (
+    <button
+      className={`ad-btn${block ? ' ad-btn-block' : ''}${hero ? ' ad-btn-hero' : ''}`}
+      data-variant={variant}
+      onClick={onClick}
+      style={{ ...st, ...(block ? { width: '100%' } : {}), ...(hero ? { fontSize: 14, padding: '14px 16px' } : {}) }}
+      {...rest}
+    >
+      {children}
+    </button>
+  );
 }
-function AdBanner({ tone = 'info', children, hook }: { tone?: 'info' | 'ok' | 'warn' | 'bad'; children: React.ReactNode; hook?: string }) {
+function AdBanner({
+  tone = 'info',
+  children,
+  hook,
+}: {
+  tone?: 'info' | 'ok' | 'warn' | 'bad';
+  children: React.ReactNode;
+  hook?: string;
+}) {
   const color = tone === 'ok' ? '#00e68a' : tone === 'warn' ? '#f59e0b' : tone === 'bad' ? '#ef4444' : '#60a5fa';
-  return <div className="ad-banner" data-tone={tone} {...(hook ? { 'data-arm': hook } : {})} style={{ marginTop: 6, padding: '8px 10px', borderRadius: 12, background: `${color}14`, border: `1px solid ${color}44`, borderLeft: `3px solid ${color}`, fontSize: 12, color: '#fff', lineHeight: 1.5 }}>{children}</div>;
+  return (
+    <div
+      className="ad-banner"
+      data-tone={tone}
+      {...(hook ? { 'data-arm': hook } : {})}
+      style={{
+        marginTop: 6,
+        padding: '8px 10px',
+        borderRadius: 12,
+        background: `${color}14`,
+        border: `1px solid ${color}44`,
+        borderLeft: `3px solid ${color}`,
+        fontSize: 12,
+        color: '#fff',
+        lineHeight: 1.5,
+      }}
+    >
+      {children}
+    </div>
+  );
 }
-function AdEmpty({ icon, title, sub, children }: { icon: string; title: string; sub?: string; children?: React.ReactNode }) {
-  return <div className="ad-empty" style={{ textAlign: 'center', padding: '18px 12px' }}><div className="ad-empty-ic" aria-hidden style={{ fontSize: 32 }}>{icon}</div><div className="ad-empty-t" style={{ fontSize: 14, fontWeight: 800, color: '#fff', marginTop: 6 }}>{title}</div>{sub ? <p className="ad-empty-s" style={{ ...SMALL, marginTop: 4 }}>{sub}</p> : null}{children ? <div style={{ marginTop: 10 }}>{children}</div> : null}</div>;
+function AdEmpty({
+  icon,
+  title,
+  sub,
+  children,
+}: {
+  icon: string;
+  title: string;
+  sub?: string;
+  children?: React.ReactNode;
+}) {
+  return (
+    <div className="ad-empty" style={{ textAlign: 'center', padding: '18px 12px' }}>
+      <div className="ad-empty-ic" aria-hidden style={{ fontSize: 32 }}>
+        {icon}
+      </div>
+      <div className="ad-empty-t" style={{ fontSize: 14, fontWeight: 800, color: '#fff', marginTop: 6 }}>
+        {title}
+      </div>
+      {sub ? (
+        <p className="ad-empty-s" style={{ ...SMALL, marginTop: 4 }}>
+          {sub}
+        </p>
+      ) : null}
+      {children ? <div style={{ marginTop: 10 }}>{children}</div> : null}
+    </div>
+  );
 }
 function AdCta({ children }: { children: React.ReactNode }) {
   // Плотная навигация без липкой пустоты: обычный поток, gap 6.
-  return <div className="ad-cta" style={{ display: 'flex', flexDirection: 'column', gap: 6, marginTop: 2 }}>{children}</div>;
+  return (
+    <div className="ad-cta" style={{ display: 'flex', flexDirection: 'column', gap: 6, marginTop: 2 }}>
+      {children}
+    </div>
+  );
 }
 
-type Step = 'params'|'athlete'|'grip'|'split'|'plan'|'quality'|'export'|'year';
+type Step = 'params' | 'athlete' | 'grip' | 'split' | 'plan' | 'quality' | 'export' | 'year';
 
-const LEVELS = ['beginner','intermediate','advanced','enhanced'] as const;
+const LEVELS = ['beginner', 'intermediate', 'advanced', 'enhanced'] as const;
 const GOALS = [
   { id: 'strength', label: 'Сила' },
   { id: 'hypertrophy', label: 'Масса предплечья' },
@@ -223,13 +539,18 @@ const GRIP_FOCI = [
 
 /* №3: лёгкий haptic на навигации (guard — тишина вне устройства) */
 function buzzStep(): void {
-  try { (navigator as any)?.vibrate?.(8); } catch { /* no-op */ }
+  try {
+    (navigator as any)?.vibrate?.(8);
+  } catch {
+    /* no-op */
+  }
 }
 
 /* Шаги конструктора. Подписи — в формате ББ-авто: у первых семи номер и
    текст без эмодзи, у шагов выдачи эмодзи без номера (как «🏁 Contest prep»).
    Названия групп НЕ рисуются — только вертикальные разделители, как в ББ-авто. */
-const STEP_DEFS: AdStepDef[] = [  { id: 'params', label: '1 Параметры' },
+const STEP_DEFS: AdStepDef[] = [
+  { id: 'params', label: '1 Параметры' },
   { id: 'athlete', label: '2 Атлет' },
   { id: 'grip', label: '3 Стол и хват' },
   { id: 'split', label: '4 Сплит и цикл' },
@@ -245,8 +566,14 @@ const STEP_GROUPS: Step[][] = [
 ];
 
 const SPLIT_TAG_RU: Record<string, string> = {
-  TableHeavy: 'Стол', GripHeavy: 'Хват', TableTech: 'Техника', Support: 'Поддержка',
-  SidePress: 'Бок', Hammer: 'Молот', TableSupination: 'Супинация', TablePronation: 'Пронация',
+  TableHeavy: 'Стол',
+  GripHeavy: 'Хват',
+  TableTech: 'Техника',
+  Support: 'Поддержка',
+  SidePress: 'Бок',
+  Hammer: 'Молот',
+  TableSupination: 'Супинация',
+  TablePronation: 'Пронация',
 };
 
 function shortSplitTag(tag?: string): string {
@@ -256,15 +583,17 @@ function shortSplitTag(tag?: string): string {
 
 /* Кромка сессий по характеру дня */
 const CHAR_EDGE: Record<string, string> = {
-  'тяж': '#ef4444',
-  'памп': '#f59e0b',
-  'техника': '#60a5fa',
-  'лёг': '#22c55e',
+  тяж: '#ef4444',
+  памп: '#f59e0b',
+  техника: '#60a5fa',
+  лёг: '#22c55e',
 };
 function rirTint(rir: any): React.CSSProperties {
   const n = Number(rir);
   const c = !(n >= 0) ? undefined : n <= 1 ? '#ef4444' : n <= 2 ? '#f59e0b' : '#22c55e';
-  return c ? { borderColor: `${c}88`, color: c, fontVariantNumeric: 'tabular-nums' as const } : { fontVariantNumeric: 'tabular-nums' as const };
+  return c
+    ? { borderColor: `${c}88`, color: c, fontVariantNumeric: 'tabular-nums' as const }
+    : { fontVariantNumeric: 'tabular-nums' as const };
 }
 
 /* ── №2 Варианты арм-планов (как bb-plans-store, легче): сохранить текущий
@@ -276,18 +605,30 @@ export function loadArmVariants(): ArmPlanVariant[] {
     const raw = localStorage.getItem(ARM_VARIANTS_KEY);
     const arr = raw ? JSON.parse(raw) : [];
     return Array.isArray(arr) ? arr.filter((v) => v && v.plan && Array.isArray(v.plan.weeks)) : [];
-  } catch { return []; }
+  } catch {
+    return [];
+  }
 }
-export function saveArmVariants(list: ArmPlanVariant[]): void {
-  try { localStorage.setItem(ARM_VARIANTS_KEY, JSON.stringify(list.slice(0, 10))); } catch {}
+export function saveArmVariants(list: ArmPlanVariant[]): boolean {
+  try {
+    localStorage.setItem(ARM_VARIANTS_KEY, JSON.stringify(list.slice(0, 10)));
+    return true;
+  } catch {
+    // P2-12 было→стало: quota/приватный режим больше не «сохранено» — UI обязан
+    // показать ошибку, а не врать успехом.
+    return false;
+  }
 }
 
 /* ── Сравнение вариантов: недели/сеты/фазы/помышечный объём с дельтой.
  * Чистая функция; UI — выбор двух чекбоксами в секции вариантов. ── */
 export type ArmVariantDiff = {
-  weeksA: number; weeksB: number;
-  setsA: number; setsB: number;
-  phasesA: string; phasesB: string;
+  weeksA: number;
+  weeksB: number;
+  setsA: number;
+  setsB: number;
+  phasesA: string;
+  phasesB: string;
   rows: Array<{ muscle: string; a: number; b: number; d: number }>;
   weightRows: Array<{ name: string; a: number; b: number; d: number }>;
   rirRows: Array<{ name: string; a: number; b: number; d: number }>;
@@ -346,30 +687,49 @@ export function compareArmVariants(a: any, b: any): ArmVariantDiff | null {
   const ma = planMuscleSets(a);
   const mb = planMuscleSets(b);
   const keys = Array.from(new Set([...Object.keys(ma), ...Object.keys(mb)])).sort();
-  const rows = keys.map((muscle) => ({ muscle, a: ma[muscle] || 0, b: mb[muscle] || 0, d: (mb[muscle] || 0) - (ma[muscle] || 0) }));
+  const rows = keys.map((muscle) => ({
+    muscle,
+    a: ma[muscle] || 0,
+    b: mb[muscle] || 0,
+    d: (mb[muscle] || 0) - (ma[muscle] || 0),
+  }));
   const wa = planTopWeights(a);
   const wb = planTopWeights(b);
-  const weightRows = Array.from(new Set([...Object.keys(wa), ...Object.keys(wb)])).sort()
+  const weightRows = Array.from(new Set([...Object.keys(wa), ...Object.keys(wb)]))
+    .sort()
     .map((name) => ({ name, a: wa[name] ?? 0, b: wb[name] ?? 0, d: (wb[name] ?? 0) - (wa[name] ?? 0) }))
-    .filter(r => r.d !== 0);
+    .filter((r) => r.d !== 0);
   const ra = planAvgRir(a);
   const rb = planAvgRir(b);
-  const rirRows = Array.from(new Set([...Object.keys(ra), ...Object.keys(rb)])).sort()
+  const rirRows = Array.from(new Set([...Object.keys(ra), ...Object.keys(rb)]))
+    .sort()
     .map((name) => ({ name, a: ra[name] ?? 0, b: rb[name] ?? 0, d: (rb[name] ?? 0) - (ra[name] ?? 0) }))
-    .filter(r => r.d !== 0);
+    .filter((r) => r.d !== 0);
   const ea = new Set(Object.keys(wa));
   const eb = new Set(Object.keys(wb));
-  const exRows = Array.from(new Set([...ea, ...eb])).sort().map((name) => ({
-    name,
-    status: (ea.has(name) && eb.has(name)) ? 'в обоих' as const : (ea.has(name) ? 'только A' as const : 'только B' as const),
-  }));
+  const exRows = Array.from(new Set([...ea, ...eb]))
+    .sort()
+    .map((name) => ({
+      name,
+      status:
+        ea.has(name) && eb.has(name)
+          ? ('в обоих' as const)
+          : ea.has(name)
+            ? ('только A' as const)
+            : ('только B' as const),
+    }));
   const ph = (p: any) => (p.weeks || []).map((w: any) => String(w.phase || '').slice(0, 3)).join('→');
   return {
-    weeksA: (a.weeks || []).length, weeksB: (b.weeks || []).length,
-    setsA: planTotalSets(a), setsB: planTotalSets(b),
-    phasesA: ph(a), phasesB: ph(b),
+    weeksA: (a.weeks || []).length,
+    weeksB: (b.weeks || []).length,
+    setsA: planTotalSets(a),
+    setsB: planTotalSets(b),
+    phasesA: ph(a),
+    phasesB: ph(b),
     rows,
-    weightRows, rirRows, exRows,
+    weightRows,
+    rirRows,
+    exRows,
   };
 }
 
@@ -383,15 +743,23 @@ export function armEditKey(week: number, si: number, ei: number): string {
 export function swapCandidatesFor(ex: any): Array<{ id: string; name: string }> {
   try {
     const all = ARM_EXERCISES as any[];
-    const cur = (ex as any)?.exerciseId ? all.find((e) => e.id === (ex as any).exerciseId) : all.find((e) => e.name === ex.name);
+    const cur = (ex as any)?.exerciseId
+      ? all.find((e) => e.id === (ex as any).exerciseId)
+      : all.find((e) => e.name === ex.name);
     const grp = (cur as any)?.substitutionGroup || (ex as any)?.substitutionGroup;
     const pool = grp ? all.filter((e) => e.substitutionGroup === grp) : [];
     const curId = (cur as any)?.id;
     return pool.filter((e) => e.id !== curId && e.name !== ex.name).map((e) => ({ id: e.id, name: e.name }));
-  } catch { return []; }
+  } catch {
+    return [];
+  }
 }
-const CHAR_WEIGHT_PCT: Record<string, number> = { 'тяж': 0.82, 'техника': 0.60, 'памп': 0.68, 'лёг': 0.60 };
-export function applyArmEdits(plan: any, edits: Record<string, ArmExerciseEdit>, weightBase?: Record<string, number>): any {
+const CHAR_WEIGHT_PCT: Record<string, number> = { тяж: 0.82, техника: 0.6, памп: 0.68, лёг: 0.6 };
+export function applyArmEdits(
+  plan: any,
+  edits: Record<string, ArmExerciseEdit>,
+  weightBase?: Record<string, number>,
+): any {
   if (!plan || !edits || Object.keys(edits).length === 0) return plan;
   const round2 = (n: number) => Math.round(n * 2) / 2;
   return {
@@ -412,10 +780,10 @@ export function applyArmEdits(plan: any, edits: Record<string, ArmExerciseEdit>,
                 name: cat.name,
                 exerciseId: cat.id,
                 equipment: cat.equipment,
-                 movementPattern: cat.movementPattern,
-                 substitutionGroup: cat.substitutionGroup,
-                 loadMode: cat.equipment === 'bodyweight' ? 'bodyweight' : cat.equipment === 'band' ? 'band' : 'tool',
-                 comment: `🔄 Замена: ${cat.name}. ${cat.technique || ''}`.trim(),
+                movementPattern: cat.movementPattern,
+                substitutionGroup: cat.substitutionGroup,
+                loadMode: cat.equipment === 'bodyweight' ? 'bodyweight' : cat.equipment === 'band' ? 'band' : 'tool',
+                comment: `🔄 Замена: ${cat.name}. ${cat.technique || ''}`.trim(),
               };
               const base = weightBase?.[out.muscle];
               if (base && base > 0) {
@@ -436,15 +804,15 @@ export function applyArmEdits(plan: any, edits: Record<string, ArmExerciseEdit>,
             out.repsRange = [Math.round(ed.reps), Math.round(ed.reps)];
             out.workSets = (out.workSets || []).map((ws: any) => ({ ...ws, reps: Math.round(ed.reps as number) }));
           }
-           if (ed.weight != null && ed.weight >= 0) {
-             out.workSets = (out.workSets || []).map((ws: any) => ({ ...ws, weight: ed.weight }));
-           }
-           if (ed.swapId || ed.sets != null || ed.reps != null || ed.weight != null) {
-             out.provenance = 'manual';
-             out.provenanceSource = 'ui-edit';
-             syncArmExerciseWorkSets(out);
-           }
-           return out;
+          if (ed.weight != null && ed.weight >= 0) {
+            out.workSets = (out.workSets || []).map((ws: any) => ({ ...ws, weight: ed.weight }));
+          }
+          if (ed.swapId || ed.sets != null || ed.reps != null || ed.weight != null) {
+            out.provenance = 'manual';
+            out.provenanceSource = 'ui-edit';
+            syncArmExerciseWorkSets(out);
+          }
+          return out;
         }),
       })),
     })),
@@ -465,7 +833,9 @@ export function specBlocksToSchedule(blocks: UiSpecBlock[]): ArmSpecializationBl
     weekStart: Math.round(Number(b.weekStart) || 1),
     weekEnd: Math.round(Number(b.weekEnd) || 1),
     targets: (b.targets || []).slice(0, 2),
-    ...(b.donors?.length && b.mode !== 'none' ? { tradeoff: { mode: b.mode, donorMuscles: b.donors.slice(0, 2) } } : {}),
+    ...(b.donors?.length && b.mode !== 'none'
+      ? { tradeoff: { mode: b.mode, donorMuscles: b.donors.slice(0, 2) } }
+      : {}),
   }));
 }
 
@@ -489,7 +859,8 @@ const EXTRA_KEYS: GateKey[] = ['table', 'volume', 'cycle', 'antagonist', 'other'
 function gateOf(msg: string): GateKey {
   const s = String(msg).toLowerCase();
   if (s.includes('humerus') || s.includes('side_pressure')) return 'humerus';
-  if (s.includes('ucl') || s.includes('pron') || /\bsup\b/.test(s) || s.includes('супинац') || s.includes('пронац')) return 'ucl';
+  if (s.includes('ucl') || s.includes('pron') || /\bsup\b/.test(s) || s.includes('супинац') || s.includes('пронац'))
+    return 'ucl';
   if (s.includes('shoulder') || s.includes('плеч')) return 'shoulder';
   if (s.includes('tendon')) return 'tendon';
   if (s.includes('table time') || s.includes('стол')) return 'table';
@@ -501,7 +872,15 @@ function gateOf(msg: string): GateKey {
 
 function groupWarnings(warnings: string[]): Record<GateKey, string[]> {
   const out: Record<GateKey, string[]> = {
-    humerus: [], ucl: [], shoulder: [], tendon: [], table: [], volume: [], cycle: [], antagonist: [], other: [],
+    humerus: [],
+    ucl: [],
+    shoulder: [],
+    tendon: [],
+    table: [],
+    volume: [],
+    cycle: [],
+    antagonist: [],
+    other: [],
   };
   for (const w of warnings || []) out[gateOf(w)].push(w);
   return out;
@@ -509,51 +888,127 @@ function groupWarnings(warnings: string[]): Record<GateKey, string[]> {
 
 /* Перф: тяжёлые списки мемоизированы — ререндер только при смене данных/выбора,
  * а не на каждый ввод в соседних полях. DOM/строки/aria 1-в-1. */
-const SplitList = React.memo(function SplitList({ ranked, patternId, onPick }: { ranked: any[]; patternId: string; onPick: (id: string) => void }) {
+const SplitList = React.memo(function SplitList({
+  ranked,
+  patternId,
+  onPick,
+}: {
+  ranked: any[];
+  patternId: string;
+  onPick: (id: string) => void;
+}) {
   return (
     <div className="ad-list" data-arm="split-list">
-      {ranked.slice(0,6).map((r,i)=> (
-        <div key={r.pattern.id} className="ad-sec ad-split" data-active={patternId===r.pattern.id || (!patternId && i===0)} onClick={()=>onPick(r.pattern.id)} role="button" tabIndex={0} aria-pressed={patternId===r.pattern.id} onKeyDown={(e)=>{ if (e.key==='Enter'||e.key===' ') onPick(r.pattern.id); }}>
+      {ranked.slice(0, 6).map((r, i) => (
+        <div
+          key={r.pattern.id}
+          className="ad-sec ad-split"
+          data-active={patternId === r.pattern.id || (!patternId && i === 0)}
+          onClick={() => onPick(r.pattern.id)}
+          role="button"
+          tabIndex={0}
+          aria-pressed={patternId === r.pattern.id}
+          onKeyDown={(e) => {
+            if (e.key === 'Enter' || e.key === ' ') onPick(r.pattern.id);
+          }}
+        >
           <div className="ad-split-top">
             <span className="ad-split-radio" aria-hidden />
-            <span className="ad-split-name">{i===0 ? '★ ' : ''}{r.pattern.name} <span>— {r.pattern.sessionsPerRotation}x/{r.pattern.rotationDays}дн</span></span>
+            <span className="ad-split-name">
+              {i === 0 ? '★ ' : ''}
+              {r.pattern.name}{' '}
+              <span>
+                — {r.pattern.sessionsPerRotation}x/{r.pattern.rotationDays}дн
+              </span>
+            </span>
             <span className="ad-split-score">{r.score}</span>
           </div>
           <div className="ad-split-desc">{r.pattern.description}</div>
           <div className="ad-strip" data-arm="split-rot" aria-hidden>
-            {(r.pattern.schedule || []).map((d: any, di: number) => (
-              d && d.kind === 'тренировка'
-                ? <span key={di} className="ad-rot" data-ch={d.character || ''} title={`${d.sessionTag || ''} ${d.character || ''}`}>{shortSplitTag(d.sessionTag)}</span>
-                : <span key={di} className="ad-rest" title="отдых">·</span>
-            ))}
+            {(r.pattern.schedule || []).map((d: any, di: number) =>
+              d && d.kind === 'тренировка' ? (
+                <span
+                  key={di}
+                  className="ad-rot"
+                  data-ch={d.character || ''}
+                  title={`${d.sessionTag || ''} ${d.character || ''}`}
+                >
+                  {shortSplitTag(d.sessionTag)}
+                </span>
+              ) : (
+                <span key={di} className="ad-rest" title="отдых">
+                  ·
+                </span>
+              ),
+            )}
           </div>
-          {r.rationale.length>0 && <div className="ad-tip">{r.rationale.join(' · ')}</div>}
-          {r.warnings.length>0 && <div className="ad-tip">⚠ {r.warnings.join(' · ')}</div>}
+          {r.rationale.length > 0 && <div className="ad-tip">{r.rationale.join(' · ')}</div>}
+          {r.warnings.length > 0 && <div className="ad-tip">⚠ {r.warnings.join(' · ')}</div>}
         </div>
       ))}
     </div>
   );
 });
-const CyclePickerList = React.memo(function CyclePickerList({ items, cycId, onPick, levelRu, phaseRu }: { items: any[]; cycId: string; onPick: (id: string) => void; levelRu: Record<string, string>; phaseRu: Record<string, string> }) {
+const CyclePickerList = React.memo(function CyclePickerList({
+  items,
+  cycId,
+  onPick,
+  levelRu,
+  phaseRu,
+}: {
+  items: any[];
+  cycId: string;
+  onPick: (id: string) => void;
+  levelRu: Record<string, string>;
+  phaseRu: Record<string, string>;
+}) {
   if (!items.length) return null;
   return (
     <div className="ad-list" data-arm="cycle-picker">
       {items.map(({ cycle: c, score, reasons }, ci) => (
-        <div key={c.id} className="ad-sec ad-split" data-active={cycId===c.id} onClick={()=>onPick(c.id)} role="button" tabIndex={0} aria-pressed={cycId===c.id} aria-label={`Цикл ${c.name}`} onKeyDown={(e)=>{ if (e.key==='Enter'||e.key===' ') onPick(c.id); }}>
+        <div
+          key={c.id}
+          className="ad-sec ad-split"
+          data-active={cycId === c.id}
+          onClick={() => onPick(c.id)}
+          role="button"
+          tabIndex={0}
+          aria-pressed={cycId === c.id}
+          aria-label={`Цикл ${c.name}`}
+          onKeyDown={(e) => {
+            if (e.key === 'Enter' || e.key === ' ') onPick(c.id);
+          }}
+        >
           <div className="ad-split-top">
             <span className="ad-split-radio" aria-hidden />
-            <span className="ad-split-name">{ci < 3 ? `★${ci + 1} ` : ''}{c.name} <span>— {c.weeks} нед · {c.daysPerWeek}×/нед</span></span>
+            <span className="ad-split-name">
+              {ci < 3 ? `★${ci + 1} ` : ''}
+              {c.name}{' '}
+              <span>
+                — {c.weeks} нед · {c.daysPerWeek}×/нед
+              </span>
+            </span>
             <span className="ad-split-score">{score}</span>
           </div>
           <div className="ad-row" data-arm="cycle-chips">
             <span className="ad-tag">{c.rpe}</span>
-            {c.tablePerWeek > 0 ? <span className="ad-tag" data-ch="table">🖐️ стол {c.tablePerWeek}×/нед</span> : <span className="ad-tag">хват</span>}
-            <span className="ad-tag">{c.level.map((l: any)=>levelRu[l] || l).join('/')}</span>
+            {c.tablePerWeek > 0 ? (
+              <span className="ad-tag" data-ch="table">
+                🖐️ стол {c.tablePerWeek}×/нед
+              </span>
+            ) : (
+              <span className="ad-tag">хват</span>
+            )}
+            <span className="ad-tag">{c.level.map((l: any) => levelRu[l] || l).join('/')}</span>
           </div>
           <div className="ad-strip" data-arm="cycle-phases" aria-hidden>
             {Array.from({ length: c.weeks }, (_, i) => {
               const ph = (c.phases as Record<number, string>)[i + 1] || 'accumulation';
-              return <span key={i} className="ad-ph" data-phase={ph} title={`Нед ${i + 1}: ${phaseRu[ph] || ph}`}>{i + 1}</span>;
+              return (
+                <span key={i} className="ad-ph" data-phase={ph} title={`Нед ${i + 1}: ${phaseRu[ph] || ph}`}>
+                  {i + 1}
+                </span>
+              );
             })}
           </div>
           <div className="ad-muted">{reasons.slice(0, 2).join(' · ')}</div>
@@ -565,17 +1020,54 @@ const CyclePickerList = React.memo(function CyclePickerList({ items, cycId, onPi
 
 // ROUND-10: единая запись плана арма — хабы (арм-аудит, армлифтинг-аудит) читают `he_arm_plan_saved`
 // и слушают `he-arm-plan-saved`; конструктор раньше писал только `he_arm_last_plan` → план молча не доходил.
-export function persistArmPlan(plan: unknown): void {
+export function persistArmPlan(plan: unknown): boolean {
+  let saved = false;
   try {
-    const needsSnapshot = plan && typeof plan === 'object' && !(plan as any).planSnapshotId
-      && Array.isArray((plan as any).weeks)
-      && (plan as any).weeks.some((week: any) => Array.isArray(week?.sessions));
+    const needsSnapshot =
+      plan &&
+      typeof plan === 'object' &&
+      !(plan as any).planSnapshotId &&
+      Array.isArray((plan as any).weeks) &&
+      (plan as any).weeks.some((week: any) => Array.isArray(week?.sessions));
     const normalized = needsSnapshot ? { ...(plan as any), planSnapshotId: armPlanSnapshotId(plan) } : plan;
     const raw = JSON.stringify(normalized);
     localStorage.setItem('he_arm_last_plan', raw);
     localStorage.setItem('he_arm_plan_saved', raw);
-  } catch { /* noop */ }
-  try { window.dispatchEvent(new Event('he-arm-plan-saved')); } catch { /* noop */ }
+    saved = true;
+  } catch {
+    // 28.11.2026 (review): quota/private-mode не должны выглядеть успехом —
+    // событие шлём только после реальной записи, вызывающий покажет ошибку.
+    saved = false;
+  }
+  if (saved) {
+    try {
+      window.dispatchEvent(new Event('he-arm-plan-saved'));
+    } catch {
+      /* noop */
+    }
+  }
+  return saved;
+}
+
+/**
+ * Аудит 2026-11: план/инъекция хаба переживают перезагрузку. `he_arm_last_plan`
+ * пишут и конструктор (сам план), и хаб диагностики (план или `{...meta, plan}`);
+ * лениво поднимаем его и пересчитываем snapshot (validation/report/metrics),
+ * чтобы восстановленный план не был «старым» после инъекции коррекций.
+ */
+function loadPersistedArmPlan(): any {
+  try {
+    const raw = typeof localStorage !== 'undefined' ? localStorage.getItem('he_arm_last_plan') : null;
+    if (!raw) return null;
+    const parsed = JSON.parse(raw);
+    const plan = parsed && Array.isArray(parsed.plan?.weeks) ? parsed.plan : parsed;
+    if (!plan || typeof plan !== 'object' || !Array.isArray(plan.weeks) || plan.weeks.length === 0) return null;
+    // Без pattern шаг «План»/«Экспорт» упал бы на pattern.name — битый формат не поднимаем.
+    if (!plan.pattern || typeof plan.pattern !== 'object') return null;
+    return refreshArmPlanSnapshot(plan, plan.level);
+  } catch {
+    return null;
+  }
 }
 
 export function ArmAutoConstructor() {
@@ -587,47 +1079,71 @@ export function ArmAutoConstructor() {
   const [level, setLevel] = useState<string>('intermediate');
   const [goal, setGoal] = useState<string>('strength');
   const [weeks, setWeeks] = useState<number>(8);
+  // P0-1 было→стало: числовой ввод не клампится на каждом keystroke — иначе «12»
+  // превращалось в 22 (первый символ 1 → 2). Пока печатают, держим строку,
+  // валидное число применяем сразу, кламп — на blur/сборке.
+  const [weeksInput, setWeeksInput] = useState<string>('8');
   const [daysPerWeek, setDaysPerWeek] = useState<number>(4);
   const [weakPoints, setWeakPoints] = useState<string[]>([]);
   const [diagWeakPoints, setDiagWeakPoints] = useState<ArmWeakPoint[]>([]);
   /** PRO-5 real: grip-коррекции из армлифтинг-хаба (только дисциплина armlifting; стол не трогаем). */
-  const [armliftCorrections, setArmliftCorrections] = useState<{ items: ArmliftInjectionItem[]; spec: Array<{ week: number; targetSets: Record<string, number>; dayMap: Record<string, string> }>; weakArmNote?: string; orderNote?: string; completeness?: { pct: number; missing: string[] }; movement?: { lines: string[] } }>(() => {
+  const [armliftCorrections, setArmliftCorrections] = useState<{
+    items: ArmliftInjectionItem[];
+    spec: Array<{ week: number; targetSets: Record<string, number>; dayMap: Record<string, string> }>;
+    weakArmNote?: string;
+    orderNote?: string;
+    completeness?: { pct: number; missing: string[] };
+    movement?: { lines: string[] };
+  }>(() => {
     try {
       const raw = typeof localStorage !== 'undefined' ? localStorage.getItem('he_armlifting_corrections') : null;
       const j = raw ? JSON.parse(raw) : null;
-      const cleanItems = (arr: any): ArmliftInjectionItem[] => Array.isArray(arr)
-        ? arr.filter((t: any) => t && typeof t.exId === 'string').slice(0, 3)
-        : [];
+      const cleanItems = (arr: any): ArmliftInjectionItem[] =>
+        Array.isArray(arr) ? arr.filter((t: any) => t && typeof t.exId === 'string').slice(0, 3) : [];
       if (Array.isArray(j)) return { items: cleanItems(j), spec: [] }; // миграция старого формата
       if (j && typeof j === 'object') {
         return {
           items: cleanItems((j as any).items),
           spec: Array.isArray((j as any).spec) ? (j as any).spec.slice(0, 6) : [],
-          ...(((j as any).weakArmNote && typeof (j as any).weakArmNote === 'string') ? { weakArmNote: String((j as any).weakArmNote) } : {}),
-          ...(((j as any).orderNote && typeof (j as any).orderNote === 'string') ? { orderNote: String((j as any).orderNote) } : {}),
-          ...(((j as any).completeness && typeof (j as any).completeness === 'object') ? { completeness: (j as any).completeness as { pct: number; missing: string[] } } : {}),
-          ...((() => {
+          ...((j as any).weakArmNote && typeof (j as any).weakArmNote === 'string'
+            ? { weakArmNote: String((j as any).weakArmNote) }
+            : {}),
+          ...((j as any).orderNote && typeof (j as any).orderNote === 'string'
+            ? { orderNote: String((j as any).orderNote) }
+            : {}),
+          ...((j as any).completeness && typeof (j as any).completeness === 'object'
+            ? { completeness: (j as any).completeness as { pct: number; missing: string[] } }
+            : {}),
+          ...(() => {
             const mv = (j as any).movement;
-            const lines = mv && typeof mv === 'object' && Array.isArray((mv as any).lines)
-              ? (mv as any).lines.filter((x: unknown) => typeof x === 'string' && (x as string).trim() !== '').slice(0, 8)
-              : [];
+            const lines =
+              mv && typeof mv === 'object' && Array.isArray((mv as any).lines)
+                ? (mv as any).lines
+                    .filter((x: unknown) => typeof x === 'string' && (x as string).trim() !== '')
+                    .slice(0, 8)
+                : [];
             return lines.length ? { movement: { lines } } : {};
-          })()),
+          })(),
         };
       }
       return { items: [], spec: [] };
-    } catch { return { items: [], spec: [] }; }
+    } catch {
+      return { items: [], spec: [] };
+    }
   });
   const [focusGroup, setFocusGroup] = useState<string>('');
   const [specialization, setSpecialization] = useState<boolean>(false);
   const [patternId, setPatternId] = useState<string>('');
-  const [builtPlan, setBuiltPlan] = useState<any>(null);
+  // Аудит 2026-11: план/инъекция хаба переживают перезагрузку — ленивая
+  // инициализация из he_arm_last_plan (без пересборки; шаг остаётся 'params',
+  // weekSel=1 по умолчанию, snapshot уже пересчитан загрузчиком).
+  const [builtPlan, setBuiltPlan] = useState<any>(() => loadPersistedArmPlan());
   const [weekSel, setWeekSel] = useState<number>(1);
   const [msg, setMsg] = useState<string>('');
   const linked: any = useDataLink();
   const profileSnapshot = useMemo(() => armProfileSnapshot(linked?.profile), [linked?.profile]);
   const [pedDoses, setPedDoses] = useState<Record<string, number>>({});
-  const [courseIntensity, setCourseIntensity] = useState<'mild'|'moderate'|'heavy'>('moderate');
+  const [courseIntensity, setCourseIntensity] = useState<'mild' | 'moderate' | 'heavy'>('moderate');
   const [showPed, setShowPed] = useState(false);
   const [workMaxEdit, setWorkMaxEdit] = useState<Record<string, string>>({});
   // PRO A–J: старт/руки/бенчи/дневник/спарринг (всё опционально)
@@ -661,8 +1177,14 @@ export function ArmAutoConstructor() {
       if (!Array.isArray(sessions) || sessions.length === 0) return null;
       const r = acuteChronicRatio(toDailyLoads(sessions));
       if (!Number.isFinite(r?.ratio) || r.ratio <= 0) return null;
-      return { value: r.ratio, zone: r.zone, method: `ACWR ${r.method === 'ewma_uncoupled' ? 'EWMA' : 'coupled'} · острая ${r.acute} / хроническая ${r.chronic} (${r.acuteDays}/${r.chronicDays} дн)` };
-    } catch { return null; }
+      return {
+        value: r.ratio,
+        zone: r.zone,
+        method: `ACWR ${r.method === 'ewma_uncoupled' ? 'EWMA' : 'coupled'} · острая ${r.acute} / хроническая ${r.chronic} (${r.acuteDays}/${r.chronicDays} дн)`,
+      };
+    } catch {
+      return null;
+    }
   }, [step, builtPlan]);
   const pro7Readiness = useMemo(() => {
     try {
@@ -679,25 +1201,37 @@ export function ArmAutoConstructor() {
           days.push({
             dateIso: String(s.date || '').slice(0, 10),
             srpe: Number(s.sRPE ?? s.srpe ?? 0) || undefined,
-            velocityLossPct: Number.isFinite(Number((s as any)?.velocityLossPct)) ? Number((s as any).velocityLossPct) : undefined,
+            velocityLossPct: Number.isFinite(Number((s as any)?.velocityLossPct))
+              ? Number((s as any).velocityLossPct)
+              : undefined,
           });
         }
-      } catch { /* noop */ }
+      } catch {
+        /* noop */
+      }
       const lastDay = days.length ? days[days.length - 1] : { dateIso: localIsoDate() };
       if (Number.isFinite(srpe)) (lastDay as any).srpe = srpe;
-      if (Number.isFinite(pain) && pain > 0) { (lastDay as any).elbowPain = pain; }
+      if (Number.isFinite(pain) && pain > 0) {
+        (lastDay as any).elbowPain = pain;
+      }
       if (!days.length) days.push(lastDay);
       const lp: any = linked?.profile?.settings || {};
       return assessArmReadiness({
         diary: days,
         acwrRatio: pro7Acwr?.value,
         profile: {
-          ...(Number.isFinite(Number(lp?.lifestyle?.sleepHours)) ? { sleepHours: Number(lp.lifestyle.sleepHours) } : {}),
+          ...(Number.isFinite(Number(lp?.lifestyle?.sleepHours))
+            ? { sleepHours: Number(lp.lifestyle.sleepHours) }
+            : {}),
           ...(Number.isFinite(Number(lp?.lifestyle?.morningHRV)) ? { hrvMs: Number(lp.lifestyle.morningHRV) } : {}),
-          ...(Number.isFinite(Number(lp?.lifestyle?.stressLevel)) ? { stressLevel: Number(lp.lifestyle.stressLevel) } : {}),
+          ...(Number.isFinite(Number(lp?.lifestyle?.stressLevel))
+            ? { stressLevel: Number(lp.lifestyle.stressLevel) }
+            : {}),
         },
       });
-    } catch { return null; }
+    } catch {
+      return null;
+    }
   }, [proSrpe, proPain, pro7Acwr, linked?.profile]);
   const pro7Return = useMemo(() => {
     try {
@@ -708,16 +1242,26 @@ export function ArmAutoConstructor() {
         readiness: pro7Readiness?.status as any,
         acwrRatio: pro7Acwr?.value,
       });
-    } catch { return null; }
+    } catch {
+      return null;
+    }
   }, [proPain, proClearDays, pro7Readiness, pro7Acwr]);
   const [platformTick, setPlatformTick] = useState(0);
   const [annotationTick, setAnnotationTick] = useState(0);
   const annotationLines = useMemo(() => {
-    try { return armAnnotationLines(loadArmAnnotations()); } catch { return [] as string[]; }
+    try {
+      return armAnnotationLines(loadArmAnnotations());
+    } catch {
+      return [] as string[];
+    }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [annotationTick, step, builtPlan]);
   const platformLog = useMemo(() => {
-    try { return loadPlatformLog(); } catch { return [] as any[]; }
+    try {
+      return loadPlatformLog();
+    } catch {
+      return [] as any[];
+    }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [platformTick, discipline, step]);
   const [proPlatTarget, setProPlatTarget] = useState<string>('');
@@ -726,8 +1270,8 @@ export function ArmAutoConstructor() {
   const [topOppHand, setTopOppHand] = useState<string>('unknown');
   const [topWD, setTopWD] = useState<string>('');
   const [topRfd, setTopRfd] = useState<boolean>(false);
-// Wave-0 Э0.5: true = explosivePct посчитан из реконструкции F100, а не из отсечки прибора.
-const [rfdEstimated, setRfdEstimated] = useState<boolean>(false);
+  // Wave-0 Э0.5: true = explosivePct посчитан из реконструкции F100, а не из отсечки прибора.
+  const [rfdEstimated, setRfdEstimated] = useState<boolean>(false);
   const [topLadder, setTopLadder] = useState<string>('');
   const [topLadderVal, setTopLadderVal] = useState<string>('');
   const [topSim, setTopSim] = useState<boolean>(false);
@@ -798,7 +1342,11 @@ const [rfdEstimated, setRfdEstimated] = useState<boolean>(false);
   // 26.10.2026 (§8 п.1): перекос ротаторов плеча из диагностики (ER:IR risk) —
   // идёт в сборку как shoulderPriority и в селектор сплитов как shoulderRisk.
   const [diagShoulderRisk, setDiagShoulderRisk] = useState<boolean>(() => {
-    try { return (localStorage.getItem('he_arm_last_diagnostics') || '').includes('"shoulderRisk":true'); } catch { return false; }
+    try {
+      return (localStorage.getItem('he_arm_last_diagnostics') || '').includes('"shoulderRisk":true');
+    } catch {
+      return false;
+    }
   });
 
   useEffect(() => {
@@ -816,7 +1364,13 @@ const [rfdEstimated, setRfdEstimated] = useState<boolean>(false);
         setCycNever(true);
       }
       const mobW: string[] = Array.isArray(og.mobilityAdd)
-        ? Array.from(new Set<string>(og.mobilityAdd.map((m: unknown) => String(m)).filter((m: string) => ['wrist', 'forearm', 'elbow'].includes(m))))
+        ? Array.from(
+            new Set<string>(
+              og.mobilityAdd
+                .map((m: unknown) => String(m))
+                .filter((m: string) => ['wrist', 'forearm', 'elbow'].includes(m)),
+            ),
+          )
         : [];
       if (mobW.length) {
         bits.push(mobW.join('+'));
@@ -826,7 +1380,9 @@ const [rfdEstimated, setRfdEstimated] = useState<boolean>(false);
         } catch {}
       }
       if (bits.length && !opts?.silent) flash(`🦴 Орто-гарды: ${bits.join(' · ')}`);
-    } catch { /* опционально */ }
+    } catch {
+      /* опционально */
+    }
     return bits;
   }, []);
 
@@ -845,20 +1401,32 @@ const [rfdEstimated, setRfdEstimated] = useState<boolean>(false);
       const fRaw = typeof localStorage !== 'undefined' ? localStorage.getItem('he_arm_ortho_flags') : null;
       if (fRaw) {
         const arr = JSON.parse(fRaw);
-        if (Array.isArray(arr) && arr.length) setOrthoFlagsLine(`🦴 Орто-скрининг: ${arr.map((x) => String(x)).join(', ')}`);
+        if (Array.isArray(arr) && arr.length)
+          setOrthoFlagsLine(`🦴 Орто-скрининг: ${arr.map((x) => String(x)).join(', ')}`);
       }
-    } catch { /* опционально */ }
+    } catch {
+      /* опционально */
+    }
   }, [applyOrthoGuards]);
 
   const workMax = useMemo(() => {
     const wm: Record<string, number> = { ...profileSnapshot.workMax };
-    if (profileSnapshot.bodyWeightKg) wm.default = profileSnapshot.bodyWeightKg;
+    // 26.10.2026 было→стало: масса тела писалась в `wm.default`, а движок
+    // трактовал `default` как максимум КАЖДОЙ мышцы → пронация-пульсы и
+    // «ротация на резине» получали ~0.7×BW килограммами. Теперь масса тела
+    // в workMax не подставляется: без явного максимума вес = «по RIR».
     for (const [k, v] of Object.entries(workMaxEdit)) {
       const n = parseFloat(v);
       if (Number.isFinite(n) && n > 0) wm[k] = n;
     }
     return wm;
   }, [profileSnapshot, workMaxEdit]);
+
+  // P0-1: число недель могут писать не только с клавиатуры (именной цикл из
+  // библиотеки, восстановление варианта) — инпут обязан это отражать.
+  useEffect(() => {
+    setWeeksInput(String(weeks));
+  }, [weeks]);
 
   // Приём из хаба диагностики (Интеллект → Арм-диагностика → Применить в Арм-конструктор) — PRO MAX v3 (12 мёртвых точек)
   // + мост из Библиотеки (каталог циклов → kind 'arm_cycle': ставит именной цикл)
@@ -869,7 +1437,10 @@ const [rfdEstimated, setRfdEstimated] = useState<boolean>(false);
         try {
           const id = String(payload.data?.cycleId || '');
           const found = ARM_CYCLE_LIBRARY.find((c) => c.id === id);
-          if (!found) { flash(`⚠ Цикл ${id || '—'} не найден в библиотеке`); return; }
+          if (!found) {
+            flash(`⚠ Цикл ${id || '—'} не найден в библиотеке`);
+            return;
+          }
           setCycId(id);
           if (found.weeks > 0) setWeeks(Math.max(2, Math.min(52, found.weeks)));
           setStep('params');
@@ -889,7 +1460,7 @@ const [rfdEstimated, setRfdEstimated] = useState<boolean>(false);
         flash(`↩ Из диагностики: ${groups.join(', ')}`);
       }
       if (Array.isArray(wp) && wp.length > 0) {
-        const clean = (wp as string[]).slice(0,3) as ArmWeakPoint[];
+        const clean = (wp as string[]).slice(0, 3) as ArmWeakPoint[];
         setDiagWeakPoints(clean);
         setSpecialization(true);
         setStep('params');
@@ -919,16 +1490,24 @@ const [rfdEstimated, setRfdEstimated] = useState<boolean>(false);
           } else {
             localStorage.removeItem('he_arm_last_causes');
             localStorage.removeItem('he_arm_last_rankedids');
-            try { localStorage.removeItem('he_arm_last_tendon'); localStorage.removeItem('he_arm_last_wave'); } catch {}
-            try { localStorage.removeItem('he_arm_last_spec_sets'); localStorage.removeItem('he_arm_last_daymap'); } catch {}
+            try {
+              localStorage.removeItem('he_arm_last_tendon');
+              localStorage.removeItem('he_arm_last_wave');
+            } catch {}
+            try {
+              localStorage.removeItem('he_arm_last_spec_sets');
+              localStorage.removeItem('he_arm_last_daymap');
+            } catch {}
           }
         } catch {}
       } else if (Array.isArray(payload.data?.armBiomechCards) && payload.data.armBiomechCards.length) {
-        const fromCards = (payload.data.armBiomechCards as any[]).map((c:any)=> String(c.weakPoint)).slice(0,3) as ArmWeakPoint[];
+        const fromCards = (payload.data.armBiomechCards as any[])
+          .map((c: any) => String(c.weakPoint))
+          .slice(0, 3) as ArmWeakPoint[];
         if (fromCards.length) setDiagWeakPoints(fromCards);
       }
       // dynamicWeak fallback if groups empty but armDynamic present
-      if ((!appliedWeak || appliedWeak.length===0) && payload.data?.armDynamic) {
+      if ((!appliedWeak || appliedWeak.length === 0) && payload.data?.armDynamic) {
         try {
           const dyn = payload.data.armDynamic;
           const weak: string[] = [];
@@ -936,7 +1515,11 @@ const [rfdEstimated, setRfdEstimated] = useState<boolean>(false);
           if (dyn?.metrics?.hammer && dyn.metrics.hammer.ftIndex < 30) weak.push('brachialis');
           if (dyn?.metrics?.hook && dyn.metrics.hook.fMax < 30) weak.push('supinators');
           if (dyn?.metrics?.cup && dyn.metrics.cup.f500 < 25) weak.push('wrist_flexors');
-          if (weak.length) { setWeakPoints(weak.slice(0,2)); setSpecialization(true); flash(`↩ Динамика: ${weak.slice(0,2).join(', ')}`); }
+          if (weak.length) {
+            setWeakPoints(weak.slice(0, 2));
+            setSpecialization(true);
+            flash(`↩ Динамика: ${weak.slice(0, 2).join(', ')}`);
+          }
         } catch {}
       }
       const tech = payload.data?.armTechnique;
@@ -960,34 +1543,71 @@ const [rfdEstimated, setRfdEstimated] = useState<boolean>(false);
               ...(Number.isFinite(Number(t.intensityPct)) ? { intensityPct: Number(t.intensityPct) } : {}),
               ...(Number.isFinite(Number(t.rir)) ? { rir: Number(t.rir) } : {}),
               // PRO-CORR K5: холд из коррекции (кламп 3–60с, мусор отбрасывается).
-              ...(Number.isFinite(Number((t as any).holdSeconds)) ? { holdSeconds: Math.max(3, Math.min(60, Math.round(Number((t as any).holdSeconds)))) } : {}),
+              ...(Number.isFinite(Number((t as any).holdSeconds))
+                ? { holdSeconds: Math.max(3, Math.min(60, Math.round(Number((t as any).holdSeconds)))) }
+                : {}),
             }));
           const specRaw = Array.isArray(al?.armliftSpec) ? al.armliftSpec : [];
-          const specClean = specRaw.slice(0, 6).filter((w: any) => w && typeof w === 'object').map((w: any) => ({
-            week: Number(w.week) || 0,
-            targetSets: (w.targetSets && typeof w.targetSets === 'object' ? w.targetSets : {}) as Record<string, number>,
-            dayMap: (w.dayMap && typeof w.dayMap === 'object' ? w.dayMap : {}) as Record<string, string>,
-          }));
-          const note = typeof al?.armliftWeakArmNote === 'string' && al.armliftWeakArmNote ? String(al.armliftWeakArmNote) : undefined;
-          const ord = typeof al?.armliftOrderNote === 'string' && al.armliftOrderNote ? String(al.armliftOrderNote) : undefined;
-          const comp = al?.armliftCompleteness && typeof al.armliftCompleteness === 'object' ? al.armliftCompleteness as { pct: number; missing: string[] } : null;
+          const specClean = specRaw
+            .slice(0, 6)
+            .filter((w: any) => w && typeof w === 'object')
+            .map((w: any) => ({
+              week: Number(w.week) || 0,
+              targetSets: (w.targetSets && typeof w.targetSets === 'object' ? w.targetSets : {}) as Record<
+                string,
+                number
+              >,
+              dayMap: (w.dayMap && typeof w.dayMap === 'object' ? w.dayMap : {}) as Record<string, string>,
+            }));
+          const note =
+            typeof al?.armliftWeakArmNote === 'string' && al.armliftWeakArmNote
+              ? String(al.armliftWeakArmNote)
+              : undefined;
+          const ord =
+            typeof al?.armliftOrderNote === 'string' && al.armliftOrderNote ? String(al.armliftOrderNote) : undefined;
+          const comp =
+            al?.armliftCompleteness && typeof al.armliftCompleteness === 'object'
+              ? (al.armliftCompleteness as { pct: number; missing: string[] })
+              : null;
           /** PRO-6 M11: движение из моста — персист в пак (печать/сводка читают пак, не transient flash). */
           let moveLines: string[] = [];
-          try { moveLines = armliftMovementFlashLines(al).lines.slice(0, 8); } catch { moveLines = []; }
+          try {
+            moveLines = armliftMovementFlashLines(al).lines.slice(0, 8);
+          } catch {
+            moveLines = [];
+          }
           const movePack = moveLines.length ? { movement: { lines: moveLines } } : {};
           if (clean.length) {
-            const pack = { items: clean, spec: specClean, ...(note ? { weakArmNote: note } : {}), ...(ord ? { orderNote: ord } : {}), ...(comp ? { completeness: comp } : {}), ...movePack };
+            const pack = {
+              items: clean,
+              spec: specClean,
+              ...(note ? { weakArmNote: note } : {}),
+              ...(ord ? { orderNote: ord } : {}),
+              ...(comp ? { completeness: comp } : {}),
+              ...movePack,
+            };
             setArmliftCorrections(pack);
-            try { localStorage.setItem('he_armlifting_corrections', JSON.stringify(pack)); } catch {}
-            const compNote = comp && typeof comp.pct === 'number' && comp.pct < 60 ? ` · полнота ${comp.pct}% — ${comp.missing?.join(', ') || ''}` : '';
-            flash(`↩ Хват-коррекции: ${clean.map((c) => c.exId).join(', ')} → волной ${specClean.length || 1} нед в план при сборке${compNote}`);
+            try {
+              localStorage.setItem('he_armlifting_corrections', JSON.stringify(pack));
+            } catch {}
+            const compNote =
+              comp && typeof comp.pct === 'number' && comp.pct < 60
+                ? ` · полнота ${comp.pct}% — ${comp.missing?.join(', ') || ''}`
+                : '';
+            flash(
+              `↩ Хват-коррекции: ${clean.map((c) => c.exId).join(', ')} → волной ${specClean.length || 1} нед в план при сборке${compNote}`,
+            );
           } else if (moveLines.length) {
             const pack = { items: [], spec: [], ...movePack };
             setArmliftCorrections(pack);
-            try { localStorage.setItem('he_armlifting_corrections', JSON.stringify(pack)); } catch {}
+            try {
+              localStorage.setItem('he_armlifting_corrections', JSON.stringify(pack));
+            } catch {}
           } else {
             setArmliftCorrections({ items: [], spec: [] });
-            try { localStorage.removeItem('he_armlifting_corrections'); } catch {}
+            try {
+              localStorage.removeItem('he_armlifting_corrections');
+            } catch {}
           }
         }
       } catch {}
@@ -1004,12 +1624,16 @@ const [rfdEstimated, setRfdEstimated] = useState<boolean>(false);
       try {
         const og = payload.data?.orthoGuards;
         if (og && typeof og === 'object') {
-          try { localStorage.setItem('he_arm_ortho_guards', JSON.stringify(og)); } catch {}
+          try {
+            localStorage.setItem('he_arm_ortho_guards', JSON.stringify(og));
+          } catch {}
           applyOrthoGuards(og);
         }
         const of = payload.data?.orthoFlags;
         if (Array.isArray(of) && of.length) {
-          try { localStorage.setItem('he_arm_ortho_flags', JSON.stringify(of)); } catch {}
+          try {
+            localStorage.setItem('he_arm_ortho_flags', JSON.stringify(of));
+          } catch {}
         }
         const tn = payload.data?.teenNote;
         if (typeof tn === 'string' && tn) {
@@ -1020,9 +1644,10 @@ const [rfdEstimated, setRfdEstimated] = useState<boolean>(false);
       // Э3: мост без орто-полей снимает ранее отслеженное из профиля (только свои id).
       try {
         const d: any = payload.data;
-        const hasOrtho = (d?.orthoGuards && typeof d.orthoGuards === 'object')
-          || (Array.isArray(d?.orthoFlags) && d.orthoFlags.length)
-          || (typeof d?.teenNote === 'string' && d.teenNote);
+        const hasOrtho =
+          (d?.orthoGuards && typeof d.orthoGuards === 'object') ||
+          (Array.isArray(d?.orthoFlags) && d.orthoFlags.length) ||
+          (typeof d?.teenNote === 'string' && d.teenNote);
         if (!hasOrtho) {
           const raw = localStorage.getItem('he_arm_ortho_mobility');
           const tm: unknown = raw ? JSON.parse(raw) : [];
@@ -1041,17 +1666,25 @@ const [rfdEstimated, setRfdEstimated] = useState<boolean>(false);
         const d: any = payload.data;
         // (1) ROM-тесты хаба → профиль (живой фильтр пула, та же ветка что и орто-гарды)
         const mf = Array.isArray(d?.armMobilityFails) ? d.armMobilityFails : [];
-        const mobW = Array.from(new Set<string>((mf as unknown[]).map((m) => String(m)).filter((m: string) => ['wrist', 'forearm', 'elbow'].includes(m))));
+        const mobW = Array.from(
+          new Set<string>(
+            (mf as unknown[]).map((m) => String(m)).filter((m: string) => ['wrist', 'forearm', 'elbow'].includes(m)),
+          ),
+        );
         if (mobW.length) {
           applyArmMobilityToProfile(mobW);
-          try { localStorage.setItem('he_arm_ortho_mobility', JSON.stringify(mobW)); } catch {}
+          try {
+            localStorage.setItem('he_arm_ortho_mobility', JSON.stringify(mobW));
+          } catch {}
           flash(`🦴 Мобильность из диагностики: ${mobW.join(' + ')} — пул отфильтрован`);
         }
         // (2) попытки помоста из журнала хаба → общий журнал платформы (с дедупом)
         const att = Array.isArray(d?.armAttempts) ? d.armAttempts : [];
         let added = 0;
         try {
-          const seen = new Set(loadPlatformLog().map((e: any) => `${e.date}|${e.implement}|${e.weightKg}|${e.success ? 1 : 0}`));
+          const seen = new Set(
+            loadPlatformLog().map((e: any) => `${e.date}|${e.implement}|${e.weightKg}|${e.success ? 1 : 0}`),
+          );
           for (const a of att as any[]) {
             const w = Number(a?.weightKg);
             if (!Number.isFinite(w) || w <= 0) continue;
@@ -1059,11 +1692,19 @@ const [rfdEstimated, setRfdEstimated] = useState<boolean>(false);
             const dateIso = a?.dateIso || localIsoDate();
             const key = `${dateIso}|${implement}|${Math.round(w * 10) / 10}|${a?.success ? 1 : 0}`;
             if (seen.has(key)) continue;
-            savePlatformLogEntry({ implement, sex: a?.sex === 'female' ? 'female' : 'male', weightKg: w, success: !!a?.success, dateIso });
+            savePlatformLogEntry({
+              implement,
+              sex: a?.sex === 'female' ? 'female' : 'male',
+              weightKg: w,
+              success: !!a?.success,
+              dateIso,
+            });
             seen.add(key);
             added++;
           }
-        } catch { /* noop */ }
+        } catch {
+          /* noop */
+        }
         if (added > 0) flash(`↩ Попытки помоста из диагностики: +${added} — в журнал платформы`);
         // (3) per-muscle ACWR danger — info-слой (математику добора считает билдер сам)
         const acw = Array.isArray(d?.armAcwrDanger) ? (d.armAcwrDanger as unknown[]).map(String) : [];
@@ -1073,8 +1714,10 @@ const [rfdEstimated, setRfdEstimated] = useState<boolean>(false);
         if (bil && typeof bil === 'object') {
           const bits: string[] = [];
           if (bil.weakArm) bits.push(`слабая ${String(bil.weakArm)}`);
-          if (Number.isFinite(Number(bil.weakSets)) && Number.isFinite(Number(bil.strongSets))) bits.push(`${bil.weakSets}/${bil.strongSets} сетов`);
-          if (bil.asymmetryPct != null && Number.isFinite(Number(bil.asymmetryPct))) bits.push(`асим ${bil.asymmetryPct}%`);
+          if (Number.isFinite(Number(bil.weakSets)) && Number.isFinite(Number(bil.strongSets)))
+            bits.push(`${bil.weakSets}/${bil.strongSets} сетов`);
+          if (bil.asymmetryPct != null && Number.isFinite(Number(bil.asymmetryPct)))
+            bits.push(`асим ${bil.asymmetryPct}%`);
           if (bits.length) flash(`🧤 Двусторонний план из диагностики: ${bits.join(' · ')}`);
         }
       } catch {}
@@ -1084,7 +1727,8 @@ const [rfdEstimated, setRfdEstimated] = useState<boolean>(false);
         if (mu && typeof mu === 'object') {
           if (mu.oppStyle) setTopOpp(String(mu.oppStyle));
           if (mu.oppHand) setTopOppHand(String(mu.oppHand));
-          if (Number.isFinite(Number(mu.weightDeltaKg)) && Number(mu.weightDeltaKg) !== 0) setTopWD(String(mu.weightDeltaKg));
+          if (Number.isFinite(Number(mu.weightDeltaKg)) && Number(mu.weightDeltaKg) !== 0)
+            setTopWD(String(mu.weightDeltaKg));
           flash('↩ Матчап из диагностики применён');
         }
         // TOP wave-13: профиль хаба (L/R, вес, RT) + динамика → RFD
@@ -1096,8 +1740,14 @@ const [rfdEstimated, setRfdEstimated] = useState<boolean>(false);
             if (Number(ap.bwKg) > 0) setProBw(String(ap.bwKg));
             if (Number(ap.rtKg) > 0) setProBenchRt(String(ap.rtKg));
             // PRO-4 добивка: pinch/RT из армлифтинг-хаба в рабочие максимумы (пустые не затираем)
-            if (Number((ap as any).pinchKg) > 0) setWorkMaxEdit((prev: any) => (!prev.grip_pinch ? { ...prev, grip_pinch: String((ap as any).pinchKg) } : prev));
-            if (Number((ap as any).rtKg) > 0) setWorkMaxEdit((prev: any) => (!prev.grip_support ? { ...prev, grip_support: String((ap as any).rtKg) } : prev));
+            if (Number((ap as any).pinchKg) > 0)
+              setWorkMaxEdit((prev: any) =>
+                !prev.grip_pinch ? { ...prev, grip_pinch: String((ap as any).pinchKg) } : prev,
+              );
+            if (Number((ap as any).rtKg) > 0)
+              setWorkMaxEdit((prev: any) =>
+                !prev.grip_support ? { ...prev, grip_support: String((ap as any).rtKg) } : prev,
+              );
           }
           const ar = payload.data?.armRfd;
           if (ar && Number.isFinite(Number(ar.explosivePct)) && Number(ar.explosivePct) > 0) {
@@ -1140,7 +1790,9 @@ const [rfdEstimated, setRfdEstimated] = useState<boolean>(false);
         } catch {}
         const bouts = payload.data?.armBouts;
         if (Array.isArray(bouts) && bouts.length) {
-          try { localStorage.setItem('he_arm_table_iq', JSON.stringify(bouts.slice(0, 60))); } catch {}
+          try {
+            localStorage.setItem('he_arm_table_iq', JSON.stringify(bouts.slice(0, 60)));
+          } catch {}
           flash(`↩ Table-IQ: ${bouts.length} схваток из диагностики`);
         }
         // Движение схватки P1–P6 из хаба — инфо-слой (сборку не меняем)
@@ -1155,22 +1807,55 @@ const [rfdEstimated, setRfdEstimated] = useState<boolean>(false);
         const ax = payload.data?.armAxisCheck;
         const bits: string[] = [];
         if (ax && typeof ax === 'object') {
-          if ((ax as any).trunkRotatedTowardAttack) { setAxTrunk(true); bits.push('скрут'); }
-          if ((ax as any).wristElbowShoulderAligned === false) { setAxMisalign(true); bits.push('ось'); }
-          if ((ax as any).wristBehindShoulder) { setAxBehind(true); bits.push('запястье'); }
-          if ((ax as any).wristExtendedDorsally) { setAxDorsal(true); bits.push('кисть'); }
-          if ((ax as any).coldNoWarmup) { setAxCold(true); bits.push('холод'); }
-          if ((ax as any).fightingFromDefense) { setAxDefense(true); bits.push('защита'); }
-          if ((ax as any).sideMaxAttempt) { setAxSideMax(true); bits.push('макс'); }
+          if ((ax as any).trunkRotatedTowardAttack) {
+            setAxTrunk(true);
+            bits.push('скрут');
+          }
+          if ((ax as any).wristElbowShoulderAligned === false) {
+            setAxMisalign(true);
+            bits.push('ось');
+          }
+          if ((ax as any).wristBehindShoulder) {
+            setAxBehind(true);
+            bits.push('запястье');
+          }
+          if ((ax as any).wristExtendedDorsally) {
+            setAxDorsal(true);
+            bits.push('кисть');
+          }
+          if ((ax as any).coldNoWarmup) {
+            setAxCold(true);
+            bits.push('холод');
+          }
+          if ((ax as any).fightingFromDefense) {
+            setAxDefense(true);
+            bits.push('защита');
+          }
+          if ((ax as any).sideMaxAttempt) {
+            setAxSideMax(true);
+            bits.push('макс');
+          }
           if (bits.length) setCycAxisOn(true);
         }
         let warmed = false;
-        if ((payload.data as any)?.armWarmupDone === true) { setAxWarm(true); warmed = true; }
-        if (bits.length || warmed) flash(`🦴 Ось из диагностики${bits.length ? `: ${bits.join(' + ')}` : ''}${warmed ? ' · разминка выполнена' : ''} — гейты применены`);
+        if ((payload.data as any)?.armWarmupDone === true) {
+          setAxWarm(true);
+          warmed = true;
+        }
+        if (bits.length || warmed)
+          flash(
+            `🦴 Ось из диагностики${bits.length ? `: ${bits.join(' + ')}` : ''}${warmed ? ' · разминка выполнена' : ''} — гейты применены`,
+          );
       } catch {}
       const bench = payload.data?.armBench;
       if (bench?.level) {
-        const map: Record<string,string> = { beginner:'beginner', intermediate:'intermediate', advanced:'advanced', competitive:'advanced', elite:'enhanced' };
+        const map: Record<string, string> = {
+          beginner: 'beginner',
+          intermediate: 'intermediate',
+          advanced: 'advanced',
+          competitive: 'advanced',
+          elite: 'enhanced',
+        };
         const lvl = map[String(bench.level)] || 'intermediate';
         setLevel(lvl);
         // 26.10.2026: he_arm_last_bench_level убран как write-only — уровень уже
@@ -1181,7 +1866,10 @@ const [rfdEstimated, setRfdEstimated] = useState<boolean>(false);
         // 26.10.2026 (§8 п.1): ER:IR risk из моста → приоритет shoulder_stab в
         // следующей сборке и бонус селектору сплитов (состояние живёт до сброса).
         const shoulderRisk = payload.data?.armShoulderRisk === true;
+        // P2-10 было→стало: флаг только ставился и жил вечно — новый payload без
+        // armShoulderRisk теперь честно снимает shoulderPriority/бонус селектора.
         if (shoulderRisk) setDiagShoulderRisk(true);
+        else setDiagShoulderRisk(false);
         const diagSnap: any = {
           benchLevel: bench?.level,
           shoulderRisk: shoulderRisk || undefined,
@@ -1208,7 +1896,8 @@ const [rfdEstimated, setRfdEstimated] = useState<boolean>(false);
           },
         };
         localStorage.setItem('he_arm_last_diagnostics', JSON.stringify(diagSnap));
-        if (payload.data?.armWeakPoints) localStorage.setItem('he_arm_last_weakpoints', JSON.stringify(payload.data.armWeakPoints));
+        if (payload.data?.armWeakPoints)
+          localStorage.setItem('he_arm_last_weakpoints', JSON.stringify(payload.data.armWeakPoints));
       } catch {}
     };
     // начальный снимок (если хаб уже отправил до монтирования)
@@ -1216,8 +1905,16 @@ const [rfdEstimated, setRfdEstimated] = useState<boolean>(false);
       const cur = getPlannerApply();
       if (cur) apply(cur);
     } catch {}
-    const unsub = subscribePlannerApply((p) => { try { apply(p); } catch {} });
-    return () => { try { unsub(); } catch {} };
+    const unsub = subscribePlannerApply((p) => {
+      try {
+        apply(p);
+      } catch {}
+    });
+    return () => {
+      try {
+        unsub();
+      } catch {}
+    };
   }, []);
 
   const ranked = useMemo(() => {
@@ -1230,7 +1927,9 @@ const [rfdEstimated, setRfdEstimated] = useState<boolean>(false);
         const c = ARM_CYCLE_LIBRARY.find((x) => x.id === cycId);
         if (c && c.daysPerWeek > 0) effDays = c.daysPerWeek;
       }
-    } catch { effDays = daysPerWeek; }
+    } catch {
+      effDays = daysPerWeek;
+    }
     return rankArmSplits({
       level,
       goal: goal as any,
@@ -1240,20 +1939,35 @@ const [rfdEstimated, setRfdEstimated] = useState<boolean>(false);
       gripFocus,
       weakPoints,
       specialization,
-        equipment: profileSnapshot.equipment,
-        injuries: profileSnapshot.injuries,
-        mobilityRestrictions: profileSnapshot.mobilityRestrictions,
-        // 26.10.2026 (§8 п.3): ER:IR risk → бонус сплитам со shoulder_stab
-        shoulderRisk: diagShoulderRisk || undefined,
-      });
+      equipment: profileSnapshot.equipment,
+      injuries: profileSnapshot.injuries,
+      mobilityRestrictions: profileSnapshot.mobilityRestrictions,
+      // 26.10.2026 (§8 п.3): ER:IR risk → бонус сплитам со shoulder_stab
+      shoulderRisk: diagShoulderRisk || undefined,
+    });
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [level, goal, technique, discipline, daysPerWeek, gripFocus, weakPoints, specialization, cycId, profileSnapshot]);
+  }, [
+    level,
+    goal,
+    technique,
+    discipline,
+    daysPerWeek,
+    gripFocus,
+    weakPoints,
+    specialization,
+    cycId,
+    profileSnapshot,
+    diagShoulderRisk,
+  ]);
 
   const best = useMemo(() => ranked[0]?.pattern, [ranked]);
   // P2-11: строгий фильтр сплитов по заявленной частоте (дней/нед).
   const rankedShown = useMemo(() => {
     if (!strictDays) return ranked;
-    const exact = ranked.filter((r: any) => Math.abs((r.pattern.sessionsPerRotation * 7) / Math.max(1, r.pattern.rotationDays) - daysPerWeek) < 0.01);
+    const exact = ranked.filter(
+      (r: any) =>
+        Math.abs((r.pattern.sessionsPerRotation * 7) / Math.max(1, r.pattern.rotationDays) - daysPerWeek) < 0.01,
+    );
     return exact.length ? exact : ranked;
   }, [ranked, strictDays, daysPerWeek]);
 
@@ -1261,25 +1975,51 @@ const [rfdEstimated, setRfdEstimated] = useState<boolean>(false);
     return buildArmSchedule({ focusGroup: focusGroup || undefined, weakPoints, specialization, totalWeeks: weeks });
   }, [focusGroup, weakPoints, specialization, weeks]);
 
-  const flash = (t: string) => { setMsg(t); setTimeout(()=>setMsg(''), 2600); };
+  const flash = (t: string) => {
+    setMsg(t);
+    setTimeout(() => setMsg(''), 2600);
+  };
 
   // PRO-PLAN: старты внутри плана (мульти-пиковость) — валидация + превью окон.
   const addPeak = () => {
     const w = Math.round(Number(peakWeekInput));
-    if (!Number.isFinite(w) || w < 1 || w > weeks) { flash(`⚠ Неделя старта: 1–${weeks}`); return; }
-    if (peaks.some((p) => p.week === w)) { flash('⚠ Этот старт уже добавлен'); return; }
-    setPeaks((prev) => [...prev, { week: w, priority: peakPrioInput, ...(peakNameInput.trim() ? { name: peakNameInput.trim().slice(0, 40) } : {}) }].sort((a, b) => a.week - b.week));
+    if (!Number.isFinite(w) || w < 1 || w > weeks) {
+      flash(`⚠ Неделя старта: 1–${weeks}`);
+      return;
+    }
+    if (peaks.some((p) => p.week === w)) {
+      flash('⚠ Этот старт уже добавлен');
+      return;
+    }
+    setPeaks((prev) =>
+      [
+        ...prev,
+        {
+          week: w,
+          priority: peakPrioInput,
+          ...(peakNameInput.trim() ? { name: peakNameInput.trim().slice(0, 40) } : {}),
+        },
+      ].sort((a, b) => a.week - b.week),
+    );
     setPeakWeekInput('');
     setPeakNameInput('');
   };
   const removePeak = (w: number) => setPeaks((prev) => prev.filter((p) => p.week !== w));
   const peaksPreview = useMemo(() => {
-    try { return planArmPeaks(peaks, weeks, {}); } catch { return null; }
+    try {
+      return planArmPeaks(peaks, weeks, {});
+    } catch {
+      return null;
+    }
   }, [peaks, weeks]);
 
   // P0-1: живой дневник (v2) для контура «план ↔ факт» и дневникового ACWR в сборке.
   const diarySessions = useMemo(() => {
-    try { return loadHubDiarySessions(); } catch { return []; }
+    try {
+      return loadHubDiarySessions();
+    } catch {
+      return [];
+    }
   }, [step, builtPlan]);
   // factFeedback/compliance/planAudit считаются ОТ ПРАВЛЕНОГО плана (viewPlan) —
   // объявлены ниже, после viewPlan (иначе TDZ): было builtPlan, из-за чего цифры
@@ -1289,31 +2029,57 @@ const [rfdEstimated, setRfdEstimated] = useState<boolean>(false);
     setSpecBlocks((prev) => {
       const start = prev.length ? Math.min(weeks, prev[prev.length - 1].weekEnd + 1) : 1;
       const end = Math.min(weeks, start + 4);
-      return [...prev, { weekStart: start, weekEnd: Math.max(start, end), targets: weakPoints.slice(0, 2), donors: [], mode: 'none' as const }];
+      return [
+        ...prev,
+        {
+          weekStart: start,
+          weekEnd: Math.max(start, end),
+          targets: weakPoints.slice(0, 2),
+          donors: [],
+          mode: 'none' as const,
+        },
+      ];
     });
   };
-  const updateSpecBlock = (i: number, patch: Partial<UiSpecBlock>) => setSpecBlocks((prev) => prev.map((b, j) => {
-    if (j !== i) return b;
-    const next = { ...b, ...patch };
-    // 26.10.2026 было→стало: инвертированный блок (weekStart 8 > weekEnd 3) молча
-    // выбросился движком (filter weekStart<=weekEnd) — «показано ≠ применяется».
-    // Теперь порядок недель нормализуется в самой правке.
-    if (next.weekEnd < next.weekStart) {
-      if (patch.weekEnd != null) next.weekStart = next.weekEnd;
-      else next.weekEnd = next.weekStart;
-    }
-    return next;
-  }));
+  const updateSpecBlock = (i: number, patch: Partial<UiSpecBlock>) =>
+    setSpecBlocks((prev) =>
+      prev.map((b, j) => {
+        if (j !== i) return b;
+        const next = { ...b, ...patch };
+        // 26.10.2026 было→стало: инвертированный блок (weekStart 8 > weekEnd 3) молча
+        // выбросился движком (filter weekStart<=weekEnd) — «показано ≠ применяется».
+        // Теперь порядок недель нормализуется в самой правке.
+        if (next.weekEnd < next.weekStart) {
+          if (patch.weekEnd != null) next.weekStart = next.weekEnd;
+          else next.weekEnd = next.weekStart;
+        }
+        return next;
+      }),
+    );
   const removeSpecBlock = (i: number) => setSpecBlocks((prev) => prev.filter((_, j) => j !== i));
   const specSchedulePreview = useMemo(() => {
     try {
       if (!specialization || specBlocks.length === 0) return null;
-      return buildArmSchedule({ focusGroup: focusGroup || undefined, weakPoints, specialization, totalWeeks: weeks, explicitBlocks: specBlocksToSchedule(specBlocks) });
-    } catch { return null; }
+      return buildArmSchedule({
+        focusGroup: focusGroup || undefined,
+        weakPoints,
+        specialization,
+        totalWeeks: weeks,
+        explicitBlocks: specBlocksToSchedule(specBlocks),
+      });
+    } catch {
+      return null;
+    }
   }, [specialization, specBlocks, focusGroup, weakPoints, weeks]);
   // P1-10: тренд чек-инов + номер текущей недели плана (от даты сборки).
   const checkinTrend = useMemo(() => {
-    try { return checkins.length ? armCheckinTrend(checkins, { targetWeightKg: parseFloat(proTargetW) || undefined }) : null; } catch { return null; }
+    try {
+      return checkins.length
+        ? armCheckinTrend(checkins, { targetWeightKg: parseFloat(proTargetW) || undefined })
+        : null;
+    } catch {
+      return null;
+    }
   }, [checkins, proTargetW]);
   const checkinWeek = useMemo(() => {
     try {
@@ -1323,10 +2089,16 @@ const [rfdEstimated, setRfdEstimated] = useState<boolean>(false);
       // planStartDate чек-ин подписывался не той неделей плана.
       const week1 = /^\d{4}-\d{2}-\d{2}$/.test(planStartDate)
         ? planStartDate
-        : raw && /^\d{4}-\d{2}-\d{2}$/.test(raw) ? raw : localIsoDate();
-      const days = Math.floor((Date.parse(`${localIsoDate()}T00:00:00Z`) - Date.parse(`${week1}T00:00:00Z`)) / 86400000);
+        : raw && /^\d{4}-\d{2}-\d{2}$/.test(raw)
+          ? raw
+          : localIsoDate();
+      const days = Math.floor(
+        (Date.parse(`${localIsoDate()}T00:00:00Z`) - Date.parse(`${week1}T00:00:00Z`)) / 86400000,
+      );
       return Math.max(1, Math.min(weeks, Math.floor(days / 7) + 1));
-    } catch { /* noop */ }
+    } catch {
+      /* noop */
+    }
     return 1;
   }, [weeks, builtPlan, planStartDate]);
   useEffect(() => {
@@ -1336,9 +2108,106 @@ const [rfdEstimated, setRfdEstimated] = useState<boolean>(false);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [checkins]);
   // PRO-PLAN: возврат настроек контура из снапшота варианта (не теряются при загрузке).
+  // P1-4 было→стало: строковые поля (cocWorking/medleyId/ladderFrom/pumpkinArm/
+  // gripImplement/даты) восстанавливались через setter(!!snap[key]) → `'no1'`
+  // становился `true`, а даты/веса/ставки прогрессии вообще терялись. Теперь:
+  // строки — строкой, числа — String(n), boolean-флаги — отдельным списком.
   const restoreUiFromSnapshot = React.useCallback((snap: any) => {
     if (!snap || typeof snap !== 'object') return;
     try {
+      const str = (key: string, set: (v: string) => void, reset = false) => {
+        const v = snap[key];
+        if (typeof v === 'string') set(v);
+        else if (reset) set('');
+      };
+      const numStr = (key: string, set: (v: string) => void, opts?: { reset?: boolean; keepZero?: boolean }) => {
+        const raw = snap[key];
+        const n = Number(raw);
+        if (raw != null && raw !== '' && Number.isFinite(n) && (n !== 0 || opts?.keepZero)) set(String(n));
+        else if (opts?.reset) set('');
+      };
+      // 26.10.2026 было→стало: восстановление теряло сплит/хват — после
+      // «📥 Загрузить» повторная сборка уходила от сохранённого варианта.
+      if (snap.patternId) setPatternId(String(snap.patternId));
+      if (snap.gripFocus) setGripFocus(String(snap.gripFocus) as any);
+      // Текстовые/флаговые ключи снапшота — до «визуальных» восстановлений:
+      // строки остаются строками (`'no1'` не превращается в `true`).
+      str('cocWorking', setCycCoc, true);
+      str('medleyId', setCycMedley, true);
+      str('ladderFrom', setTopLadder, true);
+      str('pumpkinArm', setCycPumpkin, true);
+      str('calPriority', setTopCalPrio, true);
+      str('calSeries', setTopCalSeries, true);
+      setTopGripPhase(typeof snap.gripPhase === 'string' && snap.gripPhase ? snap.gripPhase : 'auto');
+      if (snap.gripImplement) setProPlatImpl(String(snap.gripImplement) as any);
+      if (snap.arm === 'left' || snap.arm === 'right' || snap.arm === 'both') setProArm(snap.arm);
+      if (snap.paraClass) setProPara(String(snap.paraClass) as WafParaClass);
+      // Даты/веса/ставки, которые реально уходят в buildArmPlan: без них
+      // «повторная сборка из варианта» теряла старт, L/R и прогрессию.
+      str('planStartWeek', setPlanStartDate, true);
+      str('competitionDateIso', setProDate, true);
+      numStr('bodyWeightKg', setProBw, { reset: true });
+      numStr('ageYears', setProAge, { reset: true });
+      numStr('leftKg', setProLeft, { reset: true });
+      numStr('rightKg', setProRight, { reset: true });
+      numStr('targetWeightKg', setProTargetW, { reset: true });
+      numStr('flatPyramidWeightKg', setCycFlatW, { reset: true });
+      numStr('larrattStepKg', setCycStep, { reset: true });
+      numStr('hookCapSets', setCycHookCap, { reset: true });
+      numStr('cyclePctPerWeek', setCycPct, { reset: true, keepZero: true });
+      numStr('mesoRatePct', setCycMeso, { reset: true, keepZero: true });
+      numStr('correctionPct', setCycCorr, { reset: true, keepZero: true });
+      numStr('ladderValue', setTopLadderVal, { reset: true });
+      numStr('explosivePct', setTopExpl, { reset: true });
+      numStr('gripWeek', setTopGripWeek, { reset: true });
+      // PED: доз нет в снапшоте → раздел был выключен при сборке (P0-2).
+      const doses: Record<string, number> = {};
+      if (snap.pedDoses && typeof snap.pedDoses === 'object') {
+        for (const [k, v] of Object.entries(snap.pedDoses as Record<string, unknown>)) {
+          const n = Number(v);
+          if (Number.isFinite(n) && n > 0) doses[k] = n;
+        }
+      }
+      setPedDoses(doses);
+      setShowPed(Object.keys(doses).length > 0);
+      if (snap.courseIntensity) setCourseIntensity(String(snap.courseIntensity) as any);
+      // Boolean-флаги — отдельным списком, значение ровно из снапшота.
+      for (const [key, setter] of [
+        ['legsAnchor', setLegsAnchor],
+        ['rotationMode', setRotMode],
+        ['intensityTechniques', setIntensityT],
+        ['cycleConsent', setCycConsent],
+        ['supermatch', setProSupermatch],
+        ['strapExpected', setProStrap],
+        ['rfd', setTopRfd],
+        ['gripAuto', setTopGripAuto],
+        ['contestSim', setTopSim],
+        ['rpeParity', setCycRpe],
+        ['flatPyramid', setCycFlat],
+        ['bloodflow', setCycBlood],
+        ['neverFail', setCycNever],
+        ['heavySingles', setCycSingles],
+        ['brzenkMode', setCycBrzenk],
+        ['akimovHook', setCycAkimov],
+        ['compPeriod', setCycComp],
+        ['forMode', setCycFor],
+      ] as Array<[string, (v: boolean) => void]>) {
+        setter(snap[key] === true);
+      }
+      // Ось humerus-2026 — тем же правилом (нет axisCheck = ось выключена).
+      const ax = snap.axisCheck && typeof snap.axisCheck === 'object' ? (snap.axisCheck as any) : null;
+      setCycAxisOn(!!ax);
+      setAxTrunk(!!ax?.trunkRotatedTowardAttack);
+      setAxMisalign(ax?.wristElbowShoulderAligned === false);
+      setAxBehind(!!ax?.wristBehindShoulder);
+      setAxDorsal(!!ax?.wristExtendedDorsally);
+      setAxCold(!!ax?.coldNoWarmup);
+      setAxWarm(ax?.coldNoWarmup === true && snap.warmupDone === true);
+      setAxDefense(!!ax?.fightingFromDefense);
+      setAxSideMax(!!ax?.sideMaxAttempt);
+      // Пустой снапшот фокуса = специализация без фокус-мышцы (не тащим прошлую).
+      setFocusGroup(typeof snap.focusGroup === 'string' ? snap.focusGroup : '');
+      setSpecialization(!!snap.specialization);
       if (snap.discipline) setDiscipline(String(snap.discipline));
       if (snap.technique) setTechnique(String(snap.technique));
       if (snap.goal) setGoal(String(snap.goal));
@@ -1346,58 +2215,72 @@ const [rfdEstimated, setRfdEstimated] = useState<boolean>(false);
       if (Number(snap.weeks) > 0) setWeeks(Math.max(2, Math.min(52, Math.round(Number(snap.weeks)))));
       if (Number(snap.daysPerWeek) > 0) setDaysPerWeek(Math.max(2, Math.min(6, Math.round(Number(snap.daysPerWeek)))));
       if (snap.progressionStyle) setProgStyle(String(snap.progressionStyle));
-      setLegsAnchor(!!snap.legsAnchor);
-      setRotMode(!!snap.rotationMode);
-      setIntensityT(!!snap.intensityTechniques);
       if (Array.isArray(snap.peaks)) {
         const maxW = Math.max(1, Number(snap.weeks) || 52);
-        setPeaks(snap.peaks
-          .filter((p: any) => p && Number(p.week) >= 1 && Number(p.week) <= maxW)
-          .map((p: any) => ({
-            week: Math.round(Number(p.week)),
-            priority: (['A', 'B', 'C'].includes(String(p.priority)) ? String(p.priority) : 'B') as 'A' | 'B' | 'C',
-            ...(p.name ? { name: String(p.name) } : {}),
-          })));
+        setPeaks(
+          snap.peaks
+            .filter((p: any) => p && Number(p.week) >= 1 && Number(p.week) <= maxW)
+            .map((p: any) => ({
+              week: Math.round(Number(p.week)),
+              priority: (['A', 'B', 'C'].includes(String(p.priority)) ? String(p.priority) : 'B') as 'A' | 'B' | 'C',
+              ...(p.name ? { name: String(p.name) } : {}),
+            })),
+        );
       }
       if (Array.isArray(snap.specializationSchedule)) {
-        setSpecBlocks(snap.specializationSchedule
-          .filter((b: any) => b && Array.isArray(b.targets))
-          .slice(0, 4)
-          .map((b: any) => ({
-            weekStart: Math.max(1, Math.round(Number(b.weekStart) || 1)),
-            weekEnd: Math.max(1, Math.round(Number(b.weekEnd) || 1)),
-            targets: (b.targets || []).slice(0, 2).map((t: unknown) => String(t)),
-            donors: Array.isArray(b.tradeoff?.donorMuscles) ? b.tradeoff.donorMuscles.slice(0, 2).map((t: unknown) => String(t)) : [],
-            mode: (b.tradeoff?.mode === 'reduce_direct_to_floor' || b.tradeoff?.mode === 'remove_direct_when_indirect_covers_floor') ? b.tradeoff.mode : 'none',
-          })));
+        setSpecBlocks(
+          snap.specializationSchedule
+            .filter((b: any) => b && Array.isArray(b.targets))
+            .slice(0, 4)
+            .map((b: any) => ({
+              weekStart: Math.max(1, Math.round(Number(b.weekStart) || 1)),
+              weekEnd: Math.max(1, Math.round(Number(b.weekEnd) || 1)),
+              targets: (b.targets || []).slice(0, 2).map((t: unknown) => String(t)),
+              donors: Array.isArray(b.tradeoff?.donorMuscles)
+                ? b.tradeoff.donorMuscles.slice(0, 2).map((t: unknown) => String(t))
+                : [],
+              mode:
+                b.tradeoff?.mode === 'reduce_direct_to_floor' ||
+                b.tradeoff?.mode === 'remove_direct_when_indirect_covers_floor'
+                  ? b.tradeoff.mode
+                  : 'none',
+            })),
+        );
       }
       if (snap.cycleId) setCycId(String(snap.cycleId));
-      // 26.10.2026 было→стало: восстановление теряло сплит/хват/слабые зоны/PED и
-      // все флаги циклов — после «📥 Загрузить» повторная сборка уходила от
-      // сохранённого варианта (сплит = текущий топ-ранжирование, специализация off).
-      if (snap.patternId) setPatternId(String(snap.patternId));
-      if (snap.gripFocus) setGripFocus(String(snap.gripFocus) as any);
-      if (snap.gripImplement) setProPlatImpl(String(snap.gripImplement) as any);
-      if (Array.isArray(snap.weakPoints)) setWeakPoints(snap.weakPoints.map((t: unknown) => String(t)).filter((t: string) => ARM_MUSCLES.includes(t as any)));
-      if (snap.focusGroup) setFocusGroup(String(snap.focusGroup));
-      setSpecialization(!!snap.specialization);
-      if (snap.pedDoses && typeof snap.pedDoses === 'object') {
-        const src = snap.pedDoses as Record<string, unknown>;
-        setPedDoses(Object.fromEntries(Object.entries(src).filter(([, v]) => Number(v) > 0).map(([k, v]) => [k, Number(v)])));
-      }
-      if (snap.courseIntensity) setCourseIntensity(String(snap.courseIntensity) as any);
-      for (const [key, setter] of [
-        ['cocWorking', setCycCoc], ['flatPyramid', setCycFlat], ['bloodflow', setCycBlood],
-        ['neverFail', setCycNever], ['heavySingles', setCycSingles], ['brzenkMode', setCycBrzenk],
-        ['akimovHook', setCycAkimov], ['compPeriod', setCycComp], ['forMode', setCycFor],
-        ['rpeParity', setCycRpe], ['medleyId', setCycMedley],
-      ] as Array<[string, (v: boolean) => void]>) {
-        if (snap[key] != null) setter(!!snap[key]);
-      }
-    } catch { /* тихо */ }
+      if (Array.isArray(snap.weakPoints))
+        setWeakPoints(
+          snap.weakPoints.map((t: unknown) => String(t)).filter((t: string) => ARM_MUSCLES.includes(t as any)),
+        );
+    } catch {
+      /* тихо */
+    }
   }, []);
 
+  // 28.11.2026 (review): восстановленный после reload план поднимал только builtPlan —
+  // на шаге «Параметры» стояли дефолты, и повторная сборка молча строила ДРУГОЙ план.
+  // Один раз на монтирование восстанавливаем и форму из inputSnapshot.
+  const restoredFormRef = React.useRef(false);
+  React.useEffect(() => {
+    if (restoredFormRef.current) return;
+    restoredFormRef.current = true;
+    const snap = builtPlan?.inputSnapshot;
+    if (snap && typeof snap === 'object') {
+      try {
+        restoreUiFromSnapshot(snap);
+      } catch {
+        /* битый снапшот не должен ломать экран */
+      }
+    }
+  }, [builtPlan, restoreUiFromSnapshot]);
+
   const handleBuild = () => {
+    // P0-1: нормализуем «Недель» при сборке — в процессе набора поле может
+    // содержать ещё невалидную строку, а план должен получить число.
+    const weeksParsed = parseInt(weeksInput, 10);
+    const weeksSafe = Number.isFinite(weeksParsed) ? Math.max(2, Math.min(52, weeksParsed)) : weeks;
+    if (weeksSafe !== weeks) setWeeks(weeksSafe);
+    if (weeksInput !== String(weeksSafe)) setWeeksInput(String(weeksSafe));
     const pid = patternId || best?.id || ARM_SPLIT_PATTERNS[0].id;
     try {
       const recovery: any = {
@@ -1420,7 +2303,7 @@ const [rfdEstimated, setRfdEstimated] = useState<boolean>(false);
         level,
         goal: goal as any,
         technique: technique as any,
-        weeks,
+        weeks: weeksSafe,
         daysPerWeek,
         sex,
         gripFocus: gripFocus as any,
@@ -1434,25 +2317,35 @@ const [rfdEstimated, setRfdEstimated] = useState<boolean>(false);
         rotationMode: rotMode || undefined,
         intensityTechniques: intensityT || undefined,
         checkins: checkins.length ? checkins : undefined,
-        readinessStatus: (pro7Readiness?.status === 'red' || pro7Readiness?.status === 'yellow' || pro7Readiness?.status === 'green') ? pro7Readiness.status : undefined,
+        readinessStatus:
+          pro7Readiness?.status === 'red' || pro7Readiness?.status === 'yellow' || pro7Readiness?.status === 'green'
+            ? pro7Readiness.status
+            : undefined,
         // 26.10.2026 (§8 п.1): ER:IR risk из диагностики → приоритет shoulder_stab
         shoulderPriority: diagShoulderRisk || undefined,
         ...profilePatch,
         weakPoints,
-        focusGroup: focusGroup || undefined,
+        // P1-3 было→стало: фокус-мышца даёт ×1.3 только вместе с включённой
+        // специализацией; иначе движок «специализировал» план без согласия.
+        focusGroup: specialization ? focusGroup || undefined : undefined,
         specialization,
         // P0-3: явные блоки специализации (цели/доноры по неделям) — только когда заданы.
         specializationSchedule: specialization && specBlocks.length ? specBlocksToSchedule(specBlocks) : undefined,
         workMax,
-        pedDoses: Object.keys(pedDoses).length ? pedDoses : undefined,
-        courseIntensity,
+        // P0-2 было→стало: при выключенном разделе PED дозы/интенсивность не уходят
+        // в сборку (саммари честно пишет «Выкл»), а не меняют план скрытно.
+        pedDoses: showPed && Object.keys(pedDoses).length ? pedDoses : undefined,
+        courseIntensity: showPed ? courseIntensity : undefined,
         bodyFat: recovery.bodyFat,
         leanMass: recovery.leanMass,
         hrvMs: recovery.hrvMs,
         sleepHours: recovery.sleepHours,
         stressLevel: recovery.stressLevel,
         // PRO A–J (пустые строки = не задано; вес/возраст добираются из профиля)
-        bodyWeightKg: parseFloat(proBw) > 0 ? parseFloat(proBw) : (recovery as any).bodyWeightKg ?? (recovery as any).profileWeight,
+        bodyWeightKg:
+          parseFloat(proBw) > 0
+            ? parseFloat(proBw)
+            : ((recovery as any).bodyWeightKg ?? (recovery as any).profileWeight),
         ageYears: parseFloat(proAge) > 0 ? parseFloat(proAge) : (recovery as any).profileAge,
         arm: (proArm === 'left' || proArm === 'right' ? proArm : 'both') as any,
         leftKg: parseFloat(proLeft) > 0 ? parseFloat(proLeft) : undefined,
@@ -1463,23 +2356,46 @@ const [rfdEstimated, setRfdEstimated] = useState<boolean>(false);
         strapExpected: proStrap || undefined,
         // Wave-1 Э1.5: Para реально доезжает до плана (иначе был write-only вход).
         paraClass: proPara !== 'none' ? proPara : undefined,
-        sparring: proSpar === 'off' ? undefined : { intensityPct: Number(proSpar) as any, partnerDeltaKg: parseFloat(proSparDelta) || 0 },
+        sparring:
+          proSpar === 'off'
+            ? undefined
+            : { intensityPct: Number(proSpar) as any, partnerDeltaKg: parseFloat(proSparDelta) || 0 },
         // P0-1: живой sRPE-дневник + ручные сигналы (ACWR/CNS/боль работают в сборке).
         diary: (() => {
           try {
-            const arr = loadSRPESessions().slice(-28).map((s) => ({ dateIso: s.date, srpe: s.sRPE, durationMin: s.durationMin }));
-            const manual = parseFloat(proSrpe) > 0 || parseFloat(proElbow) > 0
-              ? [{ dateIso: localIsoDate(), srpe: parseFloat(proSrpe) || undefined, elbowPain: parseFloat(proElbow) || undefined }]
-              : [];
+            const arr = loadSRPESessions()
+              .slice(-28)
+              .map((s) => ({ dateIso: s.date, srpe: s.sRPE, durationMin: s.durationMin }));
+            const manual =
+              parseFloat(proSrpe) > 0 || parseFloat(proElbow) > 0
+                ? [
+                    {
+                      dateIso: localIsoDate(),
+                      srpe: parseFloat(proSrpe) || undefined,
+                      elbowPain: parseFloat(proElbow) || undefined,
+                    },
+                  ]
+                : [];
             const all = [...arr, ...manual];
             return all.length ? (all as any) : undefined;
-          } catch { return undefined; }
+          } catch {
+            return undefined;
+          }
         })(),
         // P0-1: факт дневника для per-muscle кросс-мезо ставки (используется с previousPlan).
         diarySessions: diarySessions.length ? (diarySessions as any) : undefined,
-        bench: (parseFloat(proBenchRt) > 0 || parseFloat(proBenchWristLb) > 0 || parseFloat(proBenchPron) > 0 || parseFloat(proBenchSide) > 0)
-          ? { rtKg: parseFloat(proBenchRt) || undefined, wristCurlLb: parseFloat(proBenchWristLb) || undefined, pronHoldSec: parseFloat(proBenchPron) || undefined, sideKg: parseFloat(proBenchSide) || undefined }
-          : undefined,
+        bench:
+          parseFloat(proBenchRt) > 0 ||
+          parseFloat(proBenchWristLb) > 0 ||
+          parseFloat(proBenchPron) > 0 ||
+          parseFloat(proBenchSide) > 0
+            ? {
+                rtKg: parseFloat(proBenchRt) || undefined,
+                wristCurlLb: parseFloat(proBenchWristLb) || undefined,
+                pronHoldSec: parseFloat(proBenchPron) || undefined,
+                sideKg: parseFloat(proBenchSide) || undefined,
+              }
+            : undefined,
         // TOP T1–T8 (не задано = выключено, план как раньше)
         oppStyle: topOpp !== 'unknown' ? topOpp : undefined,
         oppHand: topOppHand !== 'unknown' ? topOppHand : undefined,
@@ -1518,18 +2434,24 @@ const [rfdEstimated, setRfdEstimated] = useState<boolean>(false);
         forMode: cycFor || undefined,
         forSpecialization: cycFor ? (cycForSpec as any) : undefined,
         // R8: ось и попытки — только при явном вводе, иначе движок их не видит
-        axisCheck: cycAxisOn ? {
-          ...(axTrunk ? { trunkRotatedTowardAttack: true } : {}),
-          ...(axMisalign ? { wristElbowShoulderAligned: false } : {}),
-          ...(axBehind ? { wristBehindShoulder: true } : {}),
-          ...(axDorsal ? { wristExtendedDorsally: true } : {}),
-          ...(axCold ? { coldNoWarmup: true } : {}),
-          ...(axDefense ? { fightingFromDefense: true } : {}),
-          ...(axSideMax ? { sideMaxAttempt: true } : {}),
-        } : undefined,
+        axisCheck: cycAxisOn
+          ? {
+              ...(axTrunk ? { trunkRotatedTowardAttack: true } : {}),
+              ...(axMisalign ? { wristElbowShoulderAligned: false } : {}),
+              ...(axBehind ? { wristBehindShoulder: true } : {}),
+              ...(axDorsal ? { wristExtendedDorsally: true } : {}),
+              ...(axCold ? { coldNoWarmup: true } : {}),
+              ...(axDefense ? { fightingFromDefense: true } : {}),
+              ...(axSideMax ? { sideMaxAttempt: true } : {}),
+            }
+          : undefined,
         // PRO-5: разминка выполнена (только при явном флажке; иначе warmup-gate требует блок)
         warmupDone: cycAxisOn && axCold && axWarm ? true : undefined,
-        medleyAttempts: cycMedley ? medAttKg.map((kg, i) => ({ eventIdx: i, weightKg: parseFloat(kg) || 0, success: medAttOk[i] !== false })).filter((a) => a.weightKg > 0) : undefined,
+        medleyAttempts: cycMedley
+          ? medAttKg
+              .map((kg, i) => ({ eventIdx: i, weightKg: parseFloat(kg) || 0, success: medAttOk[i] !== false }))
+              .filter((a) => a.weightKg > 0)
+          : undefined,
         tableSession: (discipline as string) === 'armwrestling' ? true : undefined,
         tendonFuel: (discipline as string) === 'armwrestling' ? true : undefined,
         calStartIso: proDate || undefined,
@@ -1538,28 +2460,67 @@ const [rfdEstimated, setRfdEstimated] = useState<boolean>(false);
         cnsCheck: topHeavy !== '' || topPullH !== '' ? true : undefined,
         heavyGripThisWeek: parseInt(topHeavy) >= 0 ? parseInt(topHeavy) : undefined,
         hoursSinceHeavyPull: parseFloat(topPullH) > 0 ? parseFloat(topPullH) : undefined,
-        previousPlan: topContinuity ? ((): any => { try {
-          const raw = localStorage.getItem('he_arm_last_plan');
-          if (!raw) return undefined;
-          const parsed = JSON.parse(raw);
-          const weeks = (parsed as any)?.plan?.weeks || (parsed as any)?.weeks;
-          if (!Array.isArray(weeks) || !weeks.length) return undefined;
-          return (parsed as any)?.plan || parsed;
-        } catch { return undefined; } })() : undefined,
-        bouts: (()=>{ try { const raw = localStorage.getItem('he_arm_table_iq'); if (raw) { const arr = JSON.parse(raw); if (Array.isArray(arr) && arr.length) return arr.slice(0, 60); } } catch {} return undefined; })(),
+        previousPlan: topContinuity
+          ? ((): any => {
+              try {
+                const raw = localStorage.getItem('he_arm_last_plan');
+                if (!raw) return undefined;
+                const parsed = JSON.parse(raw);
+                const weeks = (parsed as any)?.plan?.weeks || (parsed as any)?.weeks;
+                if (!Array.isArray(weeks) || !weeks.length) return undefined;
+                return (parsed as any)?.plan || parsed;
+              } catch {
+                return undefined;
+              }
+            })()
+          : undefined,
+        bouts: (() => {
+          try {
+            const raw = localStorage.getItem('he_arm_table_iq');
+            if (raw) {
+              const arr = JSON.parse(raw);
+              if (Array.isArray(arr) && arr.length) return arr.slice(0, 60);
+            }
+          } catch {}
+          return undefined;
+        })(),
       });
       plan = finalizeArmPlan(plan, { level });
       // PRO инъекция 12 мёртвых точек (если пришли из хаба) — parity с TA
       try {
-        const toInject: ArmWeakPoint[] = diagWeakPoints.length ? diagWeakPoints : (()=>{ try{ const raw=localStorage.getItem('he_arm_last_weakpoints'); if(raw){ const arr=JSON.parse(raw); if(Array.isArray(arr) && arr.length) return arr as ArmWeakPoint[]; } } catch{} return []; })();
+        const toInject: ArmWeakPoint[] = diagWeakPoints.length
+          ? diagWeakPoints
+          : (() => {
+              try {
+                const raw = localStorage.getItem('he_arm_last_weakpoints');
+                if (raw) {
+                  const arr = JSON.parse(raw);
+                  if (Array.isArray(arr) && arr.length) return arr as ArmWeakPoint[];
+                }
+              } catch {}
+              return [];
+            })();
         if (toInject.length) {
           // доза из диагностики (нет ключей — базовый путь)
-          const doseOpts: { causes?: Record<string, any>; rankedIds?: Record<string, string[]>; tendonOverload?: boolean; waveWeek?: number; specSets?: Record<string, Record<number, number>>; dayMap?: Record<string, string> } = {};
+          const doseOpts: {
+            causes?: Record<string, any>;
+            rankedIds?: Record<string, string[]>;
+            tendonOverload?: boolean;
+            waveWeek?: number;
+            specSets?: Record<string, Record<number, number>>;
+            dayMap?: Record<string, string>;
+          } = {};
           try {
             const cRaw = localStorage.getItem('he_arm_last_causes');
             const rRaw = localStorage.getItem('he_arm_last_rankedids');
-            if (cRaw) { const c = JSON.parse(cRaw); if (c && typeof c === 'object') doseOpts.causes = c; }
-            if (rRaw) { const r = JSON.parse(rRaw); if (r && typeof r === 'object') doseOpts.rankedIds = r; }
+            if (cRaw) {
+              const c = JSON.parse(cRaw);
+              if (c && typeof c === 'object') doseOpts.causes = c;
+            }
+            if (rRaw) {
+              const r = JSON.parse(rRaw);
+              if (r && typeof r === 'object') doseOpts.rankedIds = r;
+            }
             // D5 PRO-2: v2-флаги моста (валидация; мусор — тихо без флага)
             try {
               if (localStorage.getItem('he_arm_last_tendon') === '1') doseOpts.tendonOverload = true;
@@ -1571,9 +2532,15 @@ const [rfdEstimated, setRfdEstimated] = useState<boolean>(false);
             // было write-only, теперь применяется в инъекции ниже.
             try {
               const sRaw = localStorage.getItem('he_arm_last_spec_sets');
-              if (sRaw) { const s = JSON.parse(sRaw); if (s && typeof s === 'object') doseOpts.specSets = s; }
+              if (sRaw) {
+                const s = JSON.parse(sRaw);
+                if (s && typeof s === 'object') doseOpts.specSets = s;
+              }
               const dRaw = localStorage.getItem('he_arm_last_daymap');
-              if (dRaw) { const dm = JSON.parse(dRaw); if (dm && typeof dm === 'object') doseOpts.dayMap = dm; }
+              if (dRaw) {
+                const dm = JSON.parse(dRaw);
+                if (dm && typeof dm === 'object') doseOpts.dayMap = dm;
+              }
             } catch {}
           } catch {}
           // PRO-PLAN: инъекция во ВСЕ недели плана (не только первую) — коррекция
@@ -1581,14 +2548,16 @@ const [rfdEstimated, setRfdEstimated] = useState<boolean>(false);
           // per-day dedup остаются в движке.
           const specByPlanWeek = specTargetSetsByPlanWeek(doseOpts.specSets, plan, toInject as ArmWeakPoint[]);
           const inj = injectArmCorrections(plan, toInject as ArmWeakPoint[], {
-            level, workMax,
+            level,
+            workMax,
             weekIdxs: (plan.weeks || []).map((_: any, i: number) => i),
             ...doseOpts,
             ...(Object.keys(specByPlanWeek).length ? { targetSetsByWeek: specByPlanWeek } : {}),
             ...(doseOpts.dayMap ? { dayMap: doseOpts.dayMap } : {}),
           });
           plan = inj.plan;
-          if (inj.injected>0) plan.rationale = [...(plan.rationale||[]), `Инъекция мёртвых точек: ${inj.notes.join(' · ')}`];
+          if (inj.injected > 0)
+            plan.rationale = [...(plan.rationale || []), `Инъекция мёртвых точек: ${inj.notes.join(' · ')}`];
         }
       } catch {}
       // PRO-5 real: волна хват-коррекций армлифтинга — ТОЛЬКО дисциплина armlifting
@@ -1596,37 +2565,60 @@ const [rfdEstimated, setRfdEstimated] = useState<boolean>(false);
         if ((discipline as string) === 'armlifting' && armliftCorrections.items.length) {
           const allWeekIdxs = (plan.weeks || []).map((_: any, i: number) => i);
           const inj = armliftCorrections.spec.length
-            ? applyArmliftSpecWave(plan, armliftCorrections.spec, armliftCorrections.items, { level, workMax, weekIdxs: allWeekIdxs, weakArmNote: (armliftCorrections as any).weakArmNote, orderNote: (armliftCorrections as any).orderNote })
-            : injectArmliftCorrections(plan, armliftCorrections.items, { level, workMax, weekIdxs: allWeekIdxs, weakArmNote: (armliftCorrections as any).weakArmNote, orderNote: (armliftCorrections as any).orderNote });
+            ? applyArmliftSpecWave(plan, armliftCorrections.spec, armliftCorrections.items, {
+                level,
+                workMax,
+                weekIdxs: allWeekIdxs,
+                weakArmNote: (armliftCorrections as any).weakArmNote,
+                orderNote: (armliftCorrections as any).orderNote,
+              })
+            : injectArmliftCorrections(plan, armliftCorrections.items, {
+                level,
+                workMax,
+                weekIdxs: allWeekIdxs,
+                weakArmNote: (armliftCorrections as any).weakArmNote,
+                orderNote: (armliftCorrections as any).orderNote,
+              });
           plan = inj.plan;
           if (inj.injected > 0 || inj.notes.length) {
             plan.rationale = [...(plan.rationale || []), `Армлифтинг-коррекции: ${inj.notes.join(' · ')}`];
           }
           const cp = (armliftCorrections as any).completeness as { pct: number; missing: string[] } | undefined;
           if (cp && typeof cp.pct === 'number') {
-            const tag = cp.pct < 100 ? ` · полнота ${cp.pct}% — довбей: ${cp.missing?.join(', ') || ''}` : ` · полнота ${cp.pct}%`;
+            const tag =
+              cp.pct < 100
+                ? ` · полнота ${cp.pct}% — довбей: ${cp.missing?.join(', ') || ''}`
+                : ` · полнота ${cp.pct}%`;
             plan.rationale = [...(plan.rationale || []), `Диагностика полнота:${tag}`];
           }
         }
       } catch {}
       plan = refreshArmPlanSnapshot(plan, level);
       setBuiltPlan(plan);
-      persistArmPlan(plan);
+      const persisted = persistArmPlan(plan);
       // P0-1: дата старта плана — база недельных окон для «План vs факт».
-      try { localStorage.setItem('he_arm_plan_built_at', localIsoDate()); } catch { /* noop */ }
+      try {
+        localStorage.setItem('he_arm_plan_built_at', localIsoDate());
+      } catch {
+        /* noop */
+      }
       setWeekSel(1);
       setArmEdits({});
       setEditOpen(null);
       setStep('plan');
       const injInfo = diagWeakPoints.length ? ` + ${diagWeakPoints.join(', ')} инъекция` : '';
-      flash(`✅ План собран: ${plan.pattern.name}, ${plan.weeks.length} нед${injInfo}`);
+      flash(
+        persisted
+          ? `✅ План собран: ${plan.pattern.name}, ${plan.weeks.length} нед${injInfo}`
+          : `⚠ План собран (${plan.pattern.name}, ${plan.weeks.length} нед), но не сохранён: хранилище недоступно/переполнено${injInfo}`,
+      );
     } catch (e: any) {
       flash(`❌ Ошибка: ${e?.message || e}`);
     }
   };
 
   const toggleWeak = (m: string) => {
-    setWeakPoints(prev => prev.includes(m) ? prev.filter(x=>x!==m) : [...prev, m].slice(0,2));
+    setWeakPoints((prev) => (prev.includes(m) ? prev.filter((x) => x !== m) : [...prev, m].slice(0, 2)));
   };
   // Стабильные колбэки для мемо-списков (иначе memo бесполезно)
   const pickSplit = React.useCallback((id: string) => setPatternId(id), []);
@@ -1635,11 +2627,17 @@ const [rfdEstimated, setRfdEstimated] = useState<boolean>(false);
   const cycIdRef = React.useRef(cycId);
   cycIdRef.current = cycId;
   const pickCycleId = React.useCallback((id: string) => {
-    if (!id) { setCycId(''); return; }
-    if (cycIdRef.current === id) { setCycId(''); return; }
+    if (!id) {
+      setCycId('');
+      return;
+    }
+    if (cycIdRef.current === id) {
+      setCycId('');
+      return;
+    }
     setCycId(id);
     try {
-      const c = ARM_CYCLE_LIBRARY.find(x => x.id === id);
+      const c = ARM_CYCLE_LIBRARY.find((x) => x.id === id);
       if (c && c.weeks > 0) setWeeks(Math.max(2, Math.min(52, c.weeks)));
     } catch {}
   }, []);
@@ -1654,20 +2652,33 @@ const [rfdEstimated, setRfdEstimated] = useState<boolean>(false);
   const [cmpIds, setCmpIds] = useState<string[]>([]);
   const cmpDiff = useMemo(() => {
     if (cmpIds.length !== 2) return null;
-    const va = armVariants.find(v => v.id === cmpIds[0]);
-    const vb = armVariants.find(v => v.id === cmpIds[1]);
+    const va = armVariants.find((v) => v.id === cmpIds[0]);
+    const vb = armVariants.find((v) => v.id === cmpIds[1]);
     if (!va || !vb) return null;
     return { names: [va.name, vb.name] as [string, string], diff: compareArmVariants(va.plan, vb.plan) };
   }, [cmpIds, armVariants]);
   // Год: серия → блоки (preview) → сборка каждого buildArmBlock
   const [yearSeries, setYearSeries] = useState<string>('local');
   const [yearWeeks, setYearWeeks] = useState<number>(52);
+  // P0-1: тот же управляемый ввод, что у «Недель» (кламп — blur/debounce-сборка).
+  const [yearWeeksInput, setYearWeeksInput] = useState<string>('52');
+  useEffect(() => {
+    setYearWeeksInput(String(yearWeeks));
+  }, [yearWeeks]);
   const [yearSuggest, setYearSuggest] = useState<boolean>(true);
   const [yearBuilt, setYearBuilt] = useState<any[] | null>(null);
   const [yearBusy, setYearBusy] = useState(false);
   const yearBlocks = useMemo(() => {
-    try { return buildArmYearBlocks(yearSeries, Math.max(4, Math.min(52, yearWeeks || 52)), {}, { suggestCycles: yearSuggest, discipline }); }
-    catch { return []; }
+    try {
+      return buildArmYearBlocks(
+        yearSeries,
+        Math.max(4, Math.min(52, yearWeeks || 52)),
+        {},
+        { suggestCycles: yearSuggest, discipline },
+      );
+    } catch {
+      return [];
+    }
   }, [yearSeries, yearWeeks, yearSuggest, discipline]);
   const YEAR_SERIES = [
     { id: 'local', label: 'Локальный' },
@@ -1684,7 +2695,11 @@ const [rfdEstimated, setRfdEstimated] = useState<boolean>(false);
   // ручные правки меняют сеты, и базовый builtPlan врал бы в «План vs факт»
   // и в выборе худшей точки, тогда как печать/CSV ушли из viewPlan.
   const factFeedback = useMemo(() => {
-    try { return viewPlan ? armFactFeedback(viewPlan, diarySessions as any, { windowDays: 28 }) : null; } catch { return null; }
+    try {
+      return viewPlan ? armFactFeedback(viewPlan, diarySessions as any, { windowDays: 28 }) : null;
+    } catch {
+      return null;
+    }
   }, [viewPlan, diarySessions]);
   const compliance = useMemo(() => {
     try {
@@ -1692,29 +2707,41 @@ const [rfdEstimated, setRfdEstimated] = useState<boolean>(false);
       // Приоритет: явная дата начала плана → дата сборки → сегодня.
       const week1 = /^\d{4}-\d{2}-\d{2}$/.test(planStartDate)
         ? planStartDate
-        : raw && /^\d{4}-\d{2}-\d{2}$/.test(raw) ? raw : localIsoDate();
+        : raw && /^\d{4}-\d{2}-\d{2}$/.test(raw)
+          ? raw
+          : localIsoDate();
       return viewPlan ? armPlanCompliance(viewPlan, diarySessions as any, week1) : null;
-    } catch { return null; }
+    } catch {
+      return null;
+    }
   }, [viewPlan, diarySessions, planStartDate]);
   // Паритет ББ/ТА: аудит покрытия 12 мёртвых точек прямо в конструкторе.
   const planAudit = useMemo(() => {
-    try { return viewPlan ? auditArmPlan(viewPlan) : null; } catch { return null; }
+    try {
+      return viewPlan ? auditArmPlan(viewPlan) : null;
+    } catch {
+      return null;
+    }
   }, [viewPlan]);
+  // P1-5 было→стало: overlay-правки больше НЕ запекаются обратно в builtPlan.
+  // Раньше effect коммитил viewPlan в builtPlan, и «Сбросить правки»/↩ возвращал
+  // уже правленый план. Теперь builtPlan — база, viewPlan — база+правки;
+  // в хранилище пишется актуальный план (правленый), а при снятии правок — база.
   useEffect(() => {
-    if (!builtPlan || !viewPlan || editsCount === 0 || viewPlan === builtPlan) {
-      if (editsCount === 0) committedEditsRef.current = '';
+    if (!builtPlan || !viewPlan) return;
+    const signature = editsCount > 0 ? JSON.stringify(armEdits) : '';
+    if (signature === committedEditsRef.current) return;
+    const hadEdits = committedEditsRef.current !== '';
+    committedEditsRef.current = signature;
+    if (!signature) {
+      if (hadEdits) persistArmPlan(builtPlan);
       return;
     }
-    const signature = JSON.stringify(armEdits);
-    if (signature === committedEditsRef.current) return;
-    committedEditsRef.current = signature;
-    const committed = { ...viewPlan, planSnapshotId: armPlanSnapshotId(viewPlan) };
-    setBuiltPlan(committed);
-    persistArmPlan(committed);
+    persistArmPlan(viewPlan);
   }, [builtPlan, viewPlan, editsCount, armEdits]);
   const exportBlocked = viewPlan?.validation?.status === 'blocked' || !!viewPlan?.validation?.blocked?.length;
 
-  const curWeek = viewPlan?.weeks?.find((w:any)=>w.week===weekSel) || viewPlan?.weeks?.[0];
+  const curWeek = viewPlan?.weeks?.find((w: any) => w.week === weekSel) || viewPlan?.weeks?.[0];
 
   // Дашборд выдачи — чистые производные плана (логики нет).
   const planDash = (() => {
@@ -1722,40 +2749,111 @@ const [rfdEstimated, setRfdEstimated] = useState<boolean>(false);
       if (!viewPlan) return null;
       const weeks = viewPlan.weeks;
       const sess = weeks.flatMap((w: any) => w.sessions);
-       const table = sess.filter((s: any) => s.tableTime).length;
-       const tableSets = sess.reduce((a: number, s: any) => a + s.exercises.reduce((x: number, e: any) => x + (e.isTable ? (e.sets || 0) : 0), 0), 0);
-       const allSets = sess.reduce((a: number, s: any) => a + s.exercises.reduce((x: number, e: any) => x + (e.sets || 0), 0), 0);
-       const light = weeks.filter((w: any) => w.deload || w.phase === 'deload' || w.taper || w.phase === 'peaking').length;
-       const ex = sess.reduce((a: number, s: any) => a + s.exercises.length, 0);
-       const vol = weeks.map((w: any) => w.sessions.reduce((a: number, s: any) => a + s.exercises.reduce((x: number, e: any) => x + (e.sets || 0), 0), 0));
-       const volMax = Math.max(1, ...vol);
-       const metrics = viewPlan.metrics;
-       return { weeks: weeks.length, sess: sess.length, tablePct: sess.length ? Math.round((table / sess.length) * 100) : 0, tableVolumePct: allSets ? Math.round((tableSets / allSets) * 100) : 0, tableMinutesPct: metrics?.tableMinutesShare == null ? null : Math.round(metrics.tableMinutesShare * 100), light, ex, vol, volMax };
-    } catch { return null; }
+      const table = sess.filter((s: any) => s.tableTime).length;
+      const tableSets = sess.reduce(
+        (a: number, s: any) => a + s.exercises.reduce((x: number, e: any) => x + (e.isTable ? e.sets || 0 : 0), 0),
+        0,
+      );
+      const allSets = sess.reduce(
+        (a: number, s: any) => a + s.exercises.reduce((x: number, e: any) => x + (e.sets || 0), 0),
+        0,
+      );
+      const light = weeks.filter(
+        (w: any) => w.deload || w.phase === 'deload' || w.taper || w.phase === 'peaking',
+      ).length;
+      const ex = sess.reduce((a: number, s: any) => a + s.exercises.length, 0);
+      const vol = weeks.map((w: any) =>
+        w.sessions.reduce(
+          (a: number, s: any) => a + s.exercises.reduce((x: number, e: any) => x + (e.sets || 0), 0),
+          0,
+        ),
+      );
+      const volMax = Math.max(1, ...vol);
+      const metrics = viewPlan.metrics;
+      return {
+        weeks: weeks.length,
+        sess: sess.length,
+        tablePct: sess.length ? Math.round((table / sess.length) * 100) : 0,
+        tableVolumePct: allSets ? Math.round((tableSets / allSets) * 100) : 0,
+        tableMinutesPct: metrics?.tableMinutesShare == null ? null : Math.round(metrics.tableMinutesShare * 100),
+        light,
+        ex,
+        vol,
+        volMax,
+      };
+    } catch {
+      return null;
+    }
   })();
 
   // Саммари аккордеонов — чистые производные для шапки (логики нет).
-  const summWeak = weakPoints.length ? weakPoints.map(m=>ARM_MUSCLE_RU[m] || m).join(' + ') : 'Не выбрано';
-  const summPed = !showPed ? 'Выкл' : (Object.keys(pedDoses).length ? `${Object.values(pedDoses).reduce((a,b)=>a+(Number(b)||0),0)} мг/нед` : 'Вкл');
-  const summWm = `${Object.values(workMaxEdit).filter(v=>v!=='').length}/7 задано`;
-  const summPro = `${proBw || '—'} кг · ${proArm==='both'?'обе':proArm==='left'?'левая':'правая'} · ${proDate || 'без даты'}`;
-  const summTop = [topOpp!=='unknown'&&'матчап', topRfd&&'RFD', topSim&&'sim', topContinuity&&'cross-meso', topGripAuto&&'авто-RPE', topLadder&&'лестница'].filter(Boolean).join(' · ') || 'Выкл';
-  const summCyc = cycId ? ((()=>{ try { return ARM_CYCLE_LIBRARY.find(c=>c.id===cycId)?.name || cycId; } catch { return cycId; } })()) : 'Обычный план';
+  const summWeak = weakPoints.length ? weakPoints.map((m) => ARM_MUSCLE_RU[m] || m).join(' + ') : 'Не выбрано';
+  const summPed = !showPed
+    ? 'Выкл'
+    : Object.keys(pedDoses).length
+      ? `${Object.values(pedDoses).reduce((a, b) => a + (Number(b) || 0), 0)} мг/нед`
+      : 'Вкл';
+  const summWm = `${Object.values(workMaxEdit).filter((v) => v !== '').length}/6 задано`;
+  const summPro = `${proBw || '—'} кг · ${proArm === 'both' ? 'обе' : proArm === 'left' ? 'левая' : 'правая'} · ${proDate || 'без даты'}`;
+  const summTop =
+    [
+      topOpp !== 'unknown' && 'матчап',
+      topRfd && 'RFD',
+      topSim && 'sim',
+      topContinuity && 'cross-meso',
+      topGripAuto && 'авто-RPE',
+      topLadder && 'лестница',
+    ]
+      .filter(Boolean)
+      .join(' · ') || 'Выкл';
+  const summCyc = cycId
+    ? (() => {
+        try {
+          return ARM_CYCLE_LIBRARY.find((c) => c.id === cycId)?.name || cycId;
+        } catch {
+          return cycId;
+        }
+      })()
+    : 'Обычный план';
   const rankedCycles = useMemo(() => {
     try {
       // №6: весь каталог в пикере (не топ-3) — выбор из всех 19 без селекта
       return rankArmCycles({ discipline, level, goal, weeks, daysPerWeek, gripFocus });
-    } catch { return []; }
+    } catch {
+      return [];
+    }
   }, [discipline, level, goal, weeks, daysPerWeek, gripFocus]);
-  const CYC_LEVEL_RU: Record<string, string> = { beginner: 'Новичок', intermediate: 'Средний', advanced: 'Продвинутый', enhanced: 'Enhanced' };
-  const CYC_PHASE_RU: Record<string, string> = { accumulation: 'накопление', intensification: 'интенсификация', deload: 'делод', peaking: 'пик' };
+  const CYC_LEVEL_RU: Record<string, string> = {
+    beginner: 'Новичок',
+    intermediate: 'Средний',
+    advanced: 'Продвинутый',
+    enhanced: 'Enhanced',
+  };
+  const CYC_PHASE_RU: Record<string, string> = {
+    accumulation: 'накопление',
+    intensification: 'интенсификация',
+    deload: 'делод',
+    peaking: 'пик',
+  };
 
-const GRIP_GROUPS: Array<{ title: string; ids: ArmImplement[] }> = [
-  { title: '✊ Support — удержание', ids: ['rolling_thunder', 'apollon_axle', 'farmer_handles', 'fat_gripz'] },
-  { title: '🤏 Pinch — щипок', ids: ['saxon_bar', 'pinch_block', 'hub'] },
-  { title: '🗜 Crush — дробление', ids: ['coc_bullet'] },
-];
-  const summFocus = (()=>{ try { return GRIP_FOCI.find(g=>g.id===gripFocus)?.label || gripFocus; } catch { return gripFocus; } })();
+  const GRIP_GROUPS: Array<{ title: string; ids: ArmImplement[] }> = [
+    { title: '✊ Support — удержание', ids: ['rolling_thunder', 'apollon_axle', 'farmer_handles', 'fat_gripz'] },
+    { title: '🤏 Pinch — щипок', ids: ['saxon_bar', 'pinch_block', 'hub'] },
+    { title: '🗜 Crush — дробление', ids: ['coc_bullet'] },
+  ];
+  const summFocus = (() => {
+    try {
+      return GRIP_FOCI.find((g) => g.id === gripFocus)?.label || gripFocus;
+    } catch {
+      return gripFocus;
+    }
+  })();
+  /** P2-15: %/нед вне 0–5 движок молча отбрасывает — UI обязан сказать это вслух. */
+  const pctOutOfRange = (raw: string) => {
+    if (String(raw).trim() === '') return false;
+    const n = parseFloat(raw);
+    return !(Number.isFinite(n) && n >= 0 && n <= 5);
+  };
 
   return (
     <AdRoot rootClass="train-arm">
@@ -1763,8 +2861,41 @@ const GRIP_GROUPS: Array<{ title: string; ids: ArmImplement[] }> = [
         <span style={PLANNER_HEAD_TITLE}>🤝 Арм-конструктор</span>
         {best ? (
           <span className="ad-hero-side" style={{ display: 'flex', alignItems: 'center', gap: 8, minWidth: 0 }}>
-            <div className="ad-hero-score" aria-hidden style={{ minWidth: 56, textAlign: 'center', padding: '6px 10px', borderRadius: 14, background: 'linear-gradient(135deg, rgba(0,230,138,0.25), rgba(0,200,160,0.08))', border: '1px solid rgba(0,230,138,0.4)', boxShadow: '0 4px 16px rgba(0,230,138,0.25)' }}><b style={{ fontSize: 20, fontWeight: 900, color: '#fff', fontVariantNumeric: 'tabular-nums' }}>{ranked[0]?.score ?? 0}</b><span style={{ display: 'block', fontSize: 9, color: '#fff' }}>баллов</span></div>
-            <div className="ad-hero-name" style={{ fontSize: 12, fontWeight: 800, color: '#fff', lineHeight: 1.3, minWidth: 0 }}>{best.name}<span style={{ display: 'block', fontSize: 10, fontWeight: 500, color: '#fff', fontVariantNumeric: 'tabular-nums' }}>лучший сплит · {daysPerWeek} дн/нед</span></div>
+            <div
+              className="ad-hero-score"
+              aria-hidden
+              style={{
+                minWidth: 56,
+                textAlign: 'center',
+                padding: '6px 10px',
+                borderRadius: 14,
+                background: 'linear-gradient(135deg, rgba(0,230,138,0.25), rgba(0,200,160,0.08))',
+                border: '1px solid rgba(0,230,138,0.4)',
+                boxShadow: '0 4px 16px rgba(0,230,138,0.25)',
+              }}
+            >
+              <b style={{ fontSize: 20, fontWeight: 900, color: '#fff', fontVariantNumeric: 'tabular-nums' }}>
+                {ranked[0]?.score ?? 0}
+              </b>
+              <span style={{ display: 'block', fontSize: 9, color: '#fff' }}>баллов</span>
+            </div>
+            <div
+              className="ad-hero-name"
+              style={{ fontSize: 12, fontWeight: 800, color: '#fff', lineHeight: 1.3, minWidth: 0 }}
+            >
+              {best.name}
+              <span
+                style={{
+                  display: 'block',
+                  fontSize: 10,
+                  fontWeight: 500,
+                  color: '#fff',
+                  fontVariantNumeric: 'tabular-nums',
+                }}
+              >
+                лучший сплит · {daysPerWeek} дн/нед
+              </span>
+            </div>
           </span>
         ) : null}
       </div>
@@ -1775,13 +2906,20 @@ const GRIP_GROUPS: Array<{ title: string; ids: ArmImplement[] }> = [
           steps={STEP_DEFS}
           groups={STEP_GROUPS}
           active={step}
-          onSelect={id => { buzzStep(); setStep(id as Step); }}
+          onSelect={(id) => {
+            buzzStep();
+            setStep(id as Step);
+          }}
           navAttrs={{ 'data-arm': 'steps', className: 'ad-steps' }}
           pillClassName="ad-step"
         />
       </div>
 
-      {msg && <div className="ad-toast" data-arm="msg" role="status" style={PLANNER_FLASH}>{msg}</div>}
+      {msg && (
+        <div className="ad-toast" data-arm="msg" role="status" style={PLANNER_FLASH}>
+          {msg}
+        </div>
+      )}
 
       {step === 'params' && (
         <AdCard className="ad-stepview">
@@ -1790,33 +2928,77 @@ const GRIP_GROUPS: Array<{ title: string; ids: ArmImplement[] }> = [
               <div>
                 <div className="ad-fl">Дисциплина</div>
                 <div className="ad-chips">
-                  {DISCIPLINES.map(d=> <AdChip key={d.id} active={discipline===d.id} onClick={()=>setDiscipline(d.id)}>{d.label}</AdChip>)}
+                  {DISCIPLINES.map((d) => (
+                    <AdChip key={d.id} active={discipline === d.id} onClick={() => setDiscipline(d.id)}>
+                      {d.label}
+                    </AdChip>
+                  ))}
                 </div>
               </div>
               <div>
                 <div className="ad-fl">Техника (стол)</div>
                 <div className="ad-chips">
-                  {TECHNIQUES.map(t=> <AdChip key={t.id} active={technique===t.id} onClick={()=>setTechnique(t.id)}>{t.label}</AdChip>)}
+                  {TECHNIQUES.map((t) => (
+                    <AdChip key={t.id} active={technique === t.id} onClick={() => setTechnique(t.id)}>
+                      {t.label}
+                    </AdChip>
+                  ))}
                 </div>
               </div>
               <div>
                 <div className="ad-fl">Уровень</div>
                 <div className="ad-chips">
-                  {[{id:'beginner',label:'Новичок'},{id:'intermediate',label:'Средний'},{id:'advanced',label:'Продвинутый'},{id:'enhanced',label:'На курсе'}].map(l=> <AdChip key={l.id} active={level===l.id} onClick={()=>setLevel(l.id)}>{l.label}</AdChip>)}
+                  {[
+                    { id: 'beginner', label: 'Новичок' },
+                    { id: 'intermediate', label: 'Средний' },
+                    { id: 'advanced', label: 'Продвинутый' },
+                    { id: 'enhanced', label: 'На курсе' },
+                  ].map((l) => (
+                    <AdChip key={l.id} active={level === l.id} onClick={() => setLevel(l.id)}>
+                      {l.label}
+                    </AdChip>
+                  ))}
                 </div>
               </div>
               <div>
                 <div className="ad-fl">Цель</div>
                 <div className="ad-chips">
-                  {GOALS.map(g=> <AdChip key={g.id} active={goal===g.id} onClick={()=>setGoal(g.id)}>{g.label}</AdChip>)}
+                  {GOALS.map((g) => (
+                    <AdChip key={g.id} active={goal === g.id} onClick={() => setGoal(g.id)}>
+                      {g.label}
+                    </AdChip>
+                  ))}
                 </div>
               </div>
               <AdGrid cols="2">
                 <AdField label="Недель">
-                  <input type="number" min={2} max={52} value={weeks} onChange={e=>setWeeks(Math.max(2,Math.min(52, parseInt(e.target.value)||8)))} />
+                  <input
+                    type="number"
+                    min={2}
+                    max={52}
+                    value={weeksInput}
+                    onChange={(e) => {
+                      const raw = e.target.value;
+                      setWeeksInput(raw);
+                      const n = parseInt(raw, 10);
+                      if (Number.isFinite(n) && n >= 2 && n <= 52) setWeeks(n);
+                    }}
+                    onBlur={() => {
+                      const n = parseInt(weeksInput, 10);
+                      const next = Number.isFinite(n) ? Math.max(2, Math.min(52, n)) : weeks;
+                      setWeeks(next);
+                      setWeeksInput(String(next));
+                    }}
+                  />
                 </AdField>
                 <AdField label="Дней/нед">
-                  <input type="number" min={2} max={6} value={daysPerWeek} onChange={e=>setDaysPerWeek(Math.max(2,Math.min(6, parseInt(e.target.value)||4)))} />
+                  <input
+                    type="number"
+                    min={2}
+                    max={6}
+                    value={daysPerWeek}
+                    onChange={(e) => setDaysPerWeek(Math.max(2, Math.min(6, parseInt(e.target.value) || 4)))}
+                  />
                 </AdField>
               </AdGrid>
             </div>
@@ -1825,36 +3007,79 @@ const GRIP_GROUPS: Array<{ title: string; ids: ArmImplement[] }> = [
           {discipline !== 'armwrestling' && (
             <AdSec title="Хват-фокус" collapsible defaultOpen={false} summary={summFocus}>
               <div className="ad-chips">
-                {GRIP_FOCI.map(g=> (
-                  <AdChip key={g.id} active={gripFocus===g.id} onClick={()=>setGripFocus(g.id)}>{g.label}</AdChip>
+                {GRIP_FOCI.map((g) => (
+                  <AdChip key={g.id} active={gripFocus === g.id} onClick={() => setGripFocus(g.id)}>
+                    {g.label}
+                  </AdChip>
                 ))}
               </div>
             </AdSec>
           )}
 
           <AdCta>
-            <AdBtn variant="primary" block hero onClick={()=>setStep('athlete')}>Далее: Атлет →</AdBtn>
-            <div className="ad-muted">Лучший сплит: <b>{best?.name || '—'}</b> ({ranked[0]?.score ?? 0} баллов)</div>
+            <AdBtn variant="primary" block hero onClick={() => setStep('athlete')}>
+              Далее: Атлет →
+            </AdBtn>
+            <div className="ad-muted">
+              Лучший сплит: <b>{best?.name || '—'}</b> ({ranked[0]?.score ?? 0} баллов)
+            </div>
           </AdCta>
         </AdCard>
       )}
 
       {step === 'athlete' && (
         <AdCard className="ad-stepview">
-          <AdSec title="🎯 Слабые зоны (1–2)" hint="Специализация ×1.3 — мышцы" collapsible defaultOpen summary={summWeak} status={weakPoints.length ? 'ok' : undefined}>
+          <AdSec
+            title="🎯 Слабые зоны (1–2)"
+            hint="Специализация ×1.3 — мышцы"
+            collapsible
+            defaultOpen
+            summary={summWeak}
+            status={weakPoints.length ? 'ok' : undefined}
+          >
             <div className="ad-chips">
-              {['wrist_flexors','pronators','supinators','brachialis','risers','grip_support','grip_pinch','side_pressure','back_pressure'].map(m=> (
-                <AdChip key={m} active={weakPoints.includes(m)} onClick={()=>toggleWeak(m)}>{ARM_MUSCLE_RU[m] || m}</AdChip>
+              {[
+                'wrist_flexors',
+                'pronators',
+                'supinators',
+                'brachialis',
+                'risers',
+                'grip_support',
+                'grip_pinch',
+                'side_pressure',
+                'back_pressure',
+              ].map((m) => (
+                <AdChip key={m} active={weakPoints.includes(m)} onClick={() => toggleWeak(m)}>
+                  {ARM_MUSCLE_RU[m] || m}
+                </AdChip>
               ))}
             </div>
-            <AdSwitch checked={specialization} onChange={setSpecialization} label="Специализация (цель ×1.3, блоки ниже)" />
+            <AdSwitch
+              checked={specialization}
+              onChange={setSpecialization}
+              label="Специализация (цель ×1.3, блоки ниже)"
+            />
             {specialization && (
               <div>
                 <div className="ad-fl">Фокус-мышца (×1.3 без выбора целей)</div>
                 <div className="ad-chips">
-                  <AdChip active={focusGroup === ''} onClick={() => setFocusGroup('')}>— нет</AdChip>
-                  {['wrist_flexors','pronators','supinators','brachialis','risers','grip_support','grip_pinch','side_pressure','back_pressure'].map(m => (
-                    <AdChip key={m} active={focusGroup === m} onClick={() => setFocusGroup(focusGroup === m ? '' : m)}>{ARM_MUSCLE_RU[m] || m}</AdChip>
+                  <AdChip active={focusGroup === ''} onClick={() => setFocusGroup('')}>
+                    — нет
+                  </AdChip>
+                  {[
+                    'wrist_flexors',
+                    'pronators',
+                    'supinators',
+                    'brachialis',
+                    'risers',
+                    'grip_support',
+                    'grip_pinch',
+                    'side_pressure',
+                    'back_pressure',
+                  ].map((m) => (
+                    <AdChip key={m} active={focusGroup === m} onClick={() => setFocusGroup(focusGroup === m ? '' : m)}>
+                      {ARM_MUSCLE_RU[m] || m}
+                    </AdChip>
                   ))}
                 </div>
               </div>
@@ -1863,106 +3088,231 @@ const GRIP_GROUPS: Array<{ title: string; ids: ArmImplement[] }> = [
             {orthoFlagsLine && <AdBanner tone="warn">{orthoFlagsLine}</AdBanner>}
             {specialization && (
               <div data-arm="spec-blocks">
-                <div className="ad-muted">Блоки специализации: недели → цели → доноры (пусто = legacy-блок 6 нед + баланс).</div>
+                <div className="ad-muted">
+                  Блоки специализации: недели → цели → доноры (пусто = legacy-блок 6 нед + баланс).
+                </div>
                 {specBlocks.map((b, i) => (
                   <div key={i} className="ad-sec ad-bio" data-arm="spec-block" data-valid="na">
-                    <div className="ad-row" style={{ display: 'flex', gap: 6, flexWrap: 'wrap', alignItems: 'flex-end' }}>
+                    <div
+                      className="ad-row"
+                      style={{ display: 'flex', gap: 6, flexWrap: 'wrap', alignItems: 'flex-end' }}
+                    >
                       <AdField label="С нед">
-                        <input type="number" min={1} max={weeks} value={b.weekStart} aria-label={`Начало блока ${i + 1}`} onChange={(e) => updateSpecBlock(i, { weekStart: Math.max(1, Math.min(weeks, parseInt(e.target.value) || 1)) })} style={{ width: 70 }} />
+                        <input
+                          type="number"
+                          min={1}
+                          max={weeks}
+                          value={b.weekStart}
+                          aria-label={`Начало блока ${i + 1}`}
+                          onChange={(e) =>
+                            updateSpecBlock(i, {
+                              weekStart: Math.max(1, Math.min(weeks, parseInt(e.target.value) || 1)),
+                            })
+                          }
+                          style={{ width: 70 }}
+                        />
                       </AdField>
                       <AdField label="По нед">
-                        <input type="number" min={1} max={weeks} value={b.weekEnd} aria-label={`Конец блока ${i + 1}`} onChange={(e) => updateSpecBlock(i, { weekEnd: Math.max(1, Math.min(weeks, parseInt(e.target.value) || 1)) })} style={{ width: 70 }} />
+                        <input
+                          type="number"
+                          min={1}
+                          max={weeks}
+                          value={b.weekEnd}
+                          aria-label={`Конец блока ${i + 1}`}
+                          onChange={(e) =>
+                            updateSpecBlock(i, { weekEnd: Math.max(1, Math.min(weeks, parseInt(e.target.value) || 1)) })
+                          }
+                          style={{ width: 70 }}
+                        />
                       </AdField>
-                      <AdSheetSelect label="Доноры" hook="spec-donor-mode" value={b.mode} onChange={(v) => updateSpecBlock(i, { mode: v as UiSpecBlock['mode'] })} options={[
-                        { id: 'none', label: '— без снятия (цель сама)', desc: 'доноры не трогаются' },
-                        { id: 'reduce_direct_to_floor', label: 'Снять до MEV', desc: 'изоляции доноров вниз до минимального объёма' },
-                        { id: 'remove_direct_when_indirect_covers_floor', label: 'Снять до MEV (агрессивно)', desc: 'дополнительно −1 сет изоляций' },
-                      ]} />
-                      <AdBtn variant="ghost" onClick={() => removeSpecBlock(i)} aria-label={`Убрать блок ${i + 1}`}>✕ Блок</AdBtn>
+                      <AdSheetSelect
+                        label="Доноры"
+                        hook="spec-donor-mode"
+                        value={b.mode}
+                        onChange={(v) => updateSpecBlock(i, { mode: v as UiSpecBlock['mode'] })}
+                        options={[
+                          { id: 'none', label: '— без снятия (цель сама)', desc: 'доноры не трогаются' },
+                          {
+                            id: 'reduce_direct_to_floor',
+                            label: 'Снять до MEV',
+                            desc: 'изоляции доноров вниз до минимального объёма',
+                          },
+                          {
+                            id: 'remove_direct_when_indirect_covers_floor',
+                            label: 'Снять до MEV (агрессивно)',
+                            desc: 'дополнительно −1 сет изоляций',
+                          },
+                        ]}
+                      />
+                      <AdBtn variant="ghost" onClick={() => removeSpecBlock(i)} aria-label={`Убрать блок ${i + 1}`}>
+                        ✕ Блок
+                      </AdBtn>
                     </div>
                     <div className="ad-muted">Цели блока (1–2):</div>
                     <div className="ad-chips">
                       {ARM_MUSCLES.map((m) => (
-                        <AdChip key={m} active={b.targets.includes(m)} onClick={() => updateSpecBlock(i, { targets: b.targets.includes(m) ? b.targets.filter((x) => x !== m) : [...b.targets, m].slice(0, 2) })}>{ARM_MUSCLE_RU[m] || m}</AdChip>
+                        <AdChip
+                          key={m}
+                          active={b.targets.includes(m)}
+                          onClick={() =>
+                            updateSpecBlock(i, {
+                              targets: b.targets.includes(m)
+                                ? b.targets.filter((x) => x !== m)
+                                : [...b.targets, m].slice(0, 2),
+                            })
+                          }
+                        >
+                          {ARM_MUSCLE_RU[m] || m}
+                        </AdChip>
                       ))}
                     </div>
                     <div className="ad-muted">Доноры (0–2, только при «Снять до MEV»):</div>
                     <div className="ad-chips">
                       {ARM_MUSCLES.map((m) => (
-                        <AdChip key={m} active={b.donors.includes(m)} onClick={() => updateSpecBlock(i, { donors: b.donors.includes(m) ? b.donors.filter((x) => x !== m) : [...b.donors, m].slice(0, 2) })}>{ARM_MUSCLE_RU[m] || m}</AdChip>
+                        <AdChip
+                          key={m}
+                          active={b.donors.includes(m)}
+                          onClick={() =>
+                            updateSpecBlock(i, {
+                              donors: b.donors.includes(m)
+                                ? b.donors.filter((x) => x !== m)
+                                : [...b.donors, m].slice(0, 2),
+                            })
+                          }
+                        >
+                          {ARM_MUSCLE_RU[m] || m}
+                        </AdChip>
                       ))}
                     </div>
                   </div>
                 ))}
-                <AdBtn variant="dark" block onClick={addSpecBlock}>＋ Добавить блок специализации</AdBtn>
-                {specSchedulePreview && <span className="ad-tip" data-arm="spec-preview">{specSchedulePreview.rationale}</span>}
+                <AdBtn variant="dark" block onClick={addSpecBlock}>
+                  ＋ Добавить блок специализации
+                </AdBtn>
+                {specSchedulePreview && (
+                  <span className="ad-tip" data-arm="spec-preview">
+                    {specSchedulePreview.rationale}
+                  </span>
+                )}
               </div>
             )}
           </AdSec>
-          {diagWeakPoints.length>0 && (
+          {diagWeakPoints.length > 0 && (
             <AdBanner tone="warn">
               <b>🎯 Мёртвые точки из диагностики (инъекция 3× @% в план)</b>
               <div className="ad-row">
-                {diagWeakPoints.map(wp=> (
-                  <span key={wp} className="ad-tag">{wp}</span>
+                {diagWeakPoints.map((wp) => (
+                  <span key={wp} className="ad-tag">
+                    {wp}
+                  </span>
                 ))}
               </div>
               <div className="ad-row">
-                <AdBtn variant="dark" onClick={()=>{ setDiagWeakPoints([]); try{ localStorage.removeItem('he_arm_last_weakpoints'); localStorage.removeItem('he_arm_last_causes'); localStorage.removeItem('he_arm_last_rankedids'); } catch{} }}>✕ Сбросить мёртвые точки</AdBtn>
+                <AdBtn
+                  variant="dark"
+                  onClick={() => {
+                    setDiagWeakPoints([]);
+                    try {
+                      localStorage.removeItem('he_arm_last_weakpoints');
+                      localStorage.removeItem('he_arm_last_causes');
+                      localStorage.removeItem('he_arm_last_rankedids');
+                    } catch {}
+                  }}
+                >
+                  ✕ Сбросить мёртвые точки
+                </AdBtn>
                 <span className="ad-muted">Инъекция: per-day dedup, budget 85, humerus guard</span>
               </div>
             </AdBanner>
           )}
-          {(armliftCorrections.items.length > 0 || (armliftCorrections.movement?.lines.length ?? 0) > 0) && (discipline as string) === 'armlifting' && (
-            <AdBanner tone="info">
-              <b>🏋️ Хват-коррекции из армлифтинг-диагностики (волной {armliftCorrections.spec.length || 1} нед в план при сборке)</b>
-              {armliftCorrections.items.length > 0 && (
-              <div className="ad-row">
-                {armliftCorrections.items.map(c=> (
-                  <span key={c.exId} className="ad-tag">{c.exId} {c.sets}×{c.dayTag || ''}</span>
-                ))}
-                {armliftCorrections.weakArmNote && <span className="ad-tag">{armliftCorrections.weakArmNote}</span>}
-              </div>
-              )}
-              {(armliftCorrections.movement?.lines.length ?? 0) > 0 && (
-              <div className="ad-row" data-arm="armlift-movement-card">
-                {(armliftCorrections.movement?.lines ?? []).map((ln, i) => (
-                  <span key={i} className="ad-tag">{ln}</span>
-                ))}
-              </div>
-              )}
-              <div className="ad-row">
-                <AdBtn variant="dark" onClick={()=>{ setArmliftCorrections({ items: [], spec: [] }); try{ localStorage.removeItem('he_armlifting_corrections'); } catch{} }}>✕ Сбросить хват-коррекции</AdBtn>
-                <span className="ad-muted">Инъекция: per-day dedup, budget, кап сессии 8, делод-скип</span>
-              </div>
-            </AdBanner>
-          )}
+          {(armliftCorrections.items.length > 0 || (armliftCorrections.movement?.lines.length ?? 0) > 0) &&
+            (discipline as string) === 'armlifting' && (
+              <AdBanner tone="info">
+                <b>
+                  🏋️ Хват-коррекции из армлифтинг-диагностики (волной {armliftCorrections.spec.length || 1} нед в план
+                  при сборке)
+                </b>
+                {armliftCorrections.items.length > 0 && (
+                  <div className="ad-row">
+                    {armliftCorrections.items.map((c) => (
+                      <span key={c.exId} className="ad-tag">
+                        {c.exId} {c.sets}×{c.dayTag || ''}
+                      </span>
+                    ))}
+                    {armliftCorrections.weakArmNote && <span className="ad-tag">{armliftCorrections.weakArmNote}</span>}
+                  </div>
+                )}
+                {(armliftCorrections.movement?.lines.length ?? 0) > 0 && (
+                  <div className="ad-row" data-arm="armlift-movement-card">
+                    {(armliftCorrections.movement?.lines ?? []).map((ln, i) => (
+                      <span key={i} className="ad-tag">
+                        {ln}
+                      </span>
+                    ))}
+                  </div>
+                )}
+                <div className="ad-row">
+                  <AdBtn
+                    variant="dark"
+                    onClick={() => {
+                      setArmliftCorrections({ items: [], spec: [] });
+                      try {
+                        localStorage.removeItem('he_armlifting_corrections');
+                      } catch {}
+                    }}
+                  >
+                    ✕ Сбросить хват-коррекции
+                  </AdBtn>
+                  <span className="ad-muted">Инъекция: per-day dedup, budget, кап сессии 8, делод-скип</span>
+                </div>
+              </AdBanner>
+            )}
 
-          <AdSec title="💉 На курсе (PED)" hint="TendonCap 1.5× (сухожилия медленнее), recovery × lab × nutrition уже в бюджете." collapsible defaultOpen={false} summary={summPed} status={showPed ? 'ok' : undefined}>
+          <AdSec
+            title="💉 На курсе (PED)"
+            hint="TendonCap 1.2× (сухожилия медленнее); recovery/HRV, сон, стресс — уже в бюджете. Lab/nutrition-множители движок поддерживает, но UI их пока не передаёт."
+            collapsible
+            defaultOpen={false}
+            summary={summPed}
+            status={showPed ? 'ok' : undefined}
+          >
             <AdSwitch checked={showPed} onChange={setShowPed} label="💉 На курсе (PED)" />
             {showPed && (
               <>
-              <div>
-                <div className="ad-fl">Интенсивность курса</div>
-                <div className="ad-chips">
-                  {[{id:'mild',label:'Мягкий'},{id:'moderate',label:'Средний'},{id:'heavy',label:'Тяжёлый'}].map(o=> <AdChip key={o.id} active={courseIntensity===o.id} onClick={()=>setCourseIntensity(o.id as any)}>{o.label}</AdChip>)}
+                <div>
+                  <div className="ad-fl">Интенсивность курса</div>
+                  <div className="ad-chips">
+                    {[
+                      { id: 'mild', label: 'Мягкий' },
+                      { id: 'moderate', label: 'Средний' },
+                      { id: 'heavy', label: 'Тяжёлый' },
+                    ].map((o) => (
+                      <AdChip
+                        key={o.id}
+                        active={courseIntensity === o.id}
+                        onClick={() => setCourseIntensity(o.id as any)}
+                      >
+                        {o.label}
+                      </AdChip>
+                    ))}
+                  </div>
                 </div>
-              </div>
                 <AdGrid cols="2">
                   {[
-                    ['test_e','Тест энантат мг/нед'],
-                    ['tren_a','Тренболон мг/нед'],
-                    ['bold_u','Болденон мг/нед'],
-                  ].map(([k,label])=> (
+                    ['test_e', 'Тест энантат мг/нед'],
+                    ['tren_a', 'Тренболон мг/нед'],
+                    ['bold_u', 'Болденон мг/нед'],
+                  ].map(([k, label]) => (
                     <AdField key={k} label={label}>
                       <input
                         type="number"
                         value={pedDoses[k] ?? ''}
-                        onChange={e=>{
+                        onChange={(e) => {
                           const v = parseFloat(e.target.value);
-                          setPedDoses(prev=> {
-                            const n={...prev};
-                            if (Number.isFinite(v) && v>0) n[k]=v; else delete n[k];
+                          setPedDoses((prev) => {
+                            const n = { ...prev };
+                            if (Number.isFinite(v) && v > 0) n[k] = v;
+                            else delete n[k];
                             return n;
                           });
                         }}
@@ -1972,39 +3322,70 @@ const GRIP_GROUPS: Array<{ title: string; ids: ArmImplement[] }> = [
                   ))}
                 </AdGrid>
               </>
-                )}
-              </AdSec>
+            )}
+          </AdSec>
 
-          <AdSec title="🏋️ Рабочие максимумы (для прогрессии веса)" hint="Веса теперь используются в плане (вес = workMax × %; PRO: тяж 82%, техника 60%, памп 68%)." collapsible defaultOpen={false} summary={summWm} status={Object.values(workMaxEdit).some(v=>v!=='') ? 'ok' : undefined}>
+          <AdSec
+            title="🏋️ Рабочие максимумы (для прогрессии веса)"
+            hint="Веса теперь используются в плане (вес = workMax × %; PRO: тяж 82%, техника 60%, памп 68%)."
+            collapsible
+            defaultOpen={false}
+            summary={summWm}
+            status={Object.values(workMaxEdit).some((v) => v !== '') ? 'ok' : undefined}
+          >
             <AdGrid cols="3">
               {[
-                ['wrist_flexors','Кисть (кг)'],
-                ['pronators','Пронация (кг)'],
-                ['supinators','Супинация (кг)'],
-                ['brachialis','Брахиалис (кг)'],
-                ['grip_support','Support RT/Axle (кг)'],
-                ['grip_pinch','Pinch (кг)'],
-                ['default','База (кг)'],
-              ].map(([k,label]) => (
+                ['wrist_flexors', 'Кисть (кг)'],
+                ['pronators', 'Пронация (кг)'],
+                ['supinators', 'Супинация (кг)'],
+                ['brachialis', 'Брахиалис (кг)'],
+                ['grip_support', 'Support RT/Axle (кг)'],
+                ['grip_pinch', 'Pinch (кг)'],
+              ].map(([k, label]) => (
                 <AdField key={k} label={label}>
-                  <input value={workMaxEdit[k]||''} onChange={e=> setWorkMaxEdit(prev=> ({...prev, [k]: e.target.value}))} placeholder="—" inputMode="decimal" />
+                  <input
+                    value={workMaxEdit[k] || ''}
+                    onChange={(e) => setWorkMaxEdit((prev) => ({ ...prev, [k]: e.target.value }))}
+                    placeholder="—"
+                    inputMode="decimal"
+                  />
                 </AdField>
               ))}
             </AdGrid>
           </AdSec>
 
-          <AdSec title="🏆 PRO: старт WAF" hint="Руки L/R · бенчи · дневник · спарринг" collapsible defaultOpen={false} summary={summPro} status={(proBw || proAge || proDate || proLeft || proRight) ? 'ok' : undefined}>
+          <AdSec
+            title="🏆 PRO: старт WAF"
+            hint="Руки L/R · бенчи · дневник · спарринг"
+            collapsible
+            defaultOpen={false}
+            summary={summPro}
+            status={proBw || proAge || proDate || proLeft || proRight ? 'ok' : undefined}
+          >
             <AdGrid cols="3">
               <AdField label="Вес, кг">
-                <input value={proBw} onChange={e=>setProBw(e.target.value)} placeholder="84" inputMode="decimal" />
+                <input value={proBw} onChange={(e) => setProBw(e.target.value)} placeholder="84" inputMode="decimal" />
               </AdField>
               <AdField label="Возраст">
-                <input value={proAge} onChange={e=>setProAge(e.target.value)} placeholder="30" inputMode="numeric" />
+                <input
+                  value={proAge}
+                  onChange={(e) => setProAge(e.target.value)}
+                  placeholder="30"
+                  inputMode="numeric"
+                />
               </AdField>
               <div>
                 <div className="ad-fl">Рука</div>
                 <div className="ad-chips">
-                  {[{id:'both',label:'Обе (2 зачёта)'},{id:'left',label:'Левая'},{id:'right',label:'Правая'}].map(o=> <AdChip key={o.id} active={proArm===o.id} onClick={()=>setProArm(o.id)}>{o.label}</AdChip>)}
+                  {[
+                    { id: 'both', label: 'Обе (2 зачёта)' },
+                    { id: 'left', label: 'Левая' },
+                    { id: 'right', label: 'Правая' },
+                  ].map((o) => (
+                    <AdChip key={o.id} active={proArm === o.id} onClick={() => setProArm(o.id)}>
+                      {o.label}
+                    </AdChip>
+                  ))}
                 </div>
               </div>
               {/* Wave-1 Э1.5: Para доезжает до плана. Подписи классов — официальные
@@ -2012,84 +3393,206 @@ const GRIP_GROUPS: Array<{ title: string; ids: ArmImplement[] }> = [
               <div>
                 <div className="ad-fl">Para-класс WAF (паралёльные виды спорта)</div>
                 <div className="ad-chips">
-                  {(['none','PID','PIU','PIDH','PIUH','VI','HI','CPD','CPU'] as WafParaClass[]).map(p=> (
-                    <AdChip key={p} active={proPara===p} onClick={()=>setProPara(p)}>{p==='none' ? 'Нет' : p}</AdChip>
+                  {(['none', 'PID', 'PIU', 'PIDH', 'PIUH', 'VI', 'HI', 'CPD', 'CPU'] as WafParaClass[]).map((p) => (
+                    <AdChip key={p} active={proPara === p} onClick={() => setProPara(p)}>
+                      {p === 'none' ? 'Нет' : p}
+                    </AdChip>
                   ))}
                 </div>
               </div>
               <AdField label="Дата старта">
-                <input type="date" value={proDate} onChange={e=>setProDate(e.target.value)} />
+                <input type="date" value={proDate} onChange={(e) => setProDate(e.target.value)} />
               </AdField>
               <AdField label="Целевой вес, кг">
-                <input value={proTargetW} onChange={e=>setProTargetW(e.target.value)} placeholder="85" inputMode="decimal" />
+                <input
+                  value={proTargetW}
+                  onChange={(e) => setProTargetW(e.target.value)}
+                  placeholder="85"
+                  inputMode="decimal"
+                />
               </AdField>
               <div>
                 <div className="ad-fl">Спарринг</div>
                 <div className="ad-chips">
-                  {[{id:'off',label:'Выкл'},{id:'70',label:'70% техника'},{id:'90',label:'90% контроль'},{id:'100',label:'100% (heavy-нед)'}].map(o=> <AdChip key={o.id} active={proSpar===o.id} onClick={()=>setProSpar(o.id)}>{o.label}</AdChip>)}
+                  {[
+                    { id: 'off', label: 'Выкл' },
+                    { id: '70', label: '70% техника' },
+                    { id: '90', label: '90% контроль' },
+                    { id: '100', label: '100% (heavy-нед)' },
+                  ].map((o) => (
+                    <AdChip key={o.id} active={proSpar === o.id} onClick={() => setProSpar(o.id)}>
+                      {o.label}
+                    </AdChip>
+                  ))}
                 </div>
               </div>
               <AdField label="Сила левой, кг">
-                <input value={proLeft} onChange={e=>setProLeft(e.target.value)} placeholder="—" inputMode="decimal" />
+                <input
+                  value={proLeft}
+                  onChange={(e) => setProLeft(e.target.value)}
+                  placeholder="—"
+                  inputMode="decimal"
+                />
               </AdField>
               <AdField label="Сила правой, кг">
-                <input value={proRight} onChange={e=>setProRight(e.target.value)} placeholder="—" inputMode="decimal" />
+                <input
+                  value={proRight}
+                  onChange={(e) => setProRight(e.target.value)}
+                  placeholder="—"
+                  inputMode="decimal"
+                />
               </AdField>
               <AdField label="Партнёр Δ, кг">
-                <input value={proSparDelta} onChange={e=>setProSparDelta(e.target.value)} placeholder="0" inputMode="decimal" />
+                <input
+                  value={proSparDelta}
+                  onChange={(e) => setProSparDelta(e.target.value)}
+                  placeholder="0"
+                  inputMode="decimal"
+                />
               </AdField>
               <AdField label="RT бенч, кг">
-                <input value={proBenchRt} onChange={e=>setProBenchRt(e.target.value)} placeholder="—" inputMode="decimal" />
+                <input
+                  value={proBenchRt}
+                  onChange={(e) => setProBenchRt(e.target.value)}
+                  placeholder="—"
+                  inputMode="decimal"
+                />
               </AdField>
               <AdField label="Сгибание кисти, фунт">
-                <input value={proBenchWristLb} onChange={e=>setProBenchWristLb(e.target.value)} placeholder="—" inputMode="decimal" />
+                <input
+                  value={proBenchWristLb}
+                  onChange={(e) => setProBenchWristLb(e.target.value)}
+                  placeholder="—"
+                  inputMode="decimal"
+                />
               </AdField>
               <AdField label="Пронация, с">
-                <input value={proBenchPron} onChange={e=>setProBenchPron(e.target.value)} placeholder="—" inputMode="numeric" />
+                <input
+                  value={proBenchPron}
+                  onChange={(e) => setProBenchPron(e.target.value)}
+                  placeholder="—"
+                  inputMode="numeric"
+                />
               </AdField>
               <AdField label="Боковое, кг">
-                <input value={proBenchSide} onChange={e=>setProBenchSide(e.target.value)} placeholder="—" inputMode="decimal" />
+                <input
+                  value={proBenchSide}
+                  onChange={(e) => setProBenchSide(e.target.value)}
+                  placeholder="—"
+                  inputMode="decimal"
+                />
               </AdField>
               <AdField label="sRPE (дневник)">
-                <input value={proSrpe} onChange={e=>setProSrpe(e.target.value)} placeholder="—" inputMode="decimal" />
+                <input
+                  value={proSrpe}
+                  onChange={(e) => setProSrpe(e.target.value)}
+                  placeholder="—"
+                  inputMode="decimal"
+                />
               </AdField>
               <AdField label="Боль локтя 0-10">
-                <input value={proElbow} onChange={e=>setProElbow(e.target.value)} placeholder="—" inputMode="decimal" />
+                <input
+                  value={proElbow}
+                  onChange={(e) => setProElbow(e.target.value)}
+                  placeholder="—"
+                  inputMode="decimal"
+                />
               </AdField>
             </AdGrid>
             <div className="ad-row">
               <AdSwitch checked={proSupermatch} onChange={setProSupermatch} label="Суперматч best-of-5/6" />
               <AdSwitch checked={proStrap} onChange={setProStrap} label="Ожидается ремень" />
             </div>
-            {(proBw || proAge || proPara !== 'none') && (()=>{ try {
-              const card = buildWafStartCard({ sex: profileSnapshot.sex, ageYears: parseFloat(proAge) || 30, bodyWeightKg: parseFloat(proBw) || 80, arm: proArm as any, para: proPara });
-              return <div className="ad-tip">WAF {card.ageGroup} · кат. {card.weightClass.label}{card.weightClass.label !== 'Open' ? ' кг' : ''} · {card.weighInNote}{proPara !== 'none' ? ` · Para ${proPara}` : ''}</div>;
-            } catch { return null; } })()}
-            {proSupermatch && (()=>{
-              const sm = buildSupermatchPlan({ level });
-              return <div className="ad-tip">Суперматч: {sm.rounds.length} раундов × {sm.rounds[0]?.fightSec}с / отдых {sm.rounds[0]?.restSec}с · TUT {sm.totalTimeUnderTensionSec}с — пин-холды в слабом углу + скорость.</div>;
-            })()}
-            {(proLeft && proRight) && (()=>{ try {
-              const b = planBilateralVolume({ leftKg: parseFloat(proLeft), rightKg: parseFloat(proRight), baseSets: 10, mrvSets: 16 });
-              if (b.asymmetryPct == null) return null;
-              return <div className="ad-tip">L/R: асимметрия {b.asymmetryPct}% — {b.note}</div>;
-            } catch { return null; } })()}
-            {(proBw && proTargetW && proDate) && (()=>{ try {
-              const weeksOut = weeksUntilStart(undefined, proDate);
-              const cut = planWeightCut({ startKg: parseFloat(proBw), targetKg: parseFloat(proTargetW), weeksOut, sex: profileSnapshot.sex });
-              return <div className="ad-tip">Сгонка: {cut.note}</div>;
-            } catch { return null; } })()}
+            {(proBw || proAge || proPara !== 'none') &&
+              (() => {
+                try {
+                  const card = buildWafStartCard({
+                    sex: profileSnapshot.sex,
+                    ageYears: parseFloat(proAge) || 30,
+                    bodyWeightKg: parseFloat(proBw) || 80,
+                    arm: proArm as any,
+                    para: proPara,
+                  });
+                  return (
+                    <div className="ad-tip">
+                      WAF {card.ageGroup} · кат. {card.weightClass.label}
+                      {card.weightClass.label !== 'Open' ? ' кг' : ''} · {card.weighInNote}
+                      {proPara !== 'none' ? ` · Para ${proPara}` : ''}
+                    </div>
+                  );
+                } catch {
+                  return null;
+                }
+              })()}
+            {proSupermatch &&
+              (() => {
+                const sm = buildSupermatchPlan({ level });
+                return (
+                  <div className="ad-tip">
+                    Суперматч: {sm.rounds.length} раундов × {sm.rounds[0]?.fightSec}с / отдых {sm.rounds[0]?.restSec}с ·
+                    TUT {sm.totalTimeUnderTensionSec}с — пин-холды в слабом углу + скорость.
+                  </div>
+                );
+              })()}
+            {proLeft &&
+              proRight &&
+              (() => {
+                try {
+                  const b = planBilateralVolume({
+                    leftKg: parseFloat(proLeft),
+                    rightKg: parseFloat(proRight),
+                    baseSets: 10,
+                    mrvSets: 16,
+                  });
+                  if (b.asymmetryPct == null) return null;
+                  return (
+                    <div className="ad-tip">
+                      L/R: асимметрия {b.asymmetryPct}% — {b.note}
+                    </div>
+                  );
+                } catch {
+                  return null;
+                }
+              })()}
+            {proBw &&
+              proTargetW &&
+              proDate &&
+              (() => {
+                try {
+                  // P1-8 было→стало: превью «Сгонка» считало недели от сегодня и
+                  // игнорировало дату начала плана — теперь якорь planStartDate.
+                  const anchor = /^\d{4}-\d{2}-\d{2}$/.test(planStartDate) ? planStartDate : undefined;
+                  const weeksOut = weeksUntilStart(anchor, proDate);
+                  const cut = planWeightCut({
+                    startKg: parseFloat(proBw),
+                    targetKg: parseFloat(proTargetW),
+                    weeksOut,
+                    sex: profileSnapshot.sex,
+                  });
+                  return <div className="ad-tip">Сгонка: {cut.note}</div>;
+                } catch {
+                  return null;
+                }
+              })()}
             <div>
               <div className="ad-muted">WAF-фолы ({WAF_FOULS_OUT_AFTER} фола = поражение):</div>
               <div className="ad-chips">
-                {WAF_FOULS.map(f=><span key={f.id} title={`${f.what} Профилактика: ${f.prevention}`} className="ad-tag">{f.name}</span>)}
+                {WAF_FOULS.map((f) => (
+                  <span key={f.id} title={`${f.what} Профилактика: ${f.prevention}`} className="ad-tag">
+                    {f.name}
+                  </span>
+                ))}
               </div>
             </div>
           </AdSec>
 
           <AdCta>
-            <AdBtn variant="primary" block hero onClick={()=>setStep('grip')}>Далее: Стол и хват →</AdBtn>
-            <AdBtn variant="ghost" block onClick={()=>setStep('params')}>← Назад</AdBtn>
+            <AdBtn variant="primary" block hero onClick={() => setStep('grip')}>
+              Далее: Стол и хват →
+            </AdBtn>
+            <AdBtn variant="ghost" block onClick={() => setStep('params')}>
+              ← Назад
+            </AdBtn>
           </AdCta>
         </AdCard>
       )}
@@ -2097,27 +3600,42 @@ const GRIP_GROUPS: Array<{ title: string; ids: ArmImplement[] }> = [
       {step === 'grip' && (
         <AdCard className="ad-stepview">
           <div>
-            <ArmTechniqueCard onApplyWeak={(ws)=>setWeakPoints(ws.slice(0,2))} />
+            <ArmTechniqueCard onApplyWeak={(ws) => setWeakPoints(ws.slice(0, 2))} />
           </div>
 
-          <ArmGripCard onApplyWeak={(ws)=>setWeakPoints(ws.slice(0,2))} />
+          <ArmGripCard onApplyWeak={(ws) => setWeakPoints(ws.slice(0, 2))} />
           <div className="ad-muted">Рекомендация — {best?.name}.</div>
-          {GRIP_GROUPS.map(g => (
-            <AdSec key={g.title} title={g.title} hook="grip-group" collapsible defaultOpen={false} summary={`${g.ids.length} снар.`}>
+          {GRIP_GROUPS.map((g) => (
+            <AdSec
+              key={g.title}
+              title={g.title}
+              hook="grip-group"
+              collapsible
+              defaultOpen={false}
+              summary={`${g.ids.length} снар.`}
+            >
               <div className="ad-list">
-                {g.ids.map(id => {
+                {g.ids.map((id) => {
                   const spec = GRIP_IMPLEMENTS[id];
                   if (!spec) return null;
                   return (
                     <div key={id} className="ad-sec ad-bio" data-valid="na" data-arm="grip-impl">
                       <div className="ad-row">
-                        <span><b>{spec.name}</b></span>
+                        <span>
+                          <b>{spec.name}</b>
+                        </span>
                         <span className="ad-tag ad-angle">⌀{spec.diameterMm}</span>
                         {spec.rotating ? <span className="ad-tag">вращ.</span> : null}
                         <span className="ad-tag">{spec.allowedGrips.join('/')}</span>
-                        {spec.strapsAllowed ? <span className="ad-tag">лямки ✓</span> : <span className="ad-tag">без лямок</span>}
+                        {spec.strapsAllowed ? (
+                          <span className="ad-tag">лямки ✓</span>
+                        ) : (
+                          <span className="ad-tag">без лямок</span>
+                        )}
                       </div>
-                      <div className="ad-volbar" aria-hidden><span style={{ width: `${Math.min(100, Math.round((spec.diameterMm / 76) * 100))}%` }} /></div>
+                      <div className="ad-volbar" aria-hidden>
+                        <span style={{ width: `${Math.min(100, Math.round((spec.diameterMm / 76) * 100))}%` }} />
+                      </div>
                       <div className="ad-muted">{spec.description}</div>
                     </div>
                   );
@@ -2125,67 +3643,145 @@ const GRIP_GROUPS: Array<{ title: string; ids: ArmImplement[] }> = [
               </div>
             </AdSec>
           ))}
-          <AdSec title="🥇 TOP: матчап · скорость" hint="Лестница · sim · календарь" collapsible defaultOpen={false} summary={summTop} status={(topOpp!=='unknown' || topRfd || topSim || topContinuity || topGripAuto || topLadder || cycId) ? 'ok' : undefined}>
+          <AdSec
+            title="🥇 TOP: матчап · скорость"
+            hint="Лестница · sim · календарь"
+            collapsible
+            defaultOpen={false}
+            summary={summTop}
+            status={
+              topOpp !== 'unknown' || topRfd || topSim || topContinuity || topGripAuto || topLadder || cycId
+                ? 'ok'
+                : undefined
+            }
+          >
             <AdGrid cols="3">
               <div>
                 <div className="ad-fl">Стиль оппонента</div>
                 <div className="ad-chips">
-                  {[{id:'unknown',label:'Неизвестен'},{id:'hook',label:'Хук'},{id:'toproll',label:'Топролл'},{id:'press',label:'Пресс'},{id:'balanced',label:'Универсал'}].map(o=> <AdChip key={o.id} active={topOpp===o.id} onClick={()=>setTopOpp(o.id)}>{o.label}</AdChip>)}
+                  {[
+                    { id: 'unknown', label: 'Неизвестен' },
+                    { id: 'hook', label: 'Хук' },
+                    { id: 'toproll', label: 'Топролл' },
+                    { id: 'press', label: 'Пресс' },
+                    { id: 'balanced', label: 'Универсал' },
+                  ].map((o) => (
+                    <AdChip key={o.id} active={topOpp === o.id} onClick={() => setTopOpp(o.id)}>
+                      {o.label}
+                    </AdChip>
+                  ))}
                 </div>
               </div>
               <div>
                 <div className="ad-fl">Рука оппонента</div>
                 <div className="ad-chips">
-                  {[{id:'unknown',label:'Неизвестно'},{id:'high',label:'Верхний'},{id:'low',label:'Нижний'},{id:'neutral',label:'Нейтраль'}].map(o=> <AdChip key={o.id} active={topOppHand===o.id} onClick={()=>setTopOppHand(o.id)}>{o.label}</AdChip>)}
+                  {[
+                    { id: 'unknown', label: 'Неизвестно' },
+                    { id: 'high', label: 'Верхний' },
+                    { id: 'low', label: 'Нижний' },
+                    { id: 'neutral', label: 'Нейтраль' },
+                  ].map((o) => (
+                    <AdChip key={o.id} active={topOppHand === o.id} onClick={() => setTopOppHand(o.id)}>
+                      {o.label}
+                    </AdChip>
+                  ))}
                 </div>
               </div>
               <AdField label="Оппонент Δ, кг (+ тяжелее)">
-                <input value={topWD} onChange={e=>setTopWD(e.target.value)} placeholder="0" inputMode="decimal" />
+                <input value={topWD} onChange={(e) => setTopWD(e.target.value)} placeholder="0" inputMode="decimal" />
               </AdField>
-              <AdSheetSelect label="Имплемент (лестница)" value={topLadder} onChange={setTopLadder} hook="top-ladder" options={[
-                { id:'', label:'—' },
-                { id:'fat_gripz', label:'Fat Gripz', desc:'Накладки 50мм' },
-                { id:'rolling_thunder', label:'Rolling Thunder', desc:'Вращающаяся ручка 60мм' },
-                { id:'apollon_axle', label:'Axle', desc:'Apollon Axle 2″ (51 мм)' },
-                { id:'saxon_bar', label:'Saxon', desc:'Щипок 76мм' },
-                { id:'pinch_block', label:'Pinch Block', desc:'Блок щипок' },
-                { id:'hub', label:'Hub', desc:'Хаб IronMind' },
-                { id:'coc_bullet', label:'CoC Bullet', desc:'Эспандер + патрон' },
-              ]} />
+              <AdSheetSelect
+                label="Имплемент (лестница)"
+                value={topLadder}
+                onChange={setTopLadder}
+                hook="top-ladder"
+                options={[
+                  { id: '', label: '—' },
+                  { id: 'fat_gripz', label: 'Fat Gripz', desc: 'Накладки 50мм' },
+                  { id: 'rolling_thunder', label: 'Rolling Thunder', desc: 'Вращающаяся ручка 60мм' },
+                  { id: 'apollon_axle', label: 'Axle', desc: 'Apollon Axle 2″ (51 мм)' },
+                  { id: 'saxon_bar', label: 'Saxon', desc: 'Щипок 76мм' },
+                  { id: 'pinch_block', label: 'Pinch Block', desc: 'Блок щипок' },
+                  { id: 'hub', label: 'Hub', desc: 'Хаб IronMind' },
+                  { id: 'coc_bullet', label: 'CoC Bullet', desc: 'Эспандер + патрон' },
+                ]}
+              />
               <AdField label="Результат (кг/с)">
-                <input value={topLadderVal} onChange={e=>setTopLadderVal(e.target.value)} placeholder="—" inputMode="decimal" />
+                <input
+                  value={topLadderVal}
+                  onChange={(e) => setTopLadderVal(e.target.value)}
+                  placeholder="—"
+                  inputMode="decimal"
+                />
               </AdField>
               <div>
                 <div className="ad-fl">Приоритет старта</div>
                 <div className="ad-chips">
-                  {[{id:'A',label:'A (тейпер 3н)'},{id:'B',label:'B (тейпер 2н)'},{id:'C',label:'C (без тейпера)'}].map(o=> <AdChip key={o.id} active={topCalPrio===o.id} onClick={()=>setTopCalPrio(o.id)}>{o.label}</AdChip>)}
+                  {[
+                    { id: 'A', label: 'A (тейпер 3н)' },
+                    { id: 'B', label: 'B (тейпер 2н)' },
+                    { id: 'C', label: 'C (без тейпера)' },
+                  ].map((o) => (
+                    <AdChip key={o.id} active={topCalPrio === o.id} onClick={() => setTopCalPrio(o.id)}>
+                      {o.label}
+                    </AdChip>
+                  ))}
                 </div>
               </div>
               <div>
                 <div className="ad-fl">Серия</div>
                 <div className="ad-chips">
-                  {[{id:'local',label:'Локальный'},{id:'waf_worlds',label:'WAF Worlds'},{id:'east_vs_west',label:'East-vs-West'},{id:'super_series',label:'Super Series'}].map(o=> <AdChip key={o.id} active={topCalSeries===o.id} onClick={()=>setTopCalSeries(o.id)}>{o.label}</AdChip>)}
+                  {[
+                    { id: 'local', label: 'Локальный' },
+                    { id: 'waf_worlds', label: 'WAF Worlds' },
+                    { id: 'east_vs_west', label: 'East-vs-West' },
+                    { id: 'super_series', label: 'Super Series' },
+                  ].map((o) => (
+                    <AdChip key={o.id} active={topCalSeries === o.id} onClick={() => setTopCalSeries(o.id)}>
+                      {o.label}
+                    </AdChip>
+                  ))}
                 </div>
               </div>
-              <AdSheetSelect label="Grip-RPE неделя" value={topGripWeek} onChange={setTopGripWeek} options={[
-                { id:'', label:'Авто' },
-                { id:'1', label:'1 (объём)' },
-                { id:'2', label:'2 (объём)' },
-                { id:'3', label:'3 (интенс.)' },
-                { id:'4', label:'4 (делоад)' },
-              ]} />
-              <AdSheetSelect label="Grip-RPE фаза" value={topGripPhase} onChange={setTopGripPhase} options={[
-                { id:'auto', label:'Авто' },
-                { id:'volume', label:'Объём RPE7' },
-                { id:'intensification', label:'Интенс. RPE8' },
-                { id:'peak', label:'Пик RPE9' },
-                { id:'deload', label:'Делоад' },
-              ]} />
+              <AdSheetSelect
+                label="Grip-RPE неделя"
+                value={topGripWeek}
+                onChange={setTopGripWeek}
+                options={[
+                  { id: '', label: 'Авто' },
+                  { id: '1', label: '1 (объём)' },
+                  { id: '2', label: '2 (объём)' },
+                  { id: '3', label: '3 (интенс.)' },
+                  { id: '4', label: '4 (делоад)' },
+                ]}
+              />
+              <AdSheetSelect
+                label="Grip-RPE фаза"
+                value={topGripPhase}
+                onChange={setTopGripPhase}
+                options={[
+                  { id: 'auto', label: 'Авто' },
+                  { id: 'volume', label: 'Объём RPE7' },
+                  { id: 'intensification', label: 'Интенс. RPE8' },
+                  { id: 'peak', label: 'Пик RPE9' },
+                  { id: 'deload', label: 'Делоад' },
+                ]}
+              />
               <AdField label="Тяж. хвата/нед (CNS)">
-                <input value={topHeavy} onChange={e=>setTopHeavy(e.target.value)} placeholder="—" inputMode="numeric" />
+                <input
+                  value={topHeavy}
+                  onChange={(e) => setTopHeavy(e.target.value)}
+                  placeholder="—"
+                  inputMode="numeric"
+                />
               </AdField>
               <AdField label="Часов с тяж. тяг">
-                <input value={topPullH} onChange={e=>setTopPullH(e.target.value)} placeholder="72" inputMode="decimal" />
+                <input
+                  value={topPullH}
+                  onChange={(e) => setTopPullH(e.target.value)}
+                  placeholder="72"
+                  inputMode="decimal"
+                />
               </AdField>
             </AdGrid>
             <div className="ad-row">
@@ -2197,54 +3793,113 @@ const GRIP_GROUPS: Array<{ title: string; ids: ArmImplement[] }> = [
             {topRfd && rfdEstimated && (
               <div className="ad-tip">
                 ⚠ F100 здесь — <b>оценка</b> по пробе «сила + время» (реконструкция), а не отсечка прибора на 100 мс.
-                Она выбирает тип RFD-сессии и дозу, поэтому относитесь к ней как к ориентиру: доведите F100
-                до измеренного (FB5k / высокоскоростная камера) — и блок станет точнее.
+                Она выбирает тип RFD-сессии и дозу, поэтому относитесь к ней как к ориентиру: доведите F100 до
+                измеренного (FB5k / высокоскоростная камера) — и блок станет точнее.
               </div>
             )}
-            {(topOpp !== 'unknown' || topWD) && (()=>{
-              try {
-                const mp = profileOpponent({ myTechnique: technique, oppStyle: topOpp, oppHand: topOppHand, weightDeltaKg: parseFloat(topWD) || 0, strapExpected: proStrap });
-                return <div className="ad-tip">Матчап: {mp.note} Приоритет: {mp.priorityMuscles.slice(0,3).join(', ')}.</div>;
-              } catch { return null; }
-            })()}
-            {topLadder && (()=>{
-              try {
-                const sex = profileSnapshot.sex || 'male';
-                return <div className="ad-tip">{ladderAdvice(topLadder, parseFloat(topLadderVal) || 0, sex)}</div>;
-              } catch { return null; }
-            })()}
-            {(proDate && topSim) && (()=>{
-              try {
-                const sim = buildContestSimWeek({ level, discipline, strapExpected: proStrap, targetKg: parseFloat(proTargetW) || undefined, supermatch: proSupermatch });
-                return <div className="ad-tip">{sim.note} Чеклист: {sim.checklist.slice(0,3).join(' · ')}.</div>;
-              } catch { return null; }
-            })()}
-            {proDate && (()=>{
-              try {
-                const cal = buildArmCalendar({ startIso: proDate, priority: topCalPrio, series: topCalSeries });
-                const year = topCalSeries !== 'local' ? superSeriesYear(topCalSeries) : null;
-                return <div className="ad-tip">Календарь: {cal.note}{year ? ` Год: ${year.note}.` : ''}</div>;
-              } catch { return null; }
-            })()}
-            {(topGripWeek || topGripPhase !== 'auto') && (()=>{
-              try {
-                const g = buildGripRpe({ week: parseInt(topGripWeek) || 1, phase: topGripPhase !== 'auto' ? topGripPhase : undefined });
-                return <div className="ad-tip">Grip-RPE: {g.note} Экстензоры {g.extensor.sets}×{g.extensor.reps} обязательно.</div>;
-              } catch { return null; }
-            })()}
+            {(topOpp !== 'unknown' || topWD) &&
+              (() => {
+                try {
+                  const mp = profileOpponent({
+                    myTechnique: technique,
+                    oppStyle: topOpp,
+                    oppHand: topOppHand,
+                    weightDeltaKg: parseFloat(topWD) || 0,
+                    strapExpected: proStrap,
+                  });
+                  return (
+                    <div className="ad-tip">
+                      Матчап: {mp.note} Приоритет: {mp.priorityMuscles.slice(0, 3).join(', ')}.
+                    </div>
+                  );
+                } catch {
+                  return null;
+                }
+              })()}
+            {topLadder &&
+              (() => {
+                try {
+                  const sex = profileSnapshot.sex || 'male';
+                  return <div className="ad-tip">{ladderAdvice(topLadder, parseFloat(topLadderVal) || 0, sex)}</div>;
+                } catch {
+                  return null;
+                }
+              })()}
+            {proDate &&
+              topSim &&
+              (() => {
+                try {
+                  const sim = buildContestSimWeek({
+                    level,
+                    discipline,
+                    strapExpected: proStrap,
+                    targetKg: parseFloat(proTargetW) || undefined,
+                    supermatch: proSupermatch,
+                  });
+                  return (
+                    <div className="ad-tip">
+                      {sim.note} Чеклист: {sim.checklist.slice(0, 3).join(' · ')}.
+                    </div>
+                  );
+                } catch {
+                  return null;
+                }
+              })()}
+            {proDate &&
+              (() => {
+                try {
+                  const cal = buildArmCalendar({ startIso: proDate, priority: topCalPrio, series: topCalSeries });
+                  const year = topCalSeries !== 'local' ? superSeriesYear(topCalSeries) : null;
+                  return (
+                    <div className="ad-tip">
+                      Календарь: {cal.note}
+                      {year ? ` Год: ${year.note}.` : ''}
+                    </div>
+                  );
+                } catch {
+                  return null;
+                }
+              })()}
+            {(topGripWeek || topGripPhase !== 'auto') &&
+              (() => {
+                try {
+                  const g = buildGripRpe({
+                    week: parseInt(topGripWeek) || 1,
+                    phase: topGripPhase !== 'auto' ? topGripPhase : undefined,
+                  });
+                  return (
+                    <div className="ad-tip">
+                      Grip-RPE: {g.note} Экстензоры {g.extensor.sets}×{g.extensor.reps} обязательно.
+                    </div>
+                  );
+                } catch {
+                  return null;
+                }
+              })()}
           </AdSec>
 
           <AdCta>
-            <AdBtn variant="primary" block hero onClick={()=>setStep('split')}>Далее: Сплит и цикл →</AdBtn>
-            <AdBtn variant="ghost" block onClick={()=>setStep('athlete')}>← Назад</AdBtn>
+            <AdBtn variant="primary" block hero onClick={() => setStep('split')}>
+              Далее: Сплит и цикл →
+            </AdBtn>
+            <AdBtn variant="ghost" block onClick={() => setStep('athlete')}>
+              ← Назад
+            </AdBtn>
           </AdCta>
         </AdCard>
       )}
 
       {step === 'split' && (
         <AdCard className="ad-stepview">
-          <AdSec title="🗓 Выбор сплита" hint={`Ранжирование по уровню/цели/технике/хвате/дням (${daysPerWeek}/нед). Зелёный — лучший.`}>
-            <AdSwitch checked={strictDays} onChange={setStrictDays} label={`Только точная частота ${daysPerWeek}×/нед`} />
+          <AdSec
+            title="🗓 Выбор сплита"
+            hint={`Ранжирование по уровню/цели/технике/хвате/дням (${daysPerWeek}/нед). Зелёный — лучший.`}
+          >
+            <AdSwitch
+              checked={strictDays}
+              onChange={setStrictDays}
+              label={`Только точная частота ${daysPerWeek}×/нед`}
+            />
             <SplitList ranked={rankedShown} patternId={patternId} onPick={pickSplit} />
             {/* 26.10.2026 (§11 п.2): частота и ёмкость дня — отдельным отчётом,
                 а не только скорингом (раньше пользователь не видел ни того, ни другого). */}
@@ -2254,43 +3909,113 @@ const GRIP_GROUPS: Array<{ title: string; ids: ArmImplement[] }> = [
               </div>
             )}
           </AdSec>
-          <AdSec title="📚 Именной цикл" hint="Выбор цикла ставит его недели (exact-fit, согласие не нужно). Пусто = обычный план." collapsible defaultOpen={false} summary={summCyc} status={cycId ? 'ok' : undefined}>
+          <AdSec
+            title="📚 Именной цикл"
+            hint="Выбор цикла ставит его недели (exact-fit, согласие не нужно). Пусто = обычный план."
+            collapsible
+            defaultOpen={false}
+            summary={summCyc}
+            status={cycId ? 'ok' : undefined}
+          >
             {rankedCycles.length > 0 && (
-              <CyclePickerList items={rankedCycles} cycId={cycId} onPick={pickCycleId} levelRu={CYC_LEVEL_RU} phaseRu={CYC_PHASE_RU} />
+              <CyclePickerList
+                items={rankedCycles}
+                cycId={cycId}
+                onPick={pickCycleId}
+                levelRu={CYC_LEVEL_RU}
+                phaseRu={CYC_PHASE_RU}
+              />
             )}
             <AdGrid cols="2">
-              <AdSheetSelect label="Цикл" value={cycId} onChange={pickCycleId} hook="cycle-select" options={[
-                { id:'', label:'— обычный план —', desc:'параметрический план без шаблона' },
-                ...ARM_CYCLE_LIBRARY.map(c=> ({ id: c.id, label: `${c.name} (${c.weeks}н)`, desc: `${c.daysPerWeek}×/нед · ${c.rpe}` })),
-              ]} />
-              <AdSheetSelect label="Медли (армлифтинг)" value={cycMedley} onChange={setCycMedley} options={[
-                { id:'', label:'—' },
-                ...ARM_MEDLEYS.map(m=> ({ id: m.id, label: m.name })),
-              ]} />
+              <AdSheetSelect
+                label="Цикл"
+                value={cycId}
+                onChange={pickCycleId}
+                hook="cycle-select"
+                options={[
+                  { id: '', label: '— обычный план —', desc: 'параметрический план без шаблона' },
+                  ...ARM_CYCLE_LIBRARY.map((c) => ({
+                    id: c.id,
+                    label: `${c.name} (${c.weeks}н)`,
+                    desc: `${c.daysPerWeek}×/нед · ${c.rpe}`,
+                  })),
+                ]}
+              />
+              <AdSheetSelect
+                label="Медли (армлифтинг)"
+                value={cycMedley}
+                onChange={setCycMedley}
+                options={[{ id: '', label: '—' }, ...ARM_MEDLEYS.map((m) => ({ id: m.id, label: m.name }))]}
+              />
               <AdField label="Коррекция %/нед (СРЦ 0.5)">
-                <input value={cycCorr} onChange={e=>setCycCorr(e.target.value)} placeholder="0.5" inputMode="decimal" />
+                <input
+                  value={cycCorr}
+                  onChange={(e) => setCycCorr(e.target.value)}
+                  placeholder="0.5"
+                  inputMode="decimal"
+                />
+                {pctOutOfRange(cycCorr) && (
+                  <span className="ad-tip" data-arm="pct-range-warn">
+                    ⚠ Вне 0–5 %/нед — не применено
+                  </span>
+                )}
               </AdField>
               <AdField label="PRO-5: цикл %/нед (вместо коррекции)">
-                <input value={cycPct} onChange={e=>setCycPct(e.target.value)} placeholder="—" inputMode="decimal" aria-label="Цикл процентов в неделю" />
+                <input
+                  value={cycPct}
+                  onChange={(e) => setCycPct(e.target.value)}
+                  placeholder="—"
+                  inputMode="decimal"
+                  aria-label="Цикл процентов в неделю"
+                />
+                {pctOutOfRange(cycPct) && (
+                  <span className="ad-tip" data-arm="pct-range-warn">
+                    ⚠ Вне 0–5 %/нед — не применено
+                  </span>
+                )}
               </AdField>
               <AdField label="PRO-5: мезо-ставка % (кросс-мезо)">
-                <input value={cycMeso} onChange={e=>setCycMeso(e.target.value)} placeholder="—" inputMode="decimal" aria-label="Мезо-ставка процентов" />
+                <input
+                  value={cycMeso}
+                  onChange={(e) => setCycMeso(e.target.value)}
+                  placeholder="—"
+                  inputMode="decimal"
+                  aria-label="Мезо-ставка процентов"
+                />
+                {pctOutOfRange(cycMeso) && (
+                  <span className="ad-tip" data-arm="pct-range-warn">
+                    ⚠ Вне 0–5 %/нед — не применено
+                  </span>
+                )}
               </AdField>
-              <AdSheetSelect label="CoC рабочий" value={cycCoc} onChange={setCycCoc} options={[
-                { id:'', label:'—' },
-                { id:'guide', label:'Guide', desc:'разминка' },
-                { id:'sport', label:'Sport', desc:'база' },
-                { id:'trainer', label:'Trainer', desc:'переходный' },
-                { id:'no1', label:'№1' },
-                { id:'no1_5', label:'№1.5' },
-                { id:'no2', label:'№2' },
-                { id:'no2_5', label:'№2.5' },
-                { id:'no3', label:'№3', desc:'элита' },
-              ]} />
+              <AdSheetSelect
+                label="CoC рабочий"
+                value={cycCoc}
+                onChange={setCycCoc}
+                options={[
+                  { id: '', label: '—' },
+                  { id: 'guide', label: 'Guide', desc: 'разминка' },
+                  { id: 'sport', label: 'Sport', desc: 'база' },
+                  { id: 'trainer', label: 'Trainer', desc: 'переходный' },
+                  { id: 'no1', label: '№1' },
+                  { id: 'no1_5', label: '№1.5' },
+                  { id: 'no2', label: '№2' },
+                  { id: 'no2_5', label: '№2.5' },
+                  { id: 'no3', label: '№3', desc: 'элита' },
+                ]}
+              />
               <div>
                 <div className="ad-fl">Pumpkin-рука (Larratt)</div>
                 <div className="ad-chips">
-                  {[{id:'',label:'—'},{id:'left',label:'Левая'},{id:'right',label:'Правая'}].map(o=> <AdChip key={o.id || 'none'} active={cycPumpkin===o.id} onClick={()=>setCycPumpkin(o.id)}>{o.label}</AdChip>)}
+                  {[
+                    { id: '', label: '—' },
+                    { id: 'left', label: 'Левая' },
+                    { id: 'right', label: 'Правая' },
+                  ].map((o) => (
+                    <AdChip key={o.id || 'none'} active={cycPumpkin === o.id} onClick={() => setCycPumpkin(o.id)}>
+                      {o.label}
+                    </AdChip>
+                  ))}
                 </div>
               </div>
             </AdGrid>
@@ -2303,16 +4028,34 @@ const GRIP_GROUPS: Array<{ title: string; ids: ArmImplement[] }> = [
               <AdSwitch checked={cycRpe} onChange={setCycRpe} label="PRO-5: RIR по StrengthLog" />
               {cycSingles && (
                 <AdField label="PRO-5: микрошаг синглов кг">
-                  <input value={cycStep} onChange={e=>setCycStep(e.target.value)} placeholder="0.57" inputMode="decimal" aria-label="Микрошаг синглов кг" />
+                  <input
+                    value={cycStep}
+                    onChange={(e) => setCycStep(e.target.value)}
+                    placeholder="0.57"
+                    inputMode="decimal"
+                    aria-label="Микрошаг синглов кг"
+                  />
                 </AdField>
               )}
               {cycFlat && (
                 <AdField label="Стартовый вес пирамиды, кг">
-                  <input value={cycFlatW} onChange={e=>setCycFlatW(e.target.value)} placeholder="—" inputMode="decimal" aria-label="Стартовый вес пирамиды кг" />
+                  <input
+                    value={cycFlatW}
+                    onChange={(e) => setCycFlatW(e.target.value)}
+                    placeholder="—"
+                    inputMode="decimal"
+                    aria-label="Стартовый вес пирамиды кг"
+                  />
                 </AdField>
               )}
               <AdField label="PRO-5: hook-кап сетов/нед">
-                <input value={cycHookCap} onChange={e=>setCycHookCap(e.target.value)} placeholder="12" inputMode="decimal" aria-label="Hook-кап сетов в неделю" />
+                <input
+                  value={cycHookCap}
+                  onChange={(e) => setCycHookCap(e.target.value)}
+                  placeholder="12"
+                  inputMode="decimal"
+                  aria-label="Hook-кап сетов в неделю"
+                />
               </AdField>
               <AdSwitch checked={cycBrzenk} onChange={setCycBrzenk} label="Брзенк 1+1" />
               <AdSwitch checked={cycAkimov} onChange={setCycAkimov} label="Акимов-крюк" />
@@ -2320,13 +4063,18 @@ const GRIP_GROUPS: Array<{ title: string; ids: ArmImplement[] }> = [
               <AdSwitch checked={cycFor} onChange={setCycFor} label="ФОР-7 (для продвинутых)" />
               <AdSwitch checked={cycAxisOn} onChange={setCycAxisOn} label="Ось humerus-2026" />
               {cycFor && (
-                <AdSheetSelect label="ФОР-домен" value={cycForSpec} onChange={setCycForSpec} options={[
-                  { id:'support', label:'Поддержка' },
-                  { id:'crush', label:'Дробление' },
-                  { id:'pinch', label:'Щипок' },
-                  { id:'open', label:'Открытый' },
-                  { id:'wrist', label:'Кисть' },
-                ]} />
+                <AdSheetSelect
+                  label="ФОР-домен"
+                  value={cycForSpec}
+                  onChange={setCycForSpec}
+                  options={[
+                    { id: 'support', label: 'Поддержка' },
+                    { id: 'crush', label: 'Дробление' },
+                    { id: 'pinch', label: 'Щипок' },
+                    { id: 'open', label: 'Открытый' },
+                    { id: 'wrist', label: 'Кисть' },
+                  ]}
+                />
               )}
             </div>
             {cycAxisOn && (
@@ -2337,233 +4085,637 @@ const GRIP_GROUPS: Array<{ title: string; ids: ArmImplement[] }> = [
                   <AdSwitch checked={axBehind} onChange={setAxBehind} label="Запястье позади плеча" />
                   <AdSwitch checked={axDorsal} onChange={setAxDorsal} label="Кисть разогнута назад" />
                   <AdSwitch checked={axCold} onChange={setAxCold} label="Холод без разминки" />
-                  {axCold && <AdSwitch checked={axWarm} onChange={setAxWarm} label="PRO-5: разминка 10–15 мин выполнена" />}
+                  {axCold && (
+                    <AdSwitch checked={axWarm} onChange={setAxWarm} label="PRO-5: разминка 10–15 мин выполнена" />
+                  )}
                   <AdSwitch checked={axDefense} onChange={setAxDefense} label="Борьба из защиты" />
                   <AdSwitch checked={axSideMax} onChange={setAxSideMax} label="Макс бокового" />
                 </div>
               </AdSec>
             )}
-            {cycMedley && (()=>{
-              let events: Array<{ implement: string }> = [];
-              try { events = (getMedley(cycMedley)?.events || []) as Array<{ implement: string }>; } catch { events = []; }
-              if (!events.length) return null;
-              return (
-                <AdSec title="Попытки медли (факт → сводка):">
-                  {events.map((ev, i)=>(
-                    <label key={i} className="ad-check">{ev.implement}
-                      <input aria-label={`Попытка ${i + 1} кг`} value={medAttKg[i] || ''} onChange={e=>setMedAttKg(prev=>prev.map((v, j)=>j===i?e.target.value:v))} placeholder="кг" inputMode="decimal" />
-                      <input aria-label={`Попытка ${i + 1} удачна`} type="checkbox" checked={medAttOk[i] !== false} onChange={e=>setMedAttOk(prev=>prev.map((v, j)=>j===i?e.target.checked:v))} />
-                    </label>
-                  ))}
-                </AdSec>
-              );
-            })()}
-            {cycId && (()=>{
-              try {
-                const f = fitCycleToWeeks(cycId, weeks);
-                const c = getArmCycle(cycId);
-                const prev = c ? consentPreview({ fit: f.fit, cycleWeeks: c.weeks, targetWeeks: weeks, cycleName: c.name }) : null;
-                // PRO-5 P7: несочетаемый сплит чинится в 1 клик (вместо голого warning).
-                const splitFix = (()=>{
-                  try {
-                    if (!c) return null;
-                    const cur = patternId ? (ARM_SPLIT_PATTERNS.find(p=>p.id===patternId) ?? ARM_SPLIT_PATTERNS[0]) : ARM_SPLIT_PATTERNS[0];
-                    const curPerWeek = (cur.sessionsPerRotation * 7) / Math.max(1, cur.rotationDays);
-                    if (Math.abs(curPerWeek - c.daysPerWeek) < 2) return null;
-                    const sug = suggestSplitForCycle({ id: c.id, name: c.name, daysPerWeek: c.daysPerWeek, tablePerWeek: c.tablePerWeek, discipline: c.discipline }, ARM_SPLIT_PATTERNS as any);
-                    if (!sug || sug.id === patternId) return null;
-                    return sug;
-                  } catch { return null; }
-                })();
-                return (<>
-                  <div className="ad-tip">Цикл: {f.note}{f.needsConsent && !cycConsent ? ' — поставьте согласие или недели = длине цикла.' : ''}</div>
-                  {prev && prev.lines.map((l, i)=>(<div key={i} className="ad-tip" data-arm="consent-preview">{l}</div>))}
-                  {splitFix && <AdBtn variant="ghost" block onClick={()=>pickSplit(splitFix.id)} data-arm="split-fix">🔧 Подходит сплит «{splitFix.name}» — применить в 1 клик</AdBtn>}
-                </>);
-              } catch { return null; }
-            })()}
+            {cycMedley &&
+              (() => {
+                let events: Array<{ implement: string }> = [];
+                try {
+                  events = (getMedley(cycMedley)?.events || []) as Array<{ implement: string }>;
+                } catch {
+                  events = [];
+                }
+                if (!events.length) return null;
+                return (
+                  <AdSec title="Попытки медли (факт → сводка):">
+                    {events.map((ev, i) => (
+                      <label key={i} className="ad-check">
+                        {ev.implement}
+                        <input
+                          aria-label={`Попытка ${i + 1} кг`}
+                          value={medAttKg[i] || ''}
+                          onChange={(e) => setMedAttKg((prev) => prev.map((v, j) => (j === i ? e.target.value : v)))}
+                          placeholder="кг"
+                          inputMode="decimal"
+                        />
+                        <input
+                          aria-label={`Попытка ${i + 1} удачна`}
+                          type="checkbox"
+                          checked={medAttOk[i] !== false}
+                          onChange={(e) => setMedAttOk((prev) => prev.map((v, j) => (j === i ? e.target.checked : v)))}
+                        />
+                      </label>
+                    ))}
+                  </AdSec>
+                );
+              })()}
+            {cycId &&
+              (() => {
+                try {
+                  const f = fitCycleToWeeks(cycId, weeks);
+                  const c = getArmCycle(cycId);
+                  const prev = c
+                    ? consentPreview({ fit: f.fit, cycleWeeks: c.weeks, targetWeeks: weeks, cycleName: c.name })
+                    : null;
+                  // PRO-5 P7: несочетаемый сплит чинится в 1 клик (вместо голого warning).
+                  const splitFix = (() => {
+                    try {
+                      if (!c) return null;
+                      const cur = patternId
+                        ? (ARM_SPLIT_PATTERNS.find((p) => p.id === patternId) ?? ARM_SPLIT_PATTERNS[0])
+                        : ARM_SPLIT_PATTERNS[0];
+                      const curPerWeek = (cur.sessionsPerRotation * 7) / Math.max(1, cur.rotationDays);
+                      if (Math.abs(curPerWeek - c.daysPerWeek) < 2) return null;
+                      const sug = suggestSplitForCycle(
+                        {
+                          id: c.id,
+                          name: c.name,
+                          daysPerWeek: c.daysPerWeek,
+                          tablePerWeek: c.tablePerWeek,
+                          discipline: c.discipline,
+                        },
+                        ARM_SPLIT_PATTERNS as any,
+                      );
+                      if (!sug || sug.id === patternId) return null;
+                      return sug;
+                    } catch {
+                      return null;
+                    }
+                  })();
+                  return (
+                    <>
+                      <div className="ad-tip">
+                        Цикл: {f.note}
+                        {f.needsConsent && !cycConsent ? ' — поставьте согласие или недели = длине цикла.' : ''}
+                      </div>
+                      {prev &&
+                        prev.lines.map((l, i) => (
+                          <div key={i} className="ad-tip" data-arm="consent-preview">
+                            {l}
+                          </div>
+                        ))}
+                      {splitFix && (
+                        <AdBtn variant="ghost" block onClick={() => pickSplit(splitFix.id)} data-arm="split-fix">
+                          🔧 Подходит сплит «{splitFix.name}» — применить в 1 клик
+                        </AdBtn>
+                      )}
+                    </>
+                  );
+                } catch {
+                  return null;
+                }
+              })()}
           </AdSec>
           {/* PRO-PLAN: стиль прогрессии, старты внутри плана, база-якорь. */}
-          <AdSec title="🎯 Периодизация и старты" hint="Стиль прогрессии, старты внутри ОДНОГО плана (тейпер-окна + восстановление) и база-якорь." collapsible defaultOpen={false} summary={`${progStyle === 'auto' ? 'Авто' : progStyle === 'linear' ? 'Линейная' : progStyle === 'double' ? 'Двойная' : 'Волновая'} · стартов: ${peaks.length}`} status={peaks.length ? 'ok' : undefined}>
+          <AdSec
+            title="🎯 Периодизация и старты"
+            hint="Стиль прогрессии, старты внутри ОДНОГО плана (тейпер-окна + восстановление) и база-якорь."
+            collapsible
+            defaultOpen={false}
+            summary={`${progStyle === 'auto' ? 'Авто' : progStyle === 'linear' ? 'Линейная' : progStyle === 'double' ? 'Двойная' : 'Волновая'} · стартов: ${peaks.length}`}
+            status={peaks.length ? 'ok' : undefined}
+          >
             <div className="ad-chips" data-arm="prog-style">
               {[
                 { id: 'auto', label: 'Авто (цикл/линейная)' },
                 { id: 'linear', label: 'Линейная %/нед' },
                 { id: 'double', label: 'Двойная прогрессия' },
                 { id: 'wave', label: 'Волновая в блоке' },
-              ].map((o) => <AdChip key={o.id} active={progStyle === o.id} onClick={() => setProgStyle(o.id)}>{o.label}</AdChip>)}
+              ].map((o) => (
+                <AdChip key={o.id} active={progStyle === o.id} onClick={() => setProgStyle(o.id)}>
+                  {o.label}
+                </AdChip>
+              ))}
             </div>
-            {progStyle === 'auto' && cycId && (() => {
-              try {
-                const c = getArmCycle(cycId);
-                if (c && c.correctionPctDefault > 0) return <div className="ad-tip" data-arm="prog-cycle-note">Дефолт цикла: +{c.correctionPctDefault}%/нед (переопределяется полем «цикл %/нед»).</div>;
-              } catch { /* тихий */ }
-              return null;
-            })()}
-            {progStyle === 'double' && <div className="ad-tip">Double: повторы +1/нед в блоке (до +3), вес +2.5% между блоками — профессиональная двойная прогрессия.</div>}
-            {progStyle === 'wave' && <div className="ad-tip">Wave: тяжёлая/средняя/лёгкая недели внутри блока — плотность без отказа.</div>}
-            <AdSwitch checked={legsAnchor} onChange={setLegsAnchor} label="База-якорь: присед/тяга/фермер 1×/нед (LegsCore)" />
-            <AdSwitch checked={rotMode} onChange={setRotMode} label="🔁 Ротация упражнений по неделям (3 варианта группы)" />
-            <AdSwitch checked={intensityT} onChange={setIntensityT} label="💧 Drop-set на памп-изоляции (гипертрофия)" />
-            {proDate && peaks.length === 0 && (() => {
-              try {
-                const wOut = weeksUntilStart(planStartDate || undefined, proDate);
-                if (Number.isFinite(wOut) && wOut >= 1 && wOut <= weeks) {
-                  const pw = Math.max(1, Math.min(weeks, Math.round(wOut)));
-                  return <AdBtn variant="dark" block data-arm="auto-peak" onClick={() => setPeaks([{ week: pw, priority: (['A', 'B', 'C'].includes(topCalPrio) ? topCalPrio : 'B') as 'A' | 'B' | 'C', name: 'Старт из даты' }])}>🏁 Авто-пик из даты старта: Н{pw} ({wOut} нед)</AdBtn>;
+            {progStyle === 'auto' &&
+              cycId &&
+              (() => {
+                try {
+                  const c = getArmCycle(cycId);
+                  if (c && c.correctionPctDefault > 0)
+                    return (
+                      <div className="ad-tip" data-arm="prog-cycle-note">
+                        Дефолт цикла: +{c.correctionPctDefault}%/нед (переопределяется полем «цикл %/нед»).
+                      </div>
+                    );
+                } catch {
+                  /* тихий */
                 }
-                return <div className="ad-tip">Дата старта {proDate} вне окна плана ({wOut} нед) — авто-пик не строится, только гейты готовности.</div>;
-              } catch { return null; }
-            })()}
+                return null;
+              })()}
+            {progStyle === 'double' && (
+              <div className="ad-tip">
+                Double: повторы +1/нед в блоке (до +3), вес +2.5% между блоками — профессиональная двойная прогрессия.
+              </div>
+            )}
+            {progStyle === 'wave' && (
+              <div className="ad-tip">Wave: тяжёлая/средняя/лёгкая недели внутри блока — плотность без отказа.</div>
+            )}
+            <AdSwitch
+              checked={legsAnchor}
+              onChange={setLegsAnchor}
+              label="База-якорь: присед/тяга/фермер 1×/нед (LegsCore)"
+            />
+            <AdSwitch
+              checked={rotMode}
+              onChange={setRotMode}
+              label="🔁 Ротация упражнений по неделям (3 варианта группы)"
+            />
+            <AdSwitch
+              checked={intensityT}
+              onChange={setIntensityT}
+              label="💧 Drop-set на памп-изоляции (гипертрофия)"
+            />
+            {proDate &&
+              peaks.length === 0 &&
+              (() => {
+                try {
+                  const wOut = weeksUntilStart(planStartDate || undefined, proDate);
+                  if (Number.isFinite(wOut) && wOut >= 1 && wOut <= weeks) {
+                    const pw = Math.max(1, Math.min(weeks, Math.round(wOut)));
+                    return (
+                      <AdBtn
+                        variant="dark"
+                        block
+                        data-arm="auto-peak"
+                        onClick={() =>
+                          setPeaks([
+                            {
+                              week: pw,
+                              priority: (['A', 'B', 'C'].includes(topCalPrio) ? topCalPrio : 'B') as 'A' | 'B' | 'C',
+                              name: 'Старт из даты',
+                            },
+                          ])
+                        }
+                      >
+                        🏁 Авто-пик из даты старта: Н{pw} ({wOut} нед)
+                      </AdBtn>
+                    );
+                  }
+                  return (
+                    <div className="ad-tip">
+                      Дата старта {proDate} вне окна плана ({wOut} нед) — авто-пик не строится, только гейты готовности.
+                    </div>
+                  );
+                } catch {
+                  return null;
+                }
+              })()}
             <div className="ad-row" style={{ display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'flex-end' }}>
               <AdField label="Дата начала плана (опц.)">
-                <input type="date" value={planStartDate} onChange={(e) => setPlanStartDate(e.target.value)} aria-label="Дата начала плана" />
+                <input
+                  type="date"
+                  value={planStartDate}
+                  onChange={(e) => setPlanStartDate(e.target.value)}
+                  aria-label="Дата начала плана"
+                />
               </AdField>
               <AdField label={`Неделя старта (1–${weeks})`}>
-                <input value={peakWeekInput} onChange={(e) => setPeakWeekInput(e.target.value)} placeholder="напр. 12" inputMode="numeric" aria-label="Неделя старта" style={{ width: 110 }} />
+                <input
+                  value={peakWeekInput}
+                  onChange={(e) => setPeakWeekInput(e.target.value)}
+                  placeholder="напр. 12"
+                  inputMode="numeric"
+                  aria-label="Неделя старта"
+                  style={{ width: 110 }}
+                />
               </AdField>
               <AdField label="Название (опц.)">
-                <input value={peakNameInput} onChange={(e) => setPeakNameInput(e.target.value)} placeholder="Чемпионат" aria-label="Название старта" style={{ width: 140 }} />
+                <input
+                  value={peakNameInput}
+                  onChange={(e) => setPeakNameInput(e.target.value)}
+                  placeholder="Чемпионат"
+                  aria-label="Название старта"
+                  style={{ width: 140 }}
+                />
               </AdField>
               <div>
                 <div className="ad-fl">Приоритет</div>
                 <div className="ad-chips">
-                  {[{ id: 'A', label: 'A · главный' }, { id: 'B', label: 'B · контроль' }, { id: 'C', label: 'C · тренировочный' }].map((o) => (
-                    <AdChip key={o.id} active={peakPrioInput === o.id} onClick={() => setPeakPrioInput(o.id as 'A' | 'B' | 'C')}>{o.label}</AdChip>
+                  {[
+                    { id: 'A', label: 'A · главный' },
+                    { id: 'B', label: 'B · контроль' },
+                    { id: 'C', label: 'C · тренировочный' },
+                  ].map((o) => (
+                    <AdChip
+                      key={o.id}
+                      active={peakPrioInput === o.id}
+                      onClick={() => setPeakPrioInput(o.id as 'A' | 'B' | 'C')}
+                    >
+                      {o.label}
+                    </AdChip>
                   ))}
                 </div>
               </div>
-              <AdBtn variant="dark" onClick={addPeak}>＋ Добавить старт</AdBtn>
+              <AdBtn variant="dark" onClick={addPeak}>
+                ＋ Добавить старт
+              </AdBtn>
             </div>
             {peaks.length > 0 && (
               <div className="ad-list" data-arm="peak-list">
                 {peaks.map((p) => (
                   <div key={p.week} className="ad-tip" style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                    <span>🏁 Н{p.week} · {p.priority === 'A' ? 'главный (тейпер 3 нед + восстановление)' : p.priority === 'B' ? 'контрольный (2 нед + восстановление)' : 'тренировочный (шарпенинг 85%, без восстановления)'}</span>
-                    <button type="button" className="ad-chip" data-arm="peak-remove" onClick={() => removePeak(p.week)} aria-label={`Убрать старт недели ${p.week}`}>✕</button>
+                    <span>
+                      🏁 Н{p.week} ·{' '}
+                      {p.priority === 'A'
+                        ? 'главный (тейпер 3 нед + восстановление)'
+                        : p.priority === 'B'
+                          ? 'контрольный (2 нед + восстановление)'
+                          : 'тренировочный (шарпенинг 85%, без восстановления)'}
+                    </span>
+                    <button
+                      type="button"
+                      className="ad-chip"
+                      data-arm="peak-remove"
+                      onClick={() => removePeak(p.week)}
+                      aria-label={`Убрать старт недели ${p.week}`}
+                    >
+                      ✕
+                    </button>
                   </div>
                 ))}
               </div>
             )}
-            {peaksPreview?.notes.map((n, i) => <div key={i} className="ad-tip" data-arm="peak-note">{n}</div>)}
+            {peaksPreview?.notes.map((n, i) => (
+              <div key={i} className="ad-tip" data-arm="peak-note">
+                {n}
+              </div>
+            ))}
           </AdSec>
           <AdCta>
-            <AdBtn variant="primary" block hero onClick={handleBuild}>⚡ Собрать план</AdBtn>
-            {builtPlan && <AdBtn variant="ghost" block onClick={() => setStep('plan')}>Далее: План →</AdBtn>}
-            <AdBtn variant="ghost" block onClick={()=>setStep('grip')}>← Назад</AdBtn>
-            <div className="ad-muted">Лучший сплит: <b>{best?.name || '—'}</b> ({ranked[0]?.score ?? 0} баллов) · {ranked[0]?.rationale.slice(0,2).join(' · ')}</div>
+            <AdBtn variant="primary" block hero onClick={handleBuild}>
+              ⚡ Собрать план
+            </AdBtn>
+            {builtPlan && (
+              <AdBtn variant="ghost" block onClick={() => setStep('plan')}>
+                Далее: План →
+              </AdBtn>
+            )}
+            <AdBtn variant="ghost" block onClick={() => setStep('grip')}>
+              ← Назад
+            </AdBtn>
+            <div className="ad-muted">
+              Лучший сплит: <b>{best?.name || '—'}</b> ({ranked[0]?.score ?? 0} баллов) ·{' '}
+              {ranked[0]?.rationale.slice(0, 2).join(' · ')}
+            </div>
           </AdCta>
         </AdCard>
       )}
 
       {step === 'plan' && (
         <AdCard className="ad-stepview">
-          {!builtPlan ? <AdEmpty icon="📋" title="План не собран — вернись в «Параметры»." sub="Выбери дисциплину, уровень и цель — соберём периодизацию 3/2/1 с tendon-cap и humerus-guard."><AdBtn variant="primary" block onClick={()=>setStep('params')}>🎛 К параметрам</AdBtn></AdEmpty> : (
+          {!builtPlan ? (
+            <AdEmpty
+              icon="📋"
+              title="План не собран — вернись в «Параметры»."
+              sub="Выбери дисциплину, уровень и цель — соберём периодизацию 3/2/1 с tendon-cap и humerus-guard."
+            >
+              <AdBtn variant="primary" block onClick={() => setStep('params')}>
+                🎛 К параметрам
+              </AdBtn>
+            </AdEmpty>
+          ) : (
             <>
-              <AdSec title={`📋 План — ${builtPlan.pattern.name}`} hint="Недели — сетка сверху; ниже выбранная неделя с сессиями и упражнениями.">
-              <div className="ad-row" style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginTop: 6 }}>
-                <span className="ad-tag">{DISCIPLINES.find(d => d.id === discipline)?.label || discipline}</span>
-                <span className="ad-tag">{TECHNIQUES.find(t => t.id === technique)?.label || technique}</span>
-                <span className="ad-tag">{level === 'beginner' ? 'Новичок' : level === 'intermediate' ? 'Средний' : level === 'advanced' ? 'Продвинутый' : 'На курсе'}</span>
-                <span className="ad-tag">{GOALS.find(g => g.id === goal)?.label || goal}</span>
-                {weakPoints.length > 0 && <span className="ad-tag">🎯 {weakPoints.map(m => ARM_MUSCLE_RU[m] || m).join(' + ')}</span>}
-                {cycId ? <span className="ad-tag">📚 {ARM_CYCLE_LIBRARY.find(c => c.id === cycId)?.name || cycId}</span> : null}
-              </div>
-              {planDash && (
-                <div className="ad-stats" data-arm="plan-dash">
-                  <div className="ad-stat"><div className="ad-stat-v">{planDash.weeks}</div><div className="ad-stat-l">Недель</div></div>
-                  <div className="ad-stat"><div className="ad-stat-v">{planDash.sess}</div><div className="ad-stat-l">Сессий</div><div className="ad-stat-s">{planDash.ex} упр.</div></div>
-                  <div className="ad-stat"><div className="ad-stat-v">{planDash.tablePct}%</div><div className="ad-stat-l">Стол</div></div>
-                  <div className="ad-stat"><div className="ad-stat-v">{planDash.light}</div><div className="ad-stat-l">Делод/пик</div></div>
+              <AdSec
+                title={`📋 План — ${builtPlan.pattern.name}`}
+                hint="Недели — сетка сверху; ниже выбранная неделя с сессиями и упражнениями."
+              >
+                <div className="ad-row" style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginTop: 6 }}>
+                  <span className="ad-tag">{DISCIPLINES.find((d) => d.id === discipline)?.label || discipline}</span>
+                  <span className="ad-tag">{TECHNIQUES.find((t) => t.id === technique)?.label || technique}</span>
+                  <span className="ad-tag">
+                    {level === 'beginner'
+                      ? 'Новичок'
+                      : level === 'intermediate'
+                        ? 'Средний'
+                        : level === 'advanced'
+                          ? 'Продвинутый'
+                          : 'На курсе'}
+                  </span>
+                  <span className="ad-tag">{GOALS.find((g) => g.id === goal)?.label || goal}</span>
+                  {weakPoints.length > 0 && (
+                    <span className="ad-tag">🎯 {weakPoints.map((m) => ARM_MUSCLE_RU[m] || m).join(' + ')}</span>
+                  )}
+                  {cycId ? (
+                    <span className="ad-tag">📚 {ARM_CYCLE_LIBRARY.find((c) => c.id === cycId)?.name || cycId}</span>
+                  ) : null}
                 </div>
-              )}
-              <div className="ad-strip" data-arm="week-pills">
-                {builtPlan.weeks.map((w:any)=> {
-                  const v = planDash && planDash.vol[w.week - 1] != null ? planDash.vol[w.week - 1] : 0;
-                  const h = planDash ? Math.max(8, Math.round((v / planDash.volMax) * 100)) : 8;
-                  return (
-                  <button key={w.week} className="ad-wpill" data-active={weekSel===w.week} data-phase={w.phase} onClick={()=>setWeekSel(w.week)} aria-label={`Неделя ${w.week}, сетов ${v}${w.peak ? `, старт ${w.peak.priority}` : ''}${w.block ? `, блок ${w.block}` : ''}`} title={`${w.block ? `🧱 ${w.block}` : ''}${w.peak ? ` · 🏁 старт ${w.peak.priority}` : ''}`}>
-                    <span className="ad-wpill-bar" aria-hidden><span className="ad-wpill-fill" style={{ height: `${h}%` }} /></span>
-                    <span className="ad-wpill-t" style={{ fontVariantNumeric: 'tabular-nums' }}>{w.peak ? '🏁 ' : ''}Н{w.week} · {v} {w.phase==='deload' ? '· deload' : w.phase==='peaking' ? '· пик' : ''}</span>
-                  </button>
-                  );
-                })}
-              </div>
+                {planDash && (
+                  <div className="ad-stats" data-arm="plan-dash">
+                    <div className="ad-stat">
+                      <div className="ad-stat-v">{planDash.weeks}</div>
+                      <div className="ad-stat-l">Недель</div>
+                    </div>
+                    <div className="ad-stat">
+                      <div className="ad-stat-v">{planDash.sess}</div>
+                      <div className="ad-stat-l">Сессий</div>
+                      <div className="ad-stat-s">{planDash.ex} упр.</div>
+                    </div>
+                    <div className="ad-stat">
+                      <div className="ad-stat-v">{planDash.tablePct}%</div>
+                      <div className="ad-stat-l">Стол</div>
+                    </div>
+                    <div className="ad-stat">
+                      <div className="ad-stat-v">{planDash.light}</div>
+                      <div className="ad-stat-l">Делод/пик</div>
+                    </div>
+                  </div>
+                )}
+                <div className="ad-strip" data-arm="week-pills">
+                  {builtPlan.weeks.map((w: any) => {
+                    const v = planDash && planDash.vol[w.week - 1] != null ? planDash.vol[w.week - 1] : 0;
+                    const h = planDash ? Math.max(8, Math.round((v / planDash.volMax) * 100)) : 8;
+                    return (
+                      <button
+                        key={w.week}
+                        className="ad-wpill"
+                        data-active={weekSel === w.week}
+                        data-phase={w.phase}
+                        onClick={() => setWeekSel(w.week)}
+                        aria-label={`Неделя ${w.week}, сетов ${v}${w.peak ? `, старт ${w.peak.priority}` : ''}${w.block ? `, блок ${w.block}` : ''}`}
+                        title={`${w.block ? `🧱 ${w.block}` : ''}${w.peak ? ` · 🏁 старт ${w.peak.priority}` : ''}`}
+                      >
+                        <span className="ad-wpill-bar" aria-hidden>
+                          <span className="ad-wpill-fill" style={{ height: `${h}%` }} />
+                        </span>
+                        <span className="ad-wpill-t" style={{ fontVariantNumeric: 'tabular-nums' }}>
+                          {w.peak ? '🏁 ' : ''}Н{w.week} · {v}{' '}
+                          {w.phase === 'deload' ? '· deload' : w.phase === 'peaking' ? '· пик' : ''}
+                        </span>
+                      </button>
+                    );
+                  })}
+                </div>
               </AdSec>
               {curWeek && (
-                <AdSec title={`🗓 Неделя ${curWeek.week} — ${curWeek.phase}${curWeek.deload ? ' (deload)' : ''}`} status={curWeek.deload ? 'warn' : undefined}>
-                  {curWeek.block && <div className="ad-tip" data-arm="week-block">🧱 Блок: {curWeek.block}</div>}
-                  {curWeek.peak && <div className="ad-tip" data-arm="week-peak">🏁 Старт ({curWeek.peak.priority}): {curWeek.peak.name} — тейпер-окно, объём срезан, RIR поднят.</div>}
-                  {editsCount > 0 && <div className="ad-row" style={{ display: 'flex', gap: 8, alignItems: 'center', marginBottom: 6 }}><span className="ad-tag">✏️ Правки: {editsCount} упр.</span><AdBtn variant="ghost" data-arm="edits-reset" onClick={()=>{ setArmEdits({}); setEditOpen(null); }}>Сбросить правки</AdBtn></div>}
+                <AdSec
+                  title={`🗓 Неделя ${curWeek.week} — ${curWeek.phase}${curWeek.deload ? ' (deload)' : ''}`}
+                  status={curWeek.deload ? 'warn' : undefined}
+                >
+                  {curWeek.block && (
+                    <div className="ad-tip" data-arm="week-block">
+                      🧱 Блок: {curWeek.block}
+                    </div>
+                  )}
+                  {curWeek.peak && (
+                    <div className="ad-tip" data-arm="week-peak">
+                      🏁 Старт ({curWeek.peak.priority}): {curWeek.peak.name} — тейпер-окно, объём срезан, RIR поднят.
+                    </div>
+                  )}
+                  {editsCount > 0 && (
+                    <div className="ad-row" style={{ display: 'flex', gap: 8, alignItems: 'center', marginBottom: 6 }}>
+                      <span className="ad-tag">✏️ Правки: {editsCount} упр.</span>
+                      <AdBtn
+                        variant="ghost"
+                        data-arm="edits-reset"
+                        onClick={() => {
+                          setArmEdits({});
+                          setEditOpen(null);
+                        }}
+                      >
+                        Сбросить правки
+                      </AdBtn>
+                    </div>
+                  )}
                   {curWeek.note && <div className="ad-tip">📝 {curWeek.note}</div>}
                   <div className="ad-sess-list">
-                  {curWeek.sessions.map((sess:any, si:number)=> (
-                    <div key={si} className="ad-sess" style={CHAR_EDGE[sess.character] ? { borderLeft: `4px solid ${CHAR_EDGE[sess.character]}` } : undefined}>
-                      <div className="ad-sess-h">
-                        <span className="ad-sess-num" aria-hidden>{si + 1}</span>
-                        <span className="ad-sess-tt">
-                          <span className="ad-sess-name">День {si + 1} · {sess.sessionTag}</span>
-                          <span className="ad-sess-sub">
-                            <span className="ad-tag" data-ch={sess.character}>{sess.character}</span>
-                            {sess.tableTime ? <span className="ad-tag" data-ch="table">🖐️ стол</span> : ''}
-                            <span className="ad-muted" style={{ display: 'inline' }}>{sess.exercises.length} упр.</span>
+                    {curWeek.sessions.map((sess: any, si: number) => (
+                      <div
+                        key={si}
+                        className="ad-sess"
+                        style={
+                          CHAR_EDGE[sess.character]
+                            ? { borderLeft: `4px solid ${CHAR_EDGE[sess.character]}` }
+                            : undefined
+                        }
+                      >
+                        <div className="ad-sess-h">
+                          <span className="ad-sess-num" aria-hidden>
+                            {si + 1}
                           </span>
-                        </span>
-                      </div>
-                      {sess.note && <div className="ad-muted">📝 {sess.note}</div>}
-                      {sess.exercises.map((ex:any, ei:number)=> (
-                        <div key={ei} className="ad-ex">
-                          <div className="ad-ex-top">
-                            <span className="ad-ex-nm">{ex.name} <span>· {ARM_MUSCLE_RU[ex.muscle] || ex.muscle}</span> {ex.isTable ? '🖐️' : ''} {ex.workingAngle ? `· РУ ${ex.workingAngle.elbowDeg}° ${ex.workingAngle.direction}` : ''}</span>
-                            <span className="ad-ex-vl"><b style={{ fontVariantNumeric: 'tabular-nums' }}>{ex.sets}×{ex.repsRange[0]}-{ex.repsRange[1]}</b> <span className="ad-tag" style={rirTint(ex.rir)}>RIR{ex.rir}</span>{ex.holdSeconds ? <span className="ad-tag">hold {ex.holdSeconds}с</span> : ''}{ex.workSets?.[0]?.weight > 0 ? <span className="ad-wtag">≈{ex.workSets[0].weight} кг</span> : ''}{armEdits[armEditKey(curWeek.week, si, ei)] ? <span className="ad-tag" data-arm="ex-edited">✏️</span> : ''} <button type="button" className="ad-chip" data-arm="ex-edit-toggle" aria-expanded={editOpen===armEditKey(curWeek.week, si, ei)} aria-label={`Править ${ex.name}`} onClick={()=>setEditOpen(prev=>prev===armEditKey(curWeek.week, si, ei)?null:armEditKey(curWeek.week, si, ei))} style={{ minHeight: 44, padding: '8px 12px' }}>✏️</button></span>
-                          </div>
-                          {Array.isArray(ex.warmupSets) && ex.warmupSets.length > 0 && (
-                            <div className="ad-muted" data-arm="ex-warmup" style={{ fontVariantNumeric: 'tabular-nums' }}>🔥 Разминка: {ex.warmupSets.map((w: any) => `${w.load}×${w.reps}`).join(' → ')}</div>
-                          )}
-                          {ex.comment && /RFD speed|Contest-sim|унилатерально|Table-IQ|overcrush|negatives|🔄 Замена/.test(ex.comment) && (
-                            <div className="ad-tip">💡 {ex.comment}</div>
-                          )}
-                          {ex.workSets?.[0]?.weight > 0 && ex.sets > 1 && (
-                            <div className="ad-volbar" aria-hidden><span style={{ width: `${Math.min(100, Math.round((ex.sets / 5) * 100))}%` }} /></div>
-                          )}
-                          {editOpen===armEditKey(curWeek.week, si, ei) && (()=>{
-                            const ekey = armEditKey(curWeek.week, si, ei);
-                            const cur = armEdits[ekey] || {};
-                            const cands = swapCandidatesFor(ex);
-                            const setEd = (patch: Partial<ArmExerciseEdit>) => setArmEdits(prev=>({ ...prev, [ekey]: { ...cur, ...patch } }));
-                            return (
-                            <div data-arm="ex-editor" style={{ display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'flex-end', marginTop: 6, padding: '8px 10px', borderRadius: 10, background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.08)' }}>
-                              <AdField label="Сеты">
-                                <input type="number" aria-label={`Сеты ${ex.name}`} min={0} max={20} value={cur.sets ?? ex.sets} onChange={e=>{ const v = parseInt(e.target.value); setEd({ sets: Number.isFinite(v) ? Math.max(0, Math.min(20, v)) : ex.sets }); }} style={{ width: 64 }} />
-                              </AdField>
-                              <AdField label="Повт">
-                                <input type="number" aria-label={`Повторы ${ex.name}`} min={1} max={30} value={cur.reps ?? ex.repsRange[0]} onChange={e=>{ const v = parseInt(e.target.value); if (Number.isFinite(v)) setEd({ reps: Math.max(1, Math.min(30, v)) }); }} style={{ width: 64 }} />
-                              </AdField>
-                              <AdField label="Вес, кг">
-                                <input type="number" aria-label={`Вес ${ex.name}`} min={0} max={500} inputMode="decimal" value={cur.weight ?? ex.workSets?.[0]?.weight ?? 0} onChange={e=>{ const v = parseFloat(e.target.value); if (Number.isFinite(v)) setEd({ weight: Math.max(0, v) }); }} style={{ width: 76 }} />
-                              </AdField>
-                              {cands.length > 0 && (
-                              <AdField label="Замена (та же группа)">
-                                <select aria-label={`Замена для ${ex.name}`} value={cur.swapId ?? ''} onChange={e=>setEd({ swapId: e.target.value || undefined })} style={{ maxWidth: 220 }}>
-                                  <option value="">— как в плане —</option>
-                                  {cands.map(c=><option key={c.id} value={c.id}>{c.name}</option>)}
-                                </select>
-                              </AdField>
+                          <span className="ad-sess-tt">
+                            <span className="ad-sess-name">
+                              День {si + 1} · {sess.sessionTag}
+                            </span>
+                            <span className="ad-sess-sub">
+                              <span className="ad-tag" data-ch={sess.character}>
+                                {sess.character}
+                              </span>
+                              {sess.tableTime ? (
+                                <span className="ad-tag" data-ch="table">
+                                  🖐️ стол
+                                </span>
+                              ) : (
+                                ''
                               )}
-                              <button type="button" className="ad-chip" aria-label={`Сбросить правку ${ex.name}`} onClick={()=>setArmEdits(prev=>{ const n={...prev}; delete n[ekey]; return n; })} style={{ minHeight: 44, padding: '8px 12px' }}>↩</button>
-                            </div>
-                            );
-                          })()}
+                              <span className="ad-muted" style={{ display: 'inline' }}>
+                                {sess.exercises.length} упр.
+                              </span>
+                            </span>
+                          </span>
                         </div>
-                      ))}
-                    </div>
-                  ))}
+                        {sess.note && <div className="ad-muted">📝 {sess.note}</div>}
+                        {sess.exercises.map((ex: any, ei: number) => (
+                          <div key={ei} className="ad-ex">
+                            <div className="ad-ex-top">
+                              <span className="ad-ex-nm">
+                                {ex.name} <span>· {ARM_MUSCLE_RU[ex.muscle] || ex.muscle}</span>{' '}
+                                {ex.isTable ? '🖐️' : ''}{' '}
+                                {ex.workingAngle
+                                  ? `· РУ ${ex.workingAngle.elbowDeg}° ${ex.workingAngle.direction}`
+                                  : ''}
+                              </span>
+                              <span className="ad-ex-vl">
+                                <b style={{ fontVariantNumeric: 'tabular-nums' }}>
+                                  {ex.sets}×{ex.repsRange[0]}-{ex.repsRange[1]}
+                                </b>{' '}
+                                <span className="ad-tag" style={rirTint(ex.rir)}>
+                                  RIR{ex.rir}
+                                </span>
+                                {ex.holdSeconds ? <span className="ad-tag">hold {ex.holdSeconds}с</span> : ''}
+                                {ex.workSets?.[0]?.weight > 0 ? (
+                                  <span className="ad-wtag">≈{ex.workSets[0].weight} кг</span>
+                                ) : (
+                                  ''
+                                )}
+                                {armEdits[armEditKey(curWeek.week, si, ei)] ? (
+                                  <span className="ad-tag" data-arm="ex-edited">
+                                    ✏️
+                                  </span>
+                                ) : (
+                                  ''
+                                )}{' '}
+                                <button
+                                  type="button"
+                                  className="ad-chip"
+                                  data-arm="ex-edit-toggle"
+                                  aria-expanded={editOpen === armEditKey(curWeek.week, si, ei)}
+                                  aria-label={`Править ${ex.name}`}
+                                  onClick={() =>
+                                    setEditOpen((prev) =>
+                                      prev === armEditKey(curWeek.week, si, ei)
+                                        ? null
+                                        : armEditKey(curWeek.week, si, ei),
+                                    )
+                                  }
+                                  style={{ minHeight: 44, padding: '8px 12px' }}
+                                >
+                                  ✏️
+                                </button>
+                              </span>
+                            </div>
+                            {Array.isArray(ex.warmupSets) && ex.warmupSets.length > 0 && (
+                              <div
+                                className="ad-muted"
+                                data-arm="ex-warmup"
+                                style={{ fontVariantNumeric: 'tabular-nums' }}
+                              >
+                                🔥 Разминка: {ex.warmupSets.map((w: any) => `${w.load}×${w.reps}`).join(' → ')}
+                              </div>
+                            )}
+                            {ex.comment &&
+                              /RFD speed|Contest-sim|унилатерально|Table-IQ|overcrush|negatives|🔄 Замена/.test(
+                                ex.comment,
+                              ) && <div className="ad-tip">💡 {ex.comment}</div>}
+                            {ex.workSets?.[0]?.weight > 0 && ex.sets > 1 && (
+                              <div className="ad-volbar" aria-hidden>
+                                <span style={{ width: `${Math.min(100, Math.round((ex.sets / 5) * 100))}%` }} />
+                              </div>
+                            )}
+                            {editOpen === armEditKey(curWeek.week, si, ei) &&
+                              (() => {
+                                const ekey = armEditKey(curWeek.week, si, ei);
+                                const cur = armEdits[ekey] || {};
+                                const cands = swapCandidatesFor(ex);
+                                const setEd = (patch: Partial<ArmExerciseEdit>) =>
+                                  setArmEdits((prev) => ({ ...prev, [ekey]: { ...cur, ...patch } }));
+                                return (
+                                  <div
+                                    data-arm="ex-editor"
+                                    style={{
+                                      display: 'flex',
+                                      gap: 8,
+                                      flexWrap: 'wrap',
+                                      alignItems: 'flex-end',
+                                      marginTop: 6,
+                                      padding: '8px 10px',
+                                      borderRadius: 10,
+                                      background: 'rgba(255,255,255,0.03)',
+                                      border: '1px solid rgba(255,255,255,0.08)',
+                                    }}
+                                  >
+                                    <AdField label="Сеты">
+                                      <input
+                                        type="number"
+                                        aria-label={`Сеты ${ex.name}`}
+                                        min={1}
+                                        max={20}
+                                        value={cur.sets ?? ex.sets}
+                                        onChange={(e) => {
+                                          const v = parseInt(e.target.value, 10);
+                                          // P2-14: 0 UI не разрешает — движок всё равно
+                                          // нормализует его в 1, «показано ≠ применено».
+                                          setEd({
+                                            sets: Number.isFinite(v) ? Math.max(1, Math.min(20, v)) : ex.sets,
+                                          });
+                                        }}
+                                        style={{ width: 64 }}
+                                      />
+                                    </AdField>
+                                    <AdField label="Повт">
+                                      <input
+                                        type="number"
+                                        aria-label={`Повторы ${ex.name}`}
+                                        min={1}
+                                        max={30}
+                                        value={cur.reps ?? ex.repsRange[0]}
+                                        onChange={(e) => {
+                                          const v = parseInt(e.target.value);
+                                          if (Number.isFinite(v)) setEd({ reps: Math.max(1, Math.min(30, v)) });
+                                        }}
+                                        style={{ width: 64 }}
+                                      />
+                                    </AdField>
+                                    <AdField label="Вес, кг">
+                                      <input
+                                        type="number"
+                                        aria-label={`Вес ${ex.name}`}
+                                        min={0}
+                                        max={500}
+                                        inputMode="decimal"
+                                        value={cur.weight ?? ex.workSets?.[0]?.weight ?? 0}
+                                        onChange={(e) => {
+                                          const v = parseFloat(e.target.value);
+                                          if (Number.isFinite(v)) setEd({ weight: Math.max(0, v) });
+                                        }}
+                                        style={{ width: 76 }}
+                                      />
+                                    </AdField>
+                                    {cands.length > 0 && (
+                                      <AdField label="Замена (та же группа)">
+                                        <select
+                                          aria-label={`Замена для ${ex.name}`}
+                                          value={cur.swapId ?? ''}
+                                          onChange={(e) => setEd({ swapId: e.target.value || undefined })}
+                                          style={{ maxWidth: 220 }}
+                                        >
+                                          <option value="">— как в плане —</option>
+                                          {cands.map((c) => (
+                                            <option key={c.id} value={c.id}>
+                                              {c.name}
+                                            </option>
+                                          ))}
+                                        </select>
+                                      </AdField>
+                                    )}
+                                    <button
+                                      type="button"
+                                      className="ad-chip"
+                                      aria-label={`Сбросить правку ${ex.name}`}
+                                      onClick={() =>
+                                        setArmEdits((prev) => {
+                                          const n = { ...prev };
+                                          delete n[ekey];
+                                          return n;
+                                        })
+                                      }
+                                      style={{ minHeight: 44, padding: '8px 12px' }}
+                                    >
+                                      ↩
+                                    </button>
+                                  </div>
+                                );
+                              })()}
+                          </div>
+                        ))}
+                      </div>
+                    ))}
                   </div>
                 </AdSec>
               )}
               <AdCta>
-                <AdBtn variant="primary" block hero onClick={() => setStep('quality')}>Далее: Проверка →</AdBtn>
-                <AdBtn variant="ghost" block onClick={() => setStep('split')}>← Назад</AdBtn>
+                <AdBtn variant="primary" block hero onClick={() => setStep('quality')}>
+                  Далее: Проверка →
+                </AdBtn>
+                <AdBtn variant="ghost" block onClick={() => setStep('split')}>
+                  ← Назад
+                </AdBtn>
               </AdCta>
             </>
           )}
@@ -2572,263 +4724,572 @@ const GRIP_GROUPS: Array<{ title: string; ids: ArmImplement[] }> = [
 
       {step === 'quality' && !builtPlan && (
         <AdCard className="ad-stepview">
-          <AdEmpty icon="🏋️" title="План не собран — вернись в «Сплит и цикл»." sub="Собери план — здесь появятся гейты качества, тепловая карта и веса."><AdBtn variant="primary" block onClick={() => setStep('split')}>📚 К сплиту</AdBtn></AdEmpty>
+          <AdEmpty
+            icon="🏋️"
+            title="План не собран — вернись в «Сплит и цикл»."
+            sub="Собери план — здесь появятся гейты качества, тепловая карта и веса."
+          >
+            <AdBtn variant="primary" block onClick={() => setStep('split')}>
+              📚 К сплиту
+            </AdBtn>
+          </AdEmpty>
         </AdCard>
       )}
       {step === 'quality' && builtPlan && (
         <AdCard data-arm="quality-card" className="ad-stepview">
-            <>
-              <AdSec title="📊 Качество">
-                <div className="ad-muted"><b>{viewPlan.report?.summary}</b></div>
-                <div className="ad-stats">
-                  <div className="ad-stat">
-                    <div className="ad-stat-v">Фазы</div>
-                    <div className="ad-stat-s">{viewPlan.report?.phaseRationale.join(' · ')}</div>
-                  </div>
-                  <div className="ad-stat">
-                    <div className="ad-stat-v">Объём</div>
-                    <div className="ad-stat-s">{viewPlan.report?.volumeSummary.join(' · ')}</div>
-                  </div>
-                </div>
-                {viewPlan.validation && (
-                  <div className="ad-list" data-arm="gates">
-                    {viewPlan.validation.errors.length>0 && (
-                      <div className="ad-sec ad-bio" data-valid="bad" data-arm="gate-errors">
-                        <div className="ad-sec-t">❌ Ошибки ({viewPlan.validation.errors.length})</div>
-                        {viewPlan.validation.errors.map((e: string, i: number) => <div key={i} className="ad-finding" data-level="critical">{e}</div>)}
-                      </div>
-                    )}
-                    {(viewPlan.validation.blocked || []).length>0 && (
-                      <div className="ad-sec ad-bio" data-valid="bad" data-arm="gates-blocked">
-                        <div className="ad-sec-t">⛔ Блоки safety ({(viewPlan.validation.blocked || []).length})</div>
-                        {(viewPlan.validation.blocked || []).map((b: string, i: number) => <div key={i} className="ad-finding" data-level="critical">{b}</div>)}
-                      </div>
-                    )}
-                    {(() => {
-                      const groups = groupWarnings(viewPlan.validation.warnings || []);
-                      const cards: React.ReactNode[] = [];
-                      for (const k of GUARD_KEYS) {
-                        const list = groups[k];
-                        cards.push(
-                          <div key={k} className="ad-sec ad-bio" data-valid={list.length ? 'warn' : 'ok'} data-arm={`gate-${k}`}>
-                            <div className="ad-sec-t">{GATE_META[k].title} {list.length ? `· ${list.length}` : '· ✓ чисто'}</div>
-                            {list.slice(0, 5).map((w: string, i: number) => <div key={i} className="ad-finding" data-level="warn">{w}</div>)}
-                            {list.length > 5 && <div className="ad-muted">+{list.length - 5} ещё</div>}
-                          </div>
-                        );
-                      }
-                      for (const k of EXTRA_KEYS) {
-                        const list = groups[k];
-                        if (!list.length) continue;
-                        cards.push(
-                          <div key={k} className="ad-sec ad-bio" data-valid="na" data-arm={`gate-${k}`}>
-                            <div className="ad-sec-t">{GATE_META[k].title} · {list.length}</div>
-                            {list.slice(0, 5).map((w: string, i: number) => <div key={i} className="ad-finding" data-level={k === 'other' ? 'ok' : 'warn'}>{w}</div>)}
-                            {list.length > 5 && <div className="ad-muted">+{list.length - 5} ещё</div>}
-                          </div>
-                        );
-                      }
-                      return cards;
-                    })()}
-                     {viewPlan.validation.status === 'ok' && <AdBanner tone="ok">✓ Валидация пройдена (MRV, humerus, UCL, shoulder, tendon).</AdBanner>}
-                     {viewPlan.validation.status === 'warning' && <AdBanner tone="warn">⚠ Есть предупреждения: план можно экспортировать после проверки.</AdBanner>}
-                     {viewPlan.validation.status === 'blocked' && <AdBanner tone="bad" hook="quality-blocked">⛔ Safety-блокер: исправьте ограничения до экспорта.</AdBanner>}
-
-                  </div>
-                )}
-                <div data-arm="report-lines">
-                  {viewPlan.report?.techniqueRationale.map((r:string,i:number)=><div key={i} className="ad-finding" data-level="info">{r}</div>)}
-                  {viewPlan.report?.gripRationale.map((r:string,i:number)=><div key={i} className="ad-finding" data-level="info">{r}</div>)}
-                </div>
-              </AdSec>
-              <div>
-                <ArmHeatmap plan={viewPlan} onToast={flash} />
+          <>
+            <AdSec title="📊 Качество">
+              <div className="ad-muted">
+                <b>{viewPlan.report?.summary}</b>
               </div>
-              <ArmRulebookPanel discipline={discipline} sex={profileSnapshot.sex} />
-              <div data-arm="pro7-card">
+              <div className="ad-stats">
+                <div className="ad-stat">
+                  <div className="ad-stat-v">Фазы</div>
+                  <div className="ad-stat-s">{viewPlan.report?.phaseRationale.join(' · ')}</div>
+                </div>
+                <div className="ad-stat">
+                  <div className="ad-stat-v">Объём</div>
+                  <div className="ad-stat-s">{viewPlan.report?.volumeSummary.join(' · ')}</div>
+                </div>
+              </div>
+              {viewPlan.validation && (
+                <div className="ad-list" data-arm="gates">
+                  {viewPlan.validation.errors.length > 0 && (
+                    <div className="ad-sec ad-bio" data-valid="bad" data-arm="gate-errors">
+                      <div className="ad-sec-t">❌ Ошибки ({viewPlan.validation.errors.length})</div>
+                      {viewPlan.validation.errors.map((e: string, i: number) => (
+                        <div key={i} className="ad-finding" data-level="critical">
+                          {e}
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                  {(viewPlan.validation.blocked || []).length > 0 && (
+                    <div className="ad-sec ad-bio" data-valid="bad" data-arm="gates-blocked">
+                      <div className="ad-sec-t">⛔ Блоки safety ({(viewPlan.validation.blocked || []).length})</div>
+                      {(viewPlan.validation.blocked || []).map((b: string, i: number) => (
+                        <div key={i} className="ad-finding" data-level="critical">
+                          {b}
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                  {(() => {
+                    const groups = groupWarnings(viewPlan.validation.warnings || []);
+                    const cards: React.ReactNode[] = [];
+                    for (const k of GUARD_KEYS) {
+                      const list = groups[k];
+                      cards.push(
+                        <div
+                          key={k}
+                          className="ad-sec ad-bio"
+                          data-valid={list.length ? 'warn' : 'ok'}
+                          data-arm={`gate-${k}`}
+                        >
+                          <div className="ad-sec-t">
+                            {GATE_META[k].title} {list.length ? `· ${list.length}` : '· ✓ чисто'}
+                          </div>
+                          {list.slice(0, 5).map((w: string, i: number) => (
+                            <div key={i} className="ad-finding" data-level="warn">
+                              {w}
+                            </div>
+                          ))}
+                          {list.length > 5 && <div className="ad-muted">+{list.length - 5} ещё</div>}
+                        </div>,
+                      );
+                    }
+                    for (const k of EXTRA_KEYS) {
+                      const list = groups[k];
+                      if (!list.length) continue;
+                      cards.push(
+                        <div key={k} className="ad-sec ad-bio" data-valid="na" data-arm={`gate-${k}`}>
+                          <div className="ad-sec-t">
+                            {GATE_META[k].title} · {list.length}
+                          </div>
+                          {list.slice(0, 5).map((w: string, i: number) => (
+                            <div key={i} className="ad-finding" data-level={k === 'other' ? 'ok' : 'warn'}>
+                              {w}
+                            </div>
+                          ))}
+                          {list.length > 5 && <div className="ad-muted">+{list.length - 5} ещё</div>}
+                        </div>,
+                      );
+                    }
+                    return cards;
+                  })()}
+                  {viewPlan.validation.status === 'ok' && (
+                    <AdBanner tone="ok">✓ Валидация пройдена (MRV, humerus, UCL, shoulder, tendon).</AdBanner>
+                  )}
+                  {viewPlan.validation.status === 'warning' && (
+                    <AdBanner tone="warn">⚠ Есть предупреждения: план можно экспортировать после проверки.</AdBanner>
+                  )}
+                  {viewPlan.validation.status === 'blocked' && (
+                    <AdBanner tone="bad" hook="quality-blocked">
+                      ⛔ Safety-блокер: исправьте ограничения до экспорта.
+                    </AdBanner>
+                  )}
+                </div>
+              )}
+              <div data-arm="report-lines">
+                {viewPlan.report?.techniqueRationale.map((r: string, i: number) => (
+                  <div key={i} className="ad-finding" data-level="info">
+                    {r}
+                  </div>
+                ))}
+                {viewPlan.report?.gripRationale.map((r: string, i: number) => (
+                  <div key={i} className="ad-finding" data-level="info">
+                    {r}
+                  </div>
+                ))}
+              </div>
+            </AdSec>
+            <div>
+              <ArmHeatmap plan={viewPlan} onToast={flash} />
+            </div>
+            <ArmRulebookPanel discipline={discipline} sex={profileSnapshot.sex} />
+            <div data-arm="pro7-card">
               <AdSec title="🩺 Готовность к нагрузке (ACWR, боль, возвращение)" hook="pro7">
                 <AdGrid cols="2">
                   <AdField label="Боль локоть, 0–10">
-                    <input value={proPain} onChange={e=>setProPain(e.target.value)} inputMode="numeric" placeholder="0" aria-label="Боль локоть" />
+                    <input
+                      value={proPain}
+                      onChange={(e) => setProPain(e.target.value)}
+                      inputMode="numeric"
+                      placeholder="0"
+                      aria-label="Боль локоть"
+                    />
                   </AdField>
                   <AdField label="Безболевых дней">
-                    <input value={proClearDays} onChange={e=>setProClearDays(e.target.value)} inputMode="numeric" placeholder="0" aria-label="Безболевых дней" />
+                    <input
+                      value={proClearDays}
+                      onChange={(e) => setProClearDays(e.target.value)}
+                      inputMode="numeric"
+                      placeholder="0"
+                      aria-label="Безболевых дней"
+                    />
                   </AdField>
                 </AdGrid>
-                <div className="ad-muted" data-arm="pro7-srpe">sRPE последней сессии берётся из дневника тренировок: {proSrpe || '—'}.</div>
+                <div className="ad-muted" data-arm="pro7-srpe">
+                  sRPE последней сессии берётся из дневника тренировок: {proSrpe || '—'}.
+                </div>
                 <div className="ad-list" data-arm="pro7-signals">
                   {pro7Acwr && (
-                    <div className="ad-finding" data-level={pro7Acwr.zone === 'dangerous' ? 'bad' : pro7Acwr.zone === 'caution' ? 'warn' : 'ok'} style={{ fontVariantNumeric: 'tabular-nums' }}>
+                    <div
+                      className="ad-finding"
+                      data-level={pro7Acwr.zone === 'dangerous' ? 'bad' : pro7Acwr.zone === 'caution' ? 'warn' : 'ok'}
+                      style={{ fontVariantNumeric: 'tabular-nums' }}
+                    >
                       ACWR {pro7Acwr.value.toFixed(2)} — {pro7Acwr.zone} · {pro7Acwr.method}
                     </div>
                   )}
                   {pro7Readiness && pro7Readiness.status !== 'unknown' && (
-                    <div className="ad-finding" data-level={pro7Readiness.status === 'red' ? 'bad' : pro7Readiness.status === 'yellow' ? 'warn' : 'ok'}>
-                      Готовность: {pro7Readiness.status === 'red' ? 'красная' : pro7Readiness.status === 'yellow' ? 'жёлтая' : 'зелёная'} · действие: {pro7Readiness.action === 'hold' ? 'стоп' : pro7Readiness.action === 'modify' ? 'снизить нагрузку' : 'продолжать'}
+                    <div
+                      className="ad-finding"
+                      data-level={
+                        pro7Readiness.status === 'red' ? 'bad' : pro7Readiness.status === 'yellow' ? 'warn' : 'ok'
+                      }
+                    >
+                      Готовность:{' '}
+                      {pro7Readiness.status === 'red'
+                        ? 'красная'
+                        : pro7Readiness.status === 'yellow'
+                          ? 'жёлтая'
+                          : 'зелёная'}{' '}
+                      · действие:{' '}
+                      {pro7Readiness.action === 'hold'
+                        ? 'стоп'
+                        : pro7Readiness.action === 'modify'
+                          ? 'снизить нагрузку'
+                          : 'продолжать'}
                       {pro7Readiness.reasons.length ? ` · ${pro7Readiness.reasons.slice(0, 2).join('; ')}` : ''}
                     </div>
                   )}
                   {pro7Return && (
-                    <div className="ad-finding" data-level={!pro7Return.allowed ? 'bad' : pro7Return.phase === 'hold' || pro7Return.phase === 'isometric' ? 'warn' : 'ok'}>
-                      Возврат к нагрузке: фаза «{pro7Return.phase}» · {pro7Return.allowed ? `можно до ${pro7Return.maxLoadPct}%` : `стоп — нагрузка не разрешена, до ${pro7Return.maxLoadPct}%`} · RIR ≥ {pro7Return.minRir} · {pro7Return.recommendation}
+                    <div
+                      className="ad-finding"
+                      data-level={
+                        !pro7Return.allowed
+                          ? 'bad'
+                          : pro7Return.phase === 'hold' || pro7Return.phase === 'isometric'
+                            ? 'warn'
+                            : 'ok'
+                      }
+                    >
+                      Возврат к нагрузке: фаза «{pro7Return.phase}» ·{' '}
+                      {pro7Return.allowed
+                        ? `можно до ${pro7Return.maxLoadPct}%`
+                        : `стоп — нагрузка не разрешена, до ${pro7Return.maxLoadPct}%`}{' '}
+                      · RIR ≥ {pro7Return.minRir} · {pro7Return.recommendation}
                     </div>
                   )}
-                  {!pro7Acwr && <div className="ad-muted">sRPE-сессий в дневнике нет — ACWR не считается (метод из дневника тренировок, не из замеров помоста).</div>}
+                  {!pro7Acwr && (
+                    <div className="ad-muted">
+                      sRPE-сессий в дневнике нет — ACWR не считается (метод из дневника тренировок, не из замеров
+                      помоста).
+                    </div>
+                  )}
                 </div>
                 <AdBanner tone="info">
-                  ACWR danger из дневника <b>автоматически</b> делает первую неделю разгрузочной при сборке; остальные сигналы — рекомендация: объём/веса меняйте на шаге «План».
+                  ACWR danger из дневника <b>автоматически</b> делает первую неделю разгрузочной при сборке; остальные
+                  сигналы — рекомендация: объём/веса меняйте на шаге «План».
                 </AdBanner>
               </AdSec>
-              </div>
-              {/* P1-10: недельный чек-ин (вес/сон/энергия/боль) — тренд + разгрузка при боли. */}
-              <div data-arm="checkin-card">
-              <AdSec title="🗓 Чек-ин недели" hook="checkin" collapsible defaultOpen={false}
-                summary={checkins.length ? `записей: ${checkins.length} · боль ${checkinTrend?.painAvgLast2 ?? '—'}/10` : 'нет записей'}
-                status={checkinTrend?.painWarn ? 'warn' : undefined}>
+            </div>
+            {/* P1-10: недельный чек-ин (вес/сон/энергия/боль) — тренд + разгрузка при боли. */}
+            <div data-arm="checkin-card">
+              <AdSec
+                title="🗓 Чек-ин недели"
+                hook="checkin"
+                collapsible
+                defaultOpen={false}
+                summary={
+                  checkins.length
+                    ? `записей: ${checkins.length} · боль ${checkinTrend?.painAvgLast2 ?? '—'}/10`
+                    : 'нет записей'
+                }
+                status={checkinTrend?.painWarn ? 'warn' : undefined}
+              >
                 <AdGrid cols="2">
-                  <AdField label="Вес, кг"><input inputMode="decimal" value={ciWeight} onChange={(e) => setCiWeight(e.target.value)} aria-label="Чек-ин вес" placeholder="—" /></AdField>
-                  <AdField label="Сон, ч"><input inputMode="decimal" value={ciSleep} onChange={(e) => setCiSleep(e.target.value)} aria-label="Чек-ин сон" placeholder="—" /></AdField>
-                  <AdField label="Энергия 0–10"><input inputMode="numeric" value={ciEnergy} onChange={(e) => setCiEnergy(e.target.value)} aria-label="Чек-ин энергия" placeholder="—" /></AdField>
-                  <AdField label="Боль локтя 0–10"><input inputMode="numeric" value={ciPain} onChange={(e) => setCiPain(e.target.value)} aria-label="Чек-ин боль" placeholder="—" /></AdField>
+                  <AdField label="Вес, кг">
+                    <input
+                      inputMode="decimal"
+                      value={ciWeight}
+                      onChange={(e) => setCiWeight(e.target.value)}
+                      aria-label="Чек-ин вес"
+                      placeholder="—"
+                    />
+                  </AdField>
+                  <AdField label="Сон, ч">
+                    <input
+                      inputMode="decimal"
+                      value={ciSleep}
+                      onChange={(e) => setCiSleep(e.target.value)}
+                      aria-label="Чек-ин сон"
+                      placeholder="—"
+                    />
+                  </AdField>
+                  <AdField label="Энергия 0–10">
+                    <input
+                      inputMode="numeric"
+                      value={ciEnergy}
+                      onChange={(e) => setCiEnergy(e.target.value)}
+                      aria-label="Чек-ин энергия"
+                      placeholder="—"
+                    />
+                  </AdField>
+                  <AdField label="Боль локтя 0–10">
+                    <input
+                      inputMode="numeric"
+                      value={ciPain}
+                      onChange={(e) => setCiPain(e.target.value)}
+                      aria-label="Чек-ин боль"
+                      placeholder="—"
+                    />
+                  </AdField>
                 </AdGrid>
-                <AdBtn variant="primary" block data-arm="checkin-save" onClick={() => {
-                  const w = Math.max(1, Math.min(weeks, checkinWeek));
-                  const entry: ArmWeeklyCheckin = {
-                    id: `armci-${Date.now()}`,
-                    week: w,
-                    dateIso: localIsoDate(),
-                    ...(parseFloat(ciWeight) > 0 ? { weightKg: parseFloat(ciWeight) } : {}),
-                    ...(parseFloat(ciSleep) > 0 ? { sleepHours: parseFloat(ciSleep) } : {}),
-                    ...(ciEnergy !== '' && parseFloat(ciEnergy) >= 0 ? { energy010: parseFloat(ciEnergy) } : {}),
-                    ...(ciPain !== '' && parseFloat(ciPain) >= 0 ? { elbowPain010: parseFloat(ciPain) } : {}),
-                  };
-                  const next = saveArmCheckin(entry);
-                  setCheckins(next);
-                  setCiSleep(''); setCiEnergy(''); setCiPain('');
-                  flash(`🗓 Чек-ин недели ${w} сохранён`);
-                }}>💾 Сохранить чек-ин недели {checkinWeek}</AdBtn>
+                <AdBtn
+                  variant="primary"
+                  block
+                  data-arm="checkin-save"
+                  onClick={() => {
+                    const w = Math.max(1, Math.min(weeks, checkinWeek));
+                    const entry: ArmWeeklyCheckin = {
+                      id: `armci-${Date.now()}`,
+                      week: w,
+                      dateIso: localIsoDate(),
+                      ...(parseFloat(ciWeight) > 0 ? { weightKg: parseFloat(ciWeight) } : {}),
+                      ...(parseFloat(ciSleep) > 0 ? { sleepHours: parseFloat(ciSleep) } : {}),
+                      ...(ciEnergy !== '' && parseFloat(ciEnergy) >= 0 ? { energy010: parseFloat(ciEnergy) } : {}),
+                      ...(ciPain !== '' && parseFloat(ciPain) >= 0 ? { elbowPain010: parseFloat(ciPain) } : {}),
+                    };
+                    const next = saveArmCheckin(entry);
+                    setCheckins(next);
+                    setCiSleep('');
+                    setCiEnergy('');
+                    setCiPain('');
+                    flash(`🗓 Чек-ин недели ${w} сохранён`);
+                  }}
+                >
+                  💾 Сохранить чек-ин недели {checkinWeek}
+                </AdBtn>
                 {checkinTrend && checkins.length > 0 && (
                   <>
-                    <div className="ad-tip" data-arm="checkin-trend">{checkinTrend.notes.join(' ')}</div>
+                    <div className="ad-tip" data-arm="checkin-trend">
+                      {checkinTrend.notes.join(' ')}
+                    </div>
                     <div className="ad-list" data-arm="checkin-rows">
                       {checkins.slice(0, 4).map((c) => (
-                        <div key={c.id} className="ad-finding" data-level={Number(c.elbowPain010) >= 4 ? 'warn' : 'ok'} style={{ fontVariantNumeric: 'tabular-nums' }}>
-                          Н{c.week} · {c.dateIso} · {c.weightKg ? `${c.weightKg} кг` : '—'} · сон {c.sleepHours ?? '—'} · энергия {c.energy010 ?? '—'} · боль {c.elbowPain010 ?? '—'}
-                          <button type="button" className="ad-chip" data-arm="checkin-remove" aria-label={`Убрать чек-ин недели ${c.week}`} onClick={() => setCheckins(removeArmCheckin(c.id))}>✕</button>
+                        <div
+                          key={c.id}
+                          className="ad-finding"
+                          data-level={Number(c.elbowPain010) >= 4 ? 'warn' : 'ok'}
+                          style={{ fontVariantNumeric: 'tabular-nums' }}
+                        >
+                          Н{c.week} · {c.dateIso} · {c.weightKg ? `${c.weightKg} кг` : '—'} · сон {c.sleepHours ?? '—'}{' '}
+                          · энергия {c.energy010 ?? '—'} · боль {c.elbowPain010 ?? '—'}
+                          <button
+                            type="button"
+                            className="ad-chip"
+                            data-arm="checkin-remove"
+                            aria-label={`Убрать чек-ин недели ${c.week}`}
+                            onClick={() => setCheckins(removeArmCheckin(c.id))}
+                          >
+                            ✕
+                          </button>
                         </div>
                       ))}
                     </div>
                   </>
                 )}
-                {checkins.length === 0 && <div className="ad-muted">Самооценка недели: вес, сон, энергия, боль локтя. Боль ≥4 две недели → первая неделя следующего плана разгрузочная.</div>}
+                {checkins.length === 0 && (
+                  <div className="ad-muted">
+                    Самооценка недели: вес, сон, энергия, боль локтя. Боль ≥4 две недели → первая неделя следующего
+                    плана разгрузочная.
+                  </div>
+                )}
               </AdSec>
-              </div>
-              {/* P0-1: контур «план ↔ факт» — e1RM по дневнику + выполнение по неделям. */}
-              <div data-arm="plan-fact-card">
-              <AdSec title="📈 План vs факт (дневник)" hook="plan-fact" collapsible defaultOpen={false}
-                summary={factFeedback?.muscles?.length ? `мышц с фактом: ${factFeedback.muscles.filter((f) => f.status !== 'no_data').length}/${factFeedback.muscles.length}` : 'нет записей'}
-                status={factFeedback?.stalled?.length ? 'warn' : undefined}>
+            </div>
+            {/* P0-1: контур «план ↔ факт» — e1RM по дневнику + выполнение по неделям. */}
+            <div data-arm="plan-fact-card">
+              <AdSec
+                title="📈 План vs факт (дневник)"
+                hook="plan-fact"
+                collapsible
+                defaultOpen={false}
+                summary={
+                  factFeedback?.muscles?.length
+                    ? `мышц с фактом: ${factFeedback.muscles.filter((f) => f.status !== 'no_data').length}/${factFeedback.muscles.length}`
+                    : 'нет записей'
+                }
+                status={factFeedback?.stalled?.length ? 'warn' : undefined}
+              >
                 {factFeedback && factFeedback.muscles.length > 0 ? (
                   <>
-                    <div className="ad-tip" data-arm="fact-summary">{factFeedback.summary}</div>
+                    <div className="ad-tip" data-arm="fact-summary">
+                      {factFeedback.summary}
+                    </div>
                     <div className="ad-list" data-arm="fact-rows">
                       {factFeedback.muscles.slice(0, 8).map((f) => (
-                        <div key={f.muscle} className="ad-finding" data-level={f.status === 'stalled' ? 'bad' : f.status === 'beat' ? 'ok' : 'warn'} style={{ fontVariantNumeric: 'tabular-nums' }}>
-                          {ARM_MUSCLE_RU[f.muscle] || f.muscle}: план {f.plannedE1rmKg} → факт {f.factE1rmKg} e1RM (Δ {f.deltaPct >= 0 ? '+' : ''}{f.deltaPct}%) · {f.action === 'increase' ? 'ставка мезо' : f.action === 'hold' ? 'держим' : f.action === 'back_off' ? '−2% и проверка' : 'нет данных'}
+                        <div
+                          key={f.muscle}
+                          className="ad-finding"
+                          data-level={f.status === 'stalled' ? 'bad' : f.status === 'beat' ? 'ok' : 'warn'}
+                          style={{ fontVariantNumeric: 'tabular-nums' }}
+                        >
+                          {ARM_MUSCLE_RU[f.muscle] || f.muscle}: план {f.plannedE1rmKg} → факт {f.factE1rmKg} e1RM (Δ{' '}
+                          {f.deltaPct >= 0 ? '+' : ''}
+                          {f.deltaPct}%) ·{' '}
+                          {f.action === 'increase'
+                            ? 'ставка мезо'
+                            : f.action === 'hold'
+                              ? 'держим'
+                              : f.action === 'back_off'
+                                ? '−2% и проверка'
+                                : 'нет данных'}
                         </div>
                       ))}
                     </div>
                     {compliance && (
                       <div className="ad-strip" data-arm="compliance" aria-label="Выполнение по неделям">
                         {compliance.weeks.map((w) => (
-                          <span key={w.week} className="ad-ph" data-phase={w.status === 'done' ? 'accumulation' : w.status === 'partial' ? 'intensification' : w.status === 'missed' ? 'peaking' : 'deload'} title={`Н${w.week}: ${w.factSets}/${w.plannedSets} сетов (${w.pct}%)`}>{w.week}</span>
+                          <span
+                            key={w.week}
+                            className="ad-ph"
+                            data-phase={
+                              w.status === 'done'
+                                ? 'accumulation'
+                                : w.status === 'partial'
+                                  ? 'intensification'
+                                  : w.status === 'missed'
+                                    ? 'peaking'
+                                    : 'deload'
+                            }
+                            title={`Н${w.week}: ${w.factSets}/${w.plannedSets} сетов (${w.pct}%)`}
+                          >
+                            {w.week}
+                          </span>
                         ))}
                       </div>
                     )}
-                    {compliance && <div className="ad-muted" data-arm="compliance-note">{compliance.note}</div>}
-                    <AdBtn variant="dark" block data-arm="fact-apply" onClick={() => { setTopContinuity(true); flash('✅ Факт будет учтён в следующем плане (кросс-мезо: beat → ставка, on_track → держим, stalled → −2%).'); }}>🔄 Учесть факт в следующем плане (per-muscle ставка)</AdBtn>
+                    {compliance && (
+                      <div className="ad-muted" data-arm="compliance-note">
+                        {compliance.note}
+                      </div>
+                    )}
+                    <AdBtn
+                      variant="dark"
+                      block
+                      data-arm="fact-apply"
+                      onClick={() => {
+                        setTopContinuity(true);
+                        flash(
+                          '✅ Факт будет учтён в следующем плане (кросс-мезо: beat → ставка, on_track → держим, stalled → −2%).',
+                        );
+                      }}
+                    >
+                      🔄 Учесть факт в следующем плане (per-muscle ставка)
+                    </AdBtn>
                   </>
                 ) : (
-                  <div className="ad-muted">Дневник пуст или нет рабочих весов — факт появится после первых записей.</div>
+                  <div className="ad-muted">
+                    Дневник пуст или нет рабочих весов — факт появится после первых записей.
+                  </div>
                 )}
               </AdSec>
-              </div>
-              {/* Паритет ББ/ТА: аудит покрытия 12 мёртвых точек (+ добивка в 1 клик). */}
-              <div data-arm="plan-audit-card">
-              <AdSec title="🎯 Покрытие 12 точек (аудит плана)" hook="plan-audit" collapsible defaultOpen={false}
-                summary={planAudit ? `${planAudit.coveragePct}% · стол ${Math.round(planAudit.tableRatio * 100)}%` : 'нет плана'}
-                status={planAudit && planAudit.missing.length ? 'warn' : undefined}>
+            </div>
+            {/* Паритет ББ/ТА: аудит покрытия 12 мёртвых точек (+ добивка в 1 клик). */}
+            <div data-arm="plan-audit-card">
+              <AdSec
+                title="🎯 Покрытие 12 точек (аудит плана)"
+                hook="plan-audit"
+                collapsible
+                defaultOpen={false}
+                summary={
+                  planAudit
+                    ? `${planAudit.coveragePct}% · стол ${Math.round(planAudit.tableRatio * 100)}%`
+                    : 'нет плана'
+                }
+                status={planAudit && planAudit.missing.length ? 'warn' : undefined}
+              >
                 {planAudit ? (
                   <>
                     <div className="ad-tip" data-arm="plan-audit-cover" style={{ fontVariantNumeric: 'tabular-nums' }}>
-                      Покрытие: {planAudit.covered.length}/12 точек ({planAudit.coveragePct}%) · стол {Math.round(planAudit.tableRatio * 100)}% / зал {100 - Math.round(planAudit.tableRatio * 100)}% · static {planAudit.staticSets} / dynamic {ruCount(planAudit.dynamicSets, RU_SETS)}.
+                      Покрытие: {planAudit.covered.length}/12 точек ({planAudit.coveragePct}%) · стол{' '}
+                      {Math.round(planAudit.tableRatio * 100)}% / зал {100 - Math.round(planAudit.tableRatio * 100)}% ·
+                      static {planAudit.staticSets} / dynamic {ruCount(planAudit.dynamicSets, RU_SETS)}.
                     </div>
                     <div className="ad-chips" data-arm="plan-audit-points">
                       {ARM_WEAK_POINTS.map((wp) => (
-                        <span key={wp} className="ad-tag" data-covered={planAudit.covered.includes(wp) ? 'true' : 'false'} style={{ fontVariantNumeric: 'tabular-nums' }}>
+                        <span
+                          key={wp}
+                          className="ad-tag"
+                          data-covered={planAudit.covered.includes(wp) ? 'true' : 'false'}
+                          style={{ fontVariantNumeric: 'tabular-nums' }}
+                        >
                           {wp} {planAudit.byPoint[wp]?.sets || 0}
                         </span>
                       ))}
                     </div>
                     {planAudit.missing.length > 0 && (
-                      <AdBtn variant="dark" block data-arm="plan-audit-worst" onClick={() => {
-                        try {
-                          const worst = worstArmPoint(viewPlan, planAudit.missing);
-                          if (!worst) { flash('⚠ Дыра не определена'); return; }
-                          const inj = injectArmCorrections(viewPlan, [worst], { level, workMax, weekIdxs: (viewPlan.weeks || []).map((_: any, i: number) => i) });
-                          const next = refreshArmPlanSnapshot(inj.plan, level);
-                          setBuiltPlan(next);
-                          persistArmPlan(next);
-                          flash(`💉 Добито: ${worst} (${inj.injected} упражн., все недели)`);
-                        } catch (e: any) { flash(`⚠ ${e?.message || e}`); }
-                      }}>💉 Добить худшую точку ({planAudit.missing[0]}) во все недели</AdBtn>
+                      <AdBtn
+                        variant="dark"
+                        block
+                        data-arm="plan-audit-worst"
+                        onClick={() => {
+                          try {
+                            // P1-5: добивка идёт в БАЗУ (builtPlan), правки остаются overlay —
+                            // иначе «Сбросить правки» уже не вернёт план без добивки.
+                            const worst = worstArmPoint(builtPlan, planAudit.missing);
+                            if (!worst) {
+                              flash('⚠ Дыра не определена');
+                              return;
+                            }
+                            const inj = injectArmCorrections(builtPlan, [worst], {
+                              level,
+                              workMax,
+                              weekIdxs: (builtPlan.weeks || []).map((_: any, i: number) => i),
+                            });
+                            const next = refreshArmPlanSnapshot(inj.plan, level);
+                            setBuiltPlan(next);
+                            // Правки остаются overlay на новой базе — сбрасываем подпись,
+                            // чтобы effect переписал в хранилище актуальный viewPlan.
+                            committedEditsRef.current = '';
+                            persistArmPlan(next);
+                            flash(`💉 Добито: ${worst} (${inj.injected} упражн., все недели)`);
+                          } catch (e: any) {
+                            flash(`⚠ ${e?.message || e}`);
+                          }
+                        }}
+                      >
+                        💉 Добить худшую точку ({planAudit.missing[0]}) во все недели
+                      </AdBtn>
                     )}
-                    {planAudit.duplicates.length > 0 && <div className="ad-muted">Дубли (3+ сессии): {planAudit.duplicates.join(', ')}</div>}
+                    {planAudit.duplicates.length > 0 && (
+                      <div className="ad-muted">Дубли (3+ сессии): {planAudit.duplicates.join(', ')}</div>
+                    )}
                   </>
-                ) : <div className="ad-muted">План не собран — аудит появится после сборки.</div>}
+                ) : (
+                  <div className="ad-muted">План не собран — аудит появится после сборки.</div>
+                )}
               </AdSec>
-              </div>
-              {editsCount > 0 && <div className="ad-muted">✏️ Правки: {editsCount} упр. — гейты и отчёт по базовому плану.</div>}
-              <AdBanner tone="warn">
-                <b>4 гейта:</b> humerus (side ≤3, ≤10%/нед, RIR≥2) · UCL (hook n00b) · shoulder (≥4, 12-20, RIR≥2) · tendon (12/16/18/22) — все в валидации.
-              </AdBanner>
-              <AdCta>
-                <AdBtn variant="primary" block hero onClick={() => setStep('export')}>Далее: Экспорт →</AdBtn>
-                <AdBtn variant="ghost" block onClick={() => setStep('plan')}>← Назад</AdBtn>
-              </AdCta>
-            </>
+            </div>
+            {editsCount > 0 && (
+              <div className="ad-muted">✏️ Правки: {editsCount} упр. — гейты и отчёт по базовому плану.</div>
+            )}
+            <AdBanner tone="warn">
+              <b>4 гейта:</b> humerus (side ≤3, ≤10%/нед, RIR≥2) · UCL (hook n00b) · shoulder (≥4, 12-20, RIR≥2) ·
+              tendon (12/16/18/22) — все в валидации.
+            </AdBanner>
+            <AdCta>
+              <AdBtn variant="primary" block hero onClick={() => setStep('export')}>
+                Далее: Экспорт →
+              </AdBtn>
+              <AdBtn variant="ghost" block onClick={() => setStep('plan')}>
+                ← Назад
+              </AdBtn>
+            </AdCta>
+          </>
         </AdCard>
       )}
       {step === 'quality' && builtPlan && (
         <AdCard data-arm="weights-card" className="ad-stepview">
-          <AdSec title="🏋️ Веса — детали" hint="Веса теперь из рабочих максимумов (выше). Если пусто — используется вес из профиля (default). Прогрессия: тяж 82%, техника 60%, памп 68% от максимума. Для grip — support/pinch отдельно.">
-              <>
-                <div className="ad-stats">
-                  {Object.entries(workMax).map(([k,v])=> (
-                    <div key={k} className="ad-stat"><div className="ad-stat-v">{String(v)} кг</div><div className="ad-stat-l">{k}</div></div>
+          <AdSec
+            title="🏋️ Веса — детали"
+            hint="Веса теперь из рабочих максимумов (выше). Если пусто — используется вес из профиля (default). Прогрессия: тяж 82%, техника 60%, памп 68% от максимума. Для grip — support/pinch отдельно."
+          >
+            <>
+              <div className="ad-stats">
+                {Object.entries(workMax)
+                  .filter(([k]) => k !== 'default')
+                  .map(([k, v]) => (
+                    <div key={k} className="ad-stat">
+                      <div className="ad-stat-v">{String(v)} кг</div>
+                      {/* P2-11: латинские ключи движка — по-русски. `default` не показываем:
+                          движок больше не трактует его как максимум каждой мышцы. */}
+                      <div className="ad-stat-l">{ARM_MUSCLE_RU[k] || k}</div>
+                    </div>
                   ))}
+              </div>
+              {Object.keys(workMax).filter((k) => k !== 'default').length === 0 && (
+                <div className="ad-muted">
+                  Максимумы не заданы — введи их в «Параметры» или вес тела в профиле, иначе веса подберутся от базы.
                 </div>
-                {Object.keys(workMax).length === 0 && (
-                  <div className="ad-muted">Максимумы не заданы — введи их в «Параметры» или вес тела в профиле, иначе веса подберутся от базы.</div>
-                )}
-                <div className="ad-muted">Пример веса в плане (неделя 1, тяж): {(() => {
+              )}
+              <div className="ad-muted">
+                Пример веса в плане (неделя 1, тяж):{' '}
+                {(() => {
                   try {
-                    const ex = builtPlan.weeks[0]?.sessions[0]?.exercises[0];
+                    const ex = viewPlan.weeks[0]?.sessions[0]?.exercises[0];
                     if (!ex) return '—';
                     return `${ex.name} — ${ex.workSets[0]?.weight ?? 0} кг × ${ex.workSets[0]?.reps} RIR${ex.rir} (${ex.tempoSpec})`;
-                  } catch { return '—'; }
-                })()}</div>
-                {discipline === 'armlifting' && (
-                  <AdSec title="🏟 Помост: план попыток (опенер 90 / 96 / 102%)" hook="platform">
-                    <AdGrid cols="2">
-                      <AdSheetSelect label="Снаряд" value={proPlatImpl} onChange={setProPlatImpl} options={
-                        Object.entries(PLATFORM_WR).map(([id, r])=> ({ id, label: (r as any).name + (platformIsInternal(id) ? ' (ориентир)' : '') }))
-                      } />
-                      <AdField label="Цель, кг">
-                        <input value={proPlatTarget} onChange={e=>setProPlatTarget(e.target.value)} placeholder="100" inputMode="decimal" />
-                      </AdField>
-                    </AdGrid>
-                    <div className="ad-muted">{(()=>{
+                  } catch {
+                    return '—';
+                  }
+                })()}
+              </div>
+              {discipline === 'armlifting' && (
+                <AdSec title="🏟 Помост: план попыток (опенер 90 / 96 / 102%)" hook="platform">
+                  <AdGrid cols="2">
+                    <AdSheetSelect
+                      label="Снаряд"
+                      value={proPlatImpl}
+                      onChange={setProPlatImpl}
+                      options={Object.entries(PLATFORM_WR).map(([id, r]) => ({
+                        id,
+                        label: (r as any).name + (platformIsInternal(id) ? ' (ориентир)' : ''),
+                      }))}
+                    />
+                    <AdField label="Цель, кг">
+                      <input
+                        value={proPlatTarget}
+                        onChange={(e) => setProPlatTarget(e.target.value)}
+                        placeholder="100"
+                        inputMode="decimal"
+                      />
+                    </AdField>
+                  </AdGrid>
+                  <div className="ad-muted">
+                    {(() => {
                       const t = parseFloat(proPlatTarget);
                       if (!(t > 0)) return 'Введите цель — покажем раскладку попыток и %WR.';
                       const att = planAttempts(t);
@@ -2836,17 +5297,44 @@ const GRIP_GROUPS: Array<{ title: string; ids: ArmImplement[] }> = [
                       const pct = Math.round((t / wr) * 1000) / 10;
                       const lvl = pct >= 90 ? 'элита' : pct >= 70 ? 'соревновательный уровень' : 'база';
                       const orientir = platformIsInternal(proPlatImpl);
-                      return (<><div className="ad-hero-side" data-arm="platform-wr">
-                        <div className="ad-hero-score" aria-hidden><b>{pct}%</b><span>{orientir ? 'ориентир' : 'WR'}</span></div>
-                        <div className="ad-hero-name">цель {t} кг · {orientir ? `ориентир ${wr}` : `WR ${wr}`} кг<span>{lvl} · опенер {att[0]} кг</span></div>
-                        <span className="ad-tag" data-sev={pct >= 90 ? 'ok' : pct >= 70 ? 'warn' : 'bad'}>{lvl}</span>
-                      </div>
-                      <div className="ad-volbar" aria-hidden><span style={{ width: `${Math.min(100, pct)}%` }} /></div>
-                      <div className="ad-stats">{att.map((a: number, i: number) => (
-                        <div key={i} className="ad-stat"><div className="ad-stat-v">{a} кг</div><div className="ad-stat-l">Попытка {i + 1}</div><div className="ad-stat-s">{[90, 96, 102][i]}%</div></div>
-                      ))}</div>{`Попытки: ${att.join(' / ')} кг · WR ${wr} кг · цель ${pct}% WR — ${lvl}. Правило помоста: промах = выбыл, только DOH, без лямок.`}</>);
-                    })()}</div>
-                    <AdBtn variant="ghost" block onClick={() => {
+                      return (
+                        <>
+                          <div className="ad-hero-side" data-arm="platform-wr">
+                            <div className="ad-hero-score" aria-hidden>
+                              <b>{pct}%</b>
+                              <span>{orientir ? 'ориентир' : 'WR'}</span>
+                            </div>
+                            <div className="ad-hero-name">
+                              цель {t} кг · {orientir ? `ориентир ${wr}` : `WR ${wr}`} кг
+                              <span>
+                                {lvl} · опенер {att[0]} кг
+                              </span>
+                            </div>
+                            <span className="ad-tag" data-sev={pct >= 90 ? 'ok' : pct >= 70 ? 'warn' : 'bad'}>
+                              {lvl}
+                            </span>
+                          </div>
+                          <div className="ad-volbar" aria-hidden>
+                            <span style={{ width: `${Math.min(100, pct)}%` }} />
+                          </div>
+                          <div className="ad-stats">
+                            {att.map((a: number, i: number) => (
+                              <div key={i} className="ad-stat">
+                                <div className="ad-stat-v">{a} кг</div>
+                                <div className="ad-stat-l">Попытка {i + 1}</div>
+                                <div className="ad-stat-s">{[90, 96, 102][i]}%</div>
+                              </div>
+                            ))}
+                          </div>
+                          {`Попытки: ${att.join(' / ')} кг · WR ${wr} кг · цель ${pct}% WR — ${lvl}. Правило помоста: промах = выбыл, только DOH, без лямок.`}
+                        </>
+                      );
+                    })()}
+                  </div>
+                  <AdBtn
+                    variant="ghost"
+                    block
+                    onClick={() => {
                       if (typeof document === 'undefined') return;
                       const input = document.createElement('input');
                       input.type = 'file';
@@ -2857,222 +5345,468 @@ const GRIP_GROUPS: Array<{ title: string; ids: ArmImplement[] }> = [
                         const reader = new FileReader();
                         reader.onload = () => {
                           const text = String(reader.result || '');
-                          const isJson = /\.json$/i.test(f.name) || text.trim().startsWith('{') || text.trim().startsWith('[');
-                           const impSex = profileSnapshot.sex || 'male';
-                           const parsed = isJson ? parseArmResultJson(text, impSex) : parseArmResultCsv(text, proPlatImpl, impSex);
-                          if (parsed.errors.length > 0) { flash(`⚠ Импорт результатов: ${parsed.errors[0]}`); return; }
-                          if (parsed.entries.length === 0) { flash('⚠ Импорт результатов: распознанных попыток нет.'); return; }
+                          const isJson =
+                            /\.json$/i.test(f.name) || text.trim().startsWith('{') || text.trim().startsWith('[');
+                          const impSex = profileSnapshot.sex || 'male';
+                          const parsed = isJson
+                            ? parseArmResultJson(text, impSex)
+                            : parseArmResultCsv(text, proPlatImpl, impSex);
+                          if (parsed.errors.length > 0) {
+                            flash(`⚠ Импорт результатов: ${parsed.errors[0]}`);
+                            return;
+                          }
+                          if (parsed.entries.length === 0) {
+                            flash('⚠ Импорт результатов: распознанных попыток нет.');
+                            return;
+                          }
                           const log = applyArmResultImport(parsed, profileSnapshot.sex || 'male');
-                          flash(`📥 Импортировано попыток: ${parsed.entries.length} · снаряд ${parsed.implement} · лучший ${parsed.bestKg} кг (${parsed.wrPct}% WR)${parsed.warnings.length ? ` · замечаний: ${parsed.warnings.length}` : ''} · в журнале ${log.length}`);
-                          setPlatformTick(t => t + 1);
+                          flash(
+                            `📥 Импортировано попыток: ${parsed.entries.length} · снаряд ${parsed.implement} · лучший ${parsed.bestKg} кг (${parsed.wrPct}% WR)${parsed.warnings.length ? ` · замечаний: ${parsed.warnings.length}` : ''} · в журнале ${log.length}`,
+                          );
+                          setPlatformTick((t) => t + 1);
                         };
                         reader.onerror = () => flash('⚠ Импорт результатов: файл не прочитан.');
                         reader.readAsText(f);
                       };
                       input.click();
-                    }}>📥 Импорт результатов соревнований (CSV/JSON)</AdBtn>
-                    <div className="ad-muted" data-arm="platform-import-note">
-                      Формат: CSV «снаряд,попытка,вес,результат» (1/0, да/нет) либо JSON {`{ date, implement, attempts: [{ weightKg, success }] }`}. Попадёт в журнал помоста с датой соревнования; ничего не угадывается — нераспознанное отбрасывается.
+                    }}
+                  >
+                    📥 Импорт результатов соревнований (CSV/JSON)
+                  </AdBtn>
+                  <div className="ad-muted" data-arm="platform-import-note">
+                    Формат: CSV «снаряд,попытка,вес,результат» (1/0, да/нет) либо JSON{' '}
+                    {`{ date, implement, attempts: [{ weightKg, success }] }`}. Попадёт в журнал помоста с датой
+                    соревнования; ничего не угадывается — нераспознанное отбрасывается.
+                  </div>
+                  {platformLog.length > 0 && (
+                    <div className="ad-list" data-arm="platform-log" style={{ marginTop: 6 }}>
+                      <div className="ad-muted">Журнал помоста (последние 3):</div>
+                      {platformLog.slice(-3).map((e: any, i: number) => (
+                        <div
+                          key={`${e.date}-${e.implement}-${i}`}
+                          className="ad-finding"
+                          data-level={e.success ? 'ok' : 'warn'}
+                          style={{ fontVariantNumeric: 'tabular-nums' }}
+                        >
+                          {e.date} · {e.weightKg} кг · {e.success ? 'взят' : 'промах'} · {e.wrPct ?? 0}% WR
+                        </div>
+                      ))}
                     </div>
-                    {platformLog.length > 0 && (
-                      <div className="ad-list" data-arm="platform-log" style={{ marginTop: 6 }}>
-                        <div className="ad-muted">Журнал помоста (последние 3):</div>
-                        {platformLog.slice(-3).map((e: any, i: number) => (
-                          <div key={`${e.date}-${e.implement}-${i}`} className="ad-finding" data-level={e.success ? 'ok' : 'warn'} style={{ fontVariantNumeric: 'tabular-nums' }}>
-                            {e.date} · {e.weightKg} кг · {e.success ? 'взят' : 'промах'} · {e.wrPct ?? 0}% WR
-                          </div>
-                        ))}
-                      </div>
-                    )}
-                  </AdSec>
-                )}
-                <AdBtn variant="primary" block onClick={handleBuild}>🔄 Пересобрать с весами</AdBtn>
-                <AdCta>
-                  <AdBtn variant="primary" block hero onClick={() => setStep('export')}>Далее: Экспорт →</AdBtn>
-                  <AdBtn variant="ghost" block onClick={() => setStep('plan')}>← Назад</AdBtn>
-                </AdCta>
-              </>
+                  )}
+                </AdSec>
+              )}
+              <AdBtn variant="primary" block onClick={handleBuild}>
+                🔄 Пересобрать с весами
+              </AdBtn>
+              <AdCta>
+                <AdBtn variant="primary" block hero onClick={() => setStep('export')}>
+                  Далее: Экспорт →
+                </AdBtn>
+                <AdBtn variant="ghost" block onClick={() => setStep('plan')}>
+                  ← Назад
+                </AdBtn>
+              </AdCta>
+            </>
           </AdSec>
         </AdCard>
       )}
       {step === 'export' && (
         <AdCard className="ad-stepview">
-          {!builtPlan ? <AdEmpty icon="📤" title="План не собран — вернись в «Параметры»." sub="Собери план на шаге «Сплит и цикл» — здесь появятся печать, календарь и обоснование."><AdBtn variant="primary" block onClick={() => setStep('params')}>🎛 К параметрам</AdBtn></AdEmpty> : (
+          {!builtPlan ? (
+            <AdEmpty
+              icon="📤"
+              title="План не собран — вернись в «Параметры»."
+              sub="Собери план на шаге «Сплит и цикл» — здесь появятся печать, календарь и обоснование."
+            >
+              <AdBtn variant="primary" block onClick={() => setStep('params')}>
+                🎛 К параметрам
+              </AdBtn>
+            </AdEmpty>
+          ) : (
             <>
-               <AdSec title={`📤 Экспорт — ${builtPlan.pattern.name}`} hint="Печать · .ics · CSV · копировать сводку">
-               {exportBlocked && <AdBanner tone="bad" hook="export-blocked">⛔ Экспорт заблокирован: план содержит safety-блокеры. Сначала исправьте их в разделе «Качество».</AdBanner>}
-               <div className="ad-row" data-arm="export-actions" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(130px,1fr))', gap: 8, marginTop: 8 }}>
-                 <AdBtn variant="primary" disabled={exportBlocked} onClick={() => {
-
-                  let diag: any = null;
-                  try { const raw = localStorage.getItem('he_arm_last_diagnostics'); if (raw) diag = JSON.parse(raw); } catch {}
-                  try {
-                    const trials = loadForceTrials();
-                    const stats = buildWeeklyStats(trials, 12);
-                    const ft = fatigueTrend(stats);
-                    const tr = forceTrend(stats);
-                    if (diag) { diag.fatigue = ft?.text; diag.trend = tr?.text; }
-                  } catch {}
-                  let proSummary: any = null;
-                  try { if (builtPlan?.inputSnapshot) proSummary = buildArmProSummary(builtPlan.inputSnapshot); } catch { proSummary = null; }
-                  /** PRO-6 M12: движение армлифтинга из пака (единый ридер). */
-                  const almPackLines = readArmliftMovementPack();
-                  const armliftMovement = almPackLines.length ? almPackLines : null;
-                  const html = buildArmPrintHtml(viewPlan, { findings: diag?.findings, humerusWarnings: diag?.humerusWarnings, balanceWarnings: diag?.balanceWarnings, asymmetryPct: diag?.asymmetryPct, benchLevel: diag?.benchLevel, fatigue: diag?.fatigue, trend: diag?.trend, info: [...(diag?.info ?? []), ...annotationLines.map(l => `🎥 ${l}`)], movement: diag?.movement, armliftMovement }, proSummary);
-                  const w = window.open('', '_blank');
-                  if (w) { w.document.write(html); w.document.close(); } else flash('⚠ Всплывающие окна заблокированы');
-                 }} style={{ minHeight: 48 }}>🖨 Печать</AdBtn>
-                 <AdBtn variant="ghost" disabled={exportBlocked} style={{ minHeight: 48 }} onClick={() => {
-                   const ics = buildArmIcs(viewPlan);
-
-                  const blob = new Blob([ics], { type: 'text/calendar' });
-                  const url = URL.createObjectURL(blob);
-                  const a = document.createElement('a'); a.href = url; a.download = 'arm-plan.ics'; a.click(); URL.revokeObjectURL(url);
-                 }}>📅 .ics</AdBtn>
-                 <AdBtn variant="ghost" disabled={exportBlocked} data-arm="export-csv" onClick={() => {
-                   try {
-                     const csv = buildArmPlanCsv(viewPlan);
-                     const blob = new Blob([csv], { type: 'text/csv;charset=utf-8' });
-                     const url = URL.createObjectURL(blob);
-                     const a = document.createElement('a'); a.href = url; a.download = 'arm-plan.csv'; a.click(); URL.revokeObjectURL(url);
-                     flash('✅ CSV плана выгружен');
-                   } catch (e: any) { flash(`⚠ CSV: ${e?.message || e}`); }
-                 }}>📊 .csv</AdBtn>
-                 <AdBtn variant="ghost" disabled={exportBlocked} onClick={() => {
-                   const tot = (viewPlan.weeks || []).reduce((a: number, w: any) => a + (w.sessions || []).reduce((x: number, s: any) => x + (s.exercises || []).reduce((y: number, e: any) => y + (e.sets || 0), 0), 0), 0);
-
-                   const lines = [
-                     `🤝 Арм-план — ${viewPlan.pattern.name} (${viewPlan.weeks.length} нед)`,
-                     `${discipline} · ${technique} · ${level} · ${goal}`,
-                     weakPoints.length ? `Слабые: ${weakPoints.join(', ')}` : 'Без специализации',
-                     cycId ? `Цикл: ${cycId}` : 'Обычный план',
-                     ...(Array.isArray(viewPlan.blocks) && viewPlan.blocks.length ? [`Блоки: ${viewPlan.blocks.map((b: any) => `${b.name} (${b.weekStart}–${b.weekEnd})`).join(' → ')}`] : []),
-                     ...(Array.isArray(viewPlan.peakWindows) && viewPlan.peakWindows.length ? [`Старты: ${viewPlan.peakWindows.map((p: any) => `Н${p.week} (${p.priority})`).join(', ')}`] : []),
-                      `Всего: ${ruCount(tot, RU_SETS)} · стол-сессии ${planDash ? planDash.tablePct : '—'}% · объём ${planDash ? planDash.tableVolumePct : '—'}% · минуты ${planDash?.tableMinutesPct == null ? 'нет данных' : `${planDash.tableMinutesPct}%`}`,
-                     (viewPlan.weeks || []).map((w: any) => `Н${w.week} (${w.phase}): ${(w.sessions || []).reduce((x: number, s: any) => x + (s.exercises || []).reduce((y: number, e: any) => y + (e.sets || 0), 0), 0)}`).join(' · '),
-                   ];
-                   // Движение схватки из диагностики (тот же diag, что у печати)
-                   try {
-                     const raw = localStorage.getItem('he_arm_last_diagnostics');
-                     const dg = raw ? JSON.parse(raw) : null;
-                     const mv = dg?.movement;
-                     if (mv && typeof mv === 'object') {
-                       const bits: string[] = [];
-                       if (mv.matchPhase) bits.push(`фаза ${mv.matchPhase}`);
-                       if (mv.startNote) bits.push('старт');
-                       if (mv.vectorNote) bits.push('векторы');
-                       if (mv.tableStrengthNote) bits.push('сила стола');
-                       if (mv.foulNote) bits.push('фолы');
-                       if (bits.length) lines.push(`🥋 Движение: ${bits.join(' · ')}`);
-                      if (mv.humerusDangerNote) lines.push(`⛔ ${mv.humerusDangerNote}`);
+              <AdSec title={`📤 Экспорт — ${builtPlan.pattern.name}`} hint="Печать · .ics · CSV · копировать сводку">
+                {exportBlocked && (
+                  <AdBanner tone="bad" hook="export-blocked">
+                    ⛔ Экспорт заблокирован: план содержит safety-блокеры. Сначала исправьте их в разделе «Качество».
+                  </AdBanner>
+                )}
+                <div
+                  className="ad-row"
+                  data-arm="export-actions"
+                  style={{
+                    display: 'grid',
+                    gridTemplateColumns: 'repeat(auto-fit, minmax(130px,1fr))',
+                    gap: 8,
+                    marginTop: 8,
+                  }}
+                >
+                  <AdBtn
+                    variant="primary"
+                    disabled={exportBlocked}
+                    onClick={() => {
+                      let diag: any = null;
+                      try {
+                        const raw = localStorage.getItem('he_arm_last_diagnostics');
+                        if (raw) diag = JSON.parse(raw);
+                      } catch {}
+                      try {
+                        const trials = loadForceTrials();
+                        const stats = buildWeeklyStats(trials, 12);
+                        const ft = fatigueTrend(stats);
+                        const tr = forceTrend(stats);
+                        if (diag) {
+                          diag.fatigue = ft?.text;
+                          diag.trend = tr?.text;
+                        }
+                      } catch {}
+                      let proSummary: any = null;
+                      try {
+                        if (builtPlan?.inputSnapshot) proSummary = buildArmProSummary(builtPlan.inputSnapshot);
+                      } catch {
+                        proSummary = null;
                       }
-                    } catch { /* noop */ }
-                    // PRO-6 M12: движение армлифтинга из пака (тот же ридер, что у печати)
-                    const almSummaryLines = readArmliftMovementPack();
-                    if (almSummaryLines.length) lines.push(`🏋️ Движение: ${almSummaryLines.join(' · ')}`);
-                  const txt = lines.join('\n');
-                  const done = () => flash('✅ Сводка скопирована');
-                  const fallback = () => {
-                    try {
-                      const ta = document.createElement('textarea');
-                      ta.value = txt;
-                      document.body.appendChild(ta);
-                      ta.select();
-                      (document as any).execCommand('copy');
-                      document.body.removeChild(ta);
-                      done();
-                    } catch { flash('⚠ Не удалось скопировать'); }
-                  };
-                  try {
-                    const nav: any = navigator as any;
-                    if (nav?.clipboard?.writeText) nav.clipboard.writeText(txt).then(done, fallback);
-                    else fallback();
-                  } catch { fallback(); }
-                }} style={{ minHeight: 48 }}>📋 Копировать сводку</AdBtn>
-              </div>
+                      /** PRO-6 M12: движение армлифтинга из пака (единый ридер). */
+                      const almPackLines = readArmliftMovementPack();
+                      const armliftMovement = almPackLines.length ? almPackLines : null;
+                      const html = buildArmPrintHtml(
+                        viewPlan,
+                        {
+                          findings: diag?.findings,
+                          humerusWarnings: diag?.humerusWarnings,
+                          balanceWarnings: diag?.balanceWarnings,
+                          asymmetryPct: diag?.asymmetryPct,
+                          benchLevel: diag?.benchLevel,
+                          fatigue: diag?.fatigue,
+                          trend: diag?.trend,
+                          info: [...(diag?.info ?? []), ...annotationLines.map((l) => `🎥 ${l}`)],
+                          movement: diag?.movement,
+                          armliftMovement,
+                        },
+                        proSummary,
+                      );
+                      const w = window.open('', '_blank');
+                      if (w) {
+                        w.document.write(html);
+                        w.document.close();
+                      } else flash('⚠ Всплывающие окна заблокированы');
+                    }}
+                    style={{ minHeight: 48 }}
+                  >
+                    🖨 Печать
+                  </AdBtn>
+                  <AdBtn
+                    variant="ghost"
+                    disabled={exportBlocked}
+                    style={{ minHeight: 48 }}
+                    onClick={() => {
+                      // P1-7 было→стало: .ics ставил события от сегодня; движок уже
+                      // принимает второй аргумент — передаём дату начала плана.
+                      const icsStart = /^\d{4}-\d{2}-\d{2}$/.test(planStartDate) ? planStartDate : undefined;
+                      const ics = buildArmIcs(viewPlan, icsStart);
+
+                      const blob = new Blob([ics], { type: 'text/calendar' });
+                      const url = URL.createObjectURL(blob);
+                      const a = document.createElement('a');
+                      a.href = url;
+                      a.download = 'arm-plan.ics';
+                      a.click();
+                      URL.revokeObjectURL(url);
+                    }}
+                  >
+                    📅 .ics
+                  </AdBtn>
+                  <AdBtn
+                    variant="ghost"
+                    disabled={exportBlocked}
+                    data-arm="export-csv"
+                    onClick={() => {
+                      try {
+                        const csv = buildArmPlanCsv(viewPlan);
+                        const blob = new Blob([csv], { type: 'text/csv;charset=utf-8' });
+                        const url = URL.createObjectURL(blob);
+                        const a = document.createElement('a');
+                        a.href = url;
+                        a.download = 'arm-plan.csv';
+                        a.click();
+                        URL.revokeObjectURL(url);
+                        flash('✅ CSV плана выгружен');
+                      } catch (e: any) {
+                        flash(`⚠ CSV: ${e?.message || e}`);
+                      }
+                    }}
+                  >
+                    📊 .csv
+                  </AdBtn>
+                  <AdBtn
+                    variant="ghost"
+                    disabled={exportBlocked}
+                    onClick={() => {
+                      const tot = (viewPlan.weeks || []).reduce(
+                        (a: number, w: any) =>
+                          a +
+                          (w.sessions || []).reduce(
+                            (x: number, s: any) =>
+                              x + (s.exercises || []).reduce((y: number, e: any) => y + (e.sets || 0), 0),
+                            0,
+                          ),
+                        0,
+                      );
+
+                      const lines = [
+                        `🤝 Арм-план — ${viewPlan.pattern.name} (${viewPlan.weeks.length} нед)`,
+                        `${discipline} · ${technique} · ${level} · ${goal}`,
+                        weakPoints.length ? `Слабые: ${weakPoints.join(', ')}` : 'Без специализации',
+                        cycId ? `Цикл: ${cycId}` : 'Обычный план',
+                        ...(Array.isArray(viewPlan.blocks) && viewPlan.blocks.length
+                          ? [
+                              `Блоки: ${viewPlan.blocks.map((b: any) => `${b.name} (${b.weekStart}–${b.weekEnd})`).join(' → ')}`,
+                            ]
+                          : []),
+                        ...(Array.isArray(viewPlan.peakWindows) && viewPlan.peakWindows.length
+                          ? [`Старты: ${viewPlan.peakWindows.map((p: any) => `Н${p.week} (${p.priority})`).join(', ')}`]
+                          : []),
+                        `Всего: ${ruCount(tot, RU_SETS)} · стол-сессии ${planDash ? planDash.tablePct : '—'}% · объём ${planDash ? planDash.tableVolumePct : '—'}% · минуты ${planDash?.tableMinutesPct == null ? 'нет данных' : `${planDash.tableMinutesPct}%`}`,
+                        (viewPlan.weeks || [])
+                          .map(
+                            (w: any) =>
+                              `Н${w.week} (${w.phase}): ${(w.sessions || []).reduce((x: number, s: any) => x + (s.exercises || []).reduce((y: number, e: any) => y + (e.sets || 0), 0), 0)}`,
+                          )
+                          .join(' · '),
+                      ];
+                      // Движение схватки из диагностики (тот же diag, что у печати)
+                      try {
+                        const raw = localStorage.getItem('he_arm_last_diagnostics');
+                        const dg = raw ? JSON.parse(raw) : null;
+                        const mv = dg?.movement;
+                        if (mv && typeof mv === 'object') {
+                          const bits: string[] = [];
+                          if (mv.matchPhase) bits.push(`фаза ${mv.matchPhase}`);
+                          if (mv.startNote) bits.push('старт');
+                          if (mv.vectorNote) bits.push('векторы');
+                          if (mv.tableStrengthNote) bits.push('сила стола');
+                          if (mv.foulNote) bits.push('фолы');
+                          if (bits.length) lines.push(`🥋 Движение: ${bits.join(' · ')}`);
+                          if (mv.humerusDangerNote) lines.push(`⛔ ${mv.humerusDangerNote}`);
+                        }
+                      } catch {
+                        /* noop */
+                      }
+                      // PRO-6 M12: движение армлифтинга из пака (тот же ридер, что у печати)
+                      const almSummaryLines = readArmliftMovementPack();
+                      if (almSummaryLines.length) lines.push(`🏋️ Движение: ${almSummaryLines.join(' · ')}`);
+                      const txt = lines.join('\n');
+                      const done = () => flash('✅ Сводка скопирована');
+                      const fallback = () => {
+                        try {
+                          const ta = document.createElement('textarea');
+                          ta.value = txt;
+                          document.body.appendChild(ta);
+                          ta.select();
+                          (document as any).execCommand('copy');
+                          document.body.removeChild(ta);
+                          done();
+                        } catch {
+                          flash('⚠ Не удалось скопировать');
+                        }
+                      };
+                      try {
+                        const nav: any = navigator as any;
+                        if (nav?.clipboard?.writeText) nav.clipboard.writeText(txt).then(done, fallback);
+                        else fallback();
+                      } catch {
+                        fallback();
+                      }
+                    }}
+                    style={{ minHeight: 48 }}
+                  >
+                    📋 Копировать сводку
+                  </AdBtn>
+                </div>
               </AdSec>
-              <AdSec title="💾 Варианты плана" hint="Сохранить текущий (с правками), загрузить, удалить. Кап 10." collapsible defaultOpen={false} summary={`${armVariants.length}/10`}>
+              <AdSec
+                title="💾 Варианты плана"
+                hint="Сохранить текущий (с правками), загрузить, удалить. Кап 10."
+                collapsible
+                defaultOpen={false}
+                summary={`${armVariants.length}/10`}
+              >
                 <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'flex-end' }}>
                   <AdField label="Название варианта">
-                    <input aria-label="Название варианта" value={variantName} onChange={e=>setVariantName(e.target.value)} placeholder={`${viewPlan.pattern.name} · ${viewPlan.weeks.length} нед`} style={{ minWidth: 180 }} />
+                    <input
+                      aria-label="Название варианта"
+                      value={variantName}
+                      onChange={(e) => setVariantName(e.target.value)}
+                      placeholder={`${viewPlan.pattern.name} · ${viewPlan.weeks.length} нед`}
+                      style={{ minWidth: 180 }}
+                    />
                   </AdField>
-                   <AdBtn variant="primary" disabled={exportBlocked} onClick={()=>{
-                     const name = variantName.trim() || `${viewPlan.pattern.name} · ${viewPlan.weeks.length} нед · ${new Date().toLocaleDateString('ru-RU')}`;
+                  <AdBtn
+                    variant="primary"
+                    disabled={exportBlocked}
+                    onClick={() => {
+                      const name =
+                        variantName.trim() ||
+                        `${viewPlan.pattern.name} · ${viewPlan.weeks.length} нед · ${new Date().toLocaleDateString('ru-RU')}`;
 
-                    const v: ArmPlanVariant = { id: `armv-${Date.now()}`, name, dateIso: new Date().toISOString(), plan: viewPlan };
-                    const next = [v, ...armVariants].slice(0, 10);
-                    setArmVariants(next);
-                    saveArmVariants(next);
-                    setVariantName('');
-                    flash(`💾 Вариант сохранён: ${name}`);
-                  }}>💾 Сохранить вариант{editsCount > 0 ? ' (с правками)' : ''}</AdBtn>
+                      const v: ArmPlanVariant = {
+                        id: `armv-${Date.now()}`,
+                        name,
+                        dateIso: new Date().toISOString(),
+                        plan: viewPlan,
+                      };
+                      const next = [v, ...armVariants].slice(0, 10);
+                      setArmVariants(next);
+                      // P2-12: quota/приватный режим — не показываем ложный успех.
+                      const savedOk = saveArmVariants(next);
+                      setVariantName('');
+                      flash(
+                        savedOk
+                          ? `💾 Вариант сохранён: ${name}`
+                          : '⚠ Не сохранено: хранилище переполнено (вариант пропадёт после перезагрузки)',
+                      );
+                    }}
+                  >
+                    💾 Сохранить вариант{editsCount > 0 ? ' (с правками)' : ''}
+                  </AdBtn>
                 </div>
-                {armVariants.length === 0 ? <div className="ad-muted">Вариантов пока нет.</div> : (
+                {armVariants.length === 0 ? (
+                  <div className="ad-muted">Вариантов пока нет.</div>
+                ) : (
                   <div className="ad-list" data-arm="variants-list">
-                    {armVariants.map(v=>(
+                    {armVariants.map((v) => (
                       <div key={v.id} className="ad-sec ad-bio" data-valid="na">
-                        <div className="ad-row" style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
-                          <span style={{ flex: 1 }}><b>{v.name}</b> <span className="ad-muted">· {(v.plan?.weeks || []).length} нед · {String(v.dateIso || '').slice(0, 10)}</span></span>
-                          <AdChip active={cmpIds.includes(v.id)} onClick={()=>{
-                            setCmpIds(prev=>{
-                              if (prev.includes(v.id)) return prev.filter(x=>x!==v.id);
-                              return [...prev, v.id].slice(-2);
-                            });
-                          }} aria-label={`Сравнить ${v.name}`}>⇄</AdChip>
-                           <AdBtn variant="ghost" disabled={exportBlocked} aria-label={`Загрузить ${v.name}`} style={{ minWidth: 48, minHeight: 48 }} onClick={()=>{
-
-                            setBuiltPlan(v.plan);
-                            persistArmPlan(v.plan);
-                            try { restoreUiFromSnapshot((v.plan as any)?.inputSnapshot); } catch { /* тихо */ }
-                            setArmEdits({});
-                            setEditOpen(null);
-                            setWeekSel(1);
-                            setStep('plan');
-                            flash(`📥 Вариант загружен: ${v.name}`);
-                          }}>📥</AdBtn>
-                           <AdBtn variant="ghost" disabled={exportBlocked} aria-label={`Скачать ${v.name} JSON`} style={{ minWidth: 48, minHeight: 48 }} onClick={()=>{
-
-                            try {
-                              const blob = new Blob([JSON.stringify(v, null, 2)], { type: 'application/json' });
-                              const url = URL.createObjectURL(blob);
-                              const a = document.createElement('a');
-                              a.href = url;
-                              a.download = `arm-plan-${v.id}.json`;
-                              a.click();
-                              URL.revokeObjectURL(url);
-                            } catch { flash('⚠ Не удалось скачать'); }
-                          }}>📤</AdBtn>
-                          <AdBtn variant="ghost" aria-label={`Удалить ${v.name}`} style={{ minWidth: 48, minHeight: 48 }} onClick={()=>{
-                            const next = armVariants.filter(x=>x.id!==v.id);
-                            setArmVariants(next);
-                            saveArmVariants(next);
-                            flash('🗑 Вариант удалён');
-                          }}>✕</AdBtn>
+                        <div
+                          className="ad-row"
+                          style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}
+                        >
+                          <span style={{ flex: 1 }}>
+                            <b>{v.name}</b>{' '}
+                            <span className="ad-muted">
+                              · {(v.plan?.weeks || []).length} нед · {String(v.dateIso || '').slice(0, 10)}
+                            </span>
+                          </span>
+                          <AdChip
+                            active={cmpIds.includes(v.id)}
+                            onClick={() => {
+                              setCmpIds((prev) => {
+                                if (prev.includes(v.id)) return prev.filter((x) => x !== v.id);
+                                return [...prev, v.id].slice(-2);
+                              });
+                            }}
+                            aria-label={`Сравнить ${v.name}`}
+                          >
+                            ⇄
+                          </AdChip>
+                          <AdBtn
+                            variant="ghost"
+                            // P1-6 было→стало: загрузка сохранённого варианта НЕ гейтится
+                            // exportBlocked — иначе blocked-план не даёт выйти из блокера.
+                            aria-label={`Загрузить ${v.name}`}
+                            style={{ minWidth: 48, minHeight: 48 }}
+                            onClick={() => {
+                              setBuiltPlan(v.plan);
+                              persistArmPlan(v.plan);
+                              try {
+                                restoreUiFromSnapshot((v.plan as any)?.inputSnapshot);
+                              } catch {
+                                /* тихо */
+                              }
+                              setArmEdits({});
+                              setEditOpen(null);
+                              setWeekSel(1);
+                              setStep('plan');
+                              flash(`📥 Вариант загружен: ${v.name}`);
+                            }}
+                          >
+                            📥
+                          </AdBtn>
+                          <AdBtn
+                            variant="ghost"
+                            disabled={exportBlocked}
+                            aria-label={`Скачать ${v.name} JSON`}
+                            style={{ minWidth: 48, minHeight: 48 }}
+                            onClick={() => {
+                              try {
+                                const blob = new Blob([JSON.stringify(v, null, 2)], { type: 'application/json' });
+                                const url = URL.createObjectURL(blob);
+                                const a = document.createElement('a');
+                                a.href = url;
+                                a.download = `arm-plan-${v.id}.json`;
+                                a.click();
+                                URL.revokeObjectURL(url);
+                              } catch {
+                                flash('⚠ Не удалось скачать');
+                              }
+                            }}
+                          >
+                            📤
+                          </AdBtn>
+                          <AdBtn
+                            variant="ghost"
+                            aria-label={`Удалить ${v.name}`}
+                            style={{ minWidth: 48, minHeight: 48 }}
+                            onClick={() => {
+                              const next = armVariants.filter((x) => x.id !== v.id);
+                              setArmVariants(next);
+                              saveArmVariants(next);
+                              flash('🗑 Вариант удалён');
+                            }}
+                          >
+                            ✕
+                          </AdBtn>
                         </div>
                       </div>
                     ))}
                   </div>
                 )}
                 {cmpDiff?.diff && (
-                  <div data-arm="variants-diff" style={{ marginTop: 8, padding: '8px 10px', borderRadius: 10, background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.08)' }}>
-                    <div className="ad-sec-t">⇄ {cmpDiff.names[0]} vs {cmpDiff.names[1]}</div>
+                  <div
+                    data-arm="variants-diff"
+                    style={{
+                      marginTop: 8,
+                      padding: '8px 10px',
+                      borderRadius: 10,
+                      background: 'rgba(255,255,255,0.03)',
+                      border: '1px solid rgba(255,255,255,0.08)',
+                    }}
+                  >
+                    <div className="ad-sec-t">
+                      ⇄ {cmpDiff.names[0]} vs {cmpDiff.names[1]}
+                    </div>
                     <div className="ad-muted" style={{ fontVariantNumeric: 'tabular-nums' }}>
-                      Недели {cmpDiff.diff.weeksA} → {cmpDiff.diff.weeksB} · Сеты {cmpDiff.diff.setsA} → {cmpDiff.diff.setsB} ({cmpDiff.diff.setsB - cmpDiff.diff.setsA >= 0 ? '+' : ''}{cmpDiff.diff.setsB - cmpDiff.diff.setsA})
+                      Недели {cmpDiff.diff.weeksA} → {cmpDiff.diff.weeksB} · Сеты {cmpDiff.diff.setsA} →{' '}
+                      {cmpDiff.diff.setsB} ({cmpDiff.diff.setsB - cmpDiff.diff.setsA >= 0 ? '+' : ''}
+                      {cmpDiff.diff.setsB - cmpDiff.diff.setsA})
                     </div>
                     <div className="ad-muted">Фазы A: {cmpDiff.diff.phasesA || '—'}</div>
                     <div className="ad-muted">Фазы B: {cmpDiff.diff.phasesB || '—'}</div>
-                    {cmpDiff.diff.rows.filter(r=>r.d!==0).slice(0, 12).map(r=>(
-                      <div key={r.muscle} className="ad-finding" data-level="info" style={{ fontVariantNumeric: 'tabular-nums' }}>
-                        {ARM_MUSCLE_RU[r.muscle] || r.muscle}: {r.a} → {r.b} ({r.d >= 0 ? '+' : ''}{r.d})
-                      </div>
-                    ))}
-                    {cmpDiff.diff.rows.every(r=>r.d===0) && <div className="ad-muted">Объёмы идентичны.</div>}
+                    {cmpDiff.diff.rows
+                      .filter((r) => r.d !== 0)
+                      .slice(0, 12)
+                      .map((r) => (
+                        <div
+                          key={r.muscle}
+                          className="ad-finding"
+                          data-level="info"
+                          style={{ fontVariantNumeric: 'tabular-nums' }}
+                        >
+                          {ARM_MUSCLE_RU[r.muscle] || r.muscle}: {r.a} → {r.b} ({r.d >= 0 ? '+' : ''}
+                          {r.d})
+                        </div>
+                      ))}
+                    {cmpDiff.diff.rows.every((r) => r.d === 0) && <div className="ad-muted">Объёмы идентичны.</div>}
                     {cmpDiff.diff.weightRows.length > 0 && (
                       <div data-arm="variants-diff-weights" className="ad-list" style={{ marginTop: 6 }}>
                         <div className="ad-muted">Веса верхнего сета (кг):</div>
-                        {cmpDiff.diff.weightRows.slice(0, 10).map(r=>(
-                          <div key={r.name} className="ad-finding" data-level="info" style={{ fontVariantNumeric: 'tabular-nums' }}>
-                            {r.name}: {r.a} → {r.b} ({r.d >= 0 ? '+' : ''}{r.d})
+                        {cmpDiff.diff.weightRows.slice(0, 10).map((r) => (
+                          <div
+                            key={r.name}
+                            className="ad-finding"
+                            data-level="info"
+                            style={{ fontVariantNumeric: 'tabular-nums' }}
+                          >
+                            {r.name}: {r.a} → {r.b} ({r.d >= 0 ? '+' : ''}
+                            {r.d})
                           </div>
                         ))}
                       </div>
@@ -3080,79 +5814,132 @@ const GRIP_GROUPS: Array<{ title: string; ids: ArmImplement[] }> = [
                     {cmpDiff.diff.rirRows.length > 0 && (
                       <div data-arm="variants-diff-rir" className="ad-list" style={{ marginTop: 6 }}>
                         <div className="ad-muted">RIR (средний):</div>
-                        {cmpDiff.diff.rirRows.slice(0, 10).map(r=>(
-                          <div key={r.name} className="ad-finding" data-level="info" style={{ fontVariantNumeric: 'tabular-nums' }}>
-                            {r.name}: {r.a} → {r.b} ({r.d >= 0 ? '+' : ''}{r.d})
+                        {cmpDiff.diff.rirRows.slice(0, 10).map((r) => (
+                          <div
+                            key={r.name}
+                            className="ad-finding"
+                            data-level="info"
+                            style={{ fontVariantNumeric: 'tabular-nums' }}
+                          >
+                            {r.name}: {r.a} → {r.b} ({r.d >= 0 ? '+' : ''}
+                            {r.d})
                           </div>
                         ))}
                       </div>
                     )}
-                    {cmpDiff.diff.exRows.some(r=>r.status !== 'в обоих') && (
+                    {cmpDiff.diff.exRows.some((r) => r.status !== 'в обоих') && (
                       <div data-arm="variants-diff-ex" className="ad-list" style={{ marginTop: 6 }}>
                         <div className="ad-muted">Состав упражнений:</div>
-                        {cmpDiff.diff.exRows.filter(r=>r.status!=='в обоих').map(r=>(
-                          <div key={r.name} className="ad-finding" data-level="warn">{r.name} — {r.status}</div>
-                        ))}
+                        {cmpDiff.diff.exRows
+                          .filter((r) => r.status !== 'в обоих')
+                          .map((r) => (
+                            <div key={r.name} className="ad-finding" data-level="warn">
+                              {r.name} — {r.status}
+                            </div>
+                          ))}
                       </div>
                     )}
                   </div>
                 )}
                 <div style={{ marginTop: 8 }}>
                   <AdField label="Импорт варианта из JSON-файла">
-                     <input type="file" accept="application/json,.json" disabled={exportBlocked} aria-label="Импорт варианта JSON" onChange={(e)=>{
-
-                      const f = (e.target as HTMLInputElement).files?.[0];
-                      if (!f) return;
-                      (e.target as HTMLInputElement).value = '';
-                      const readText = (): Promise<string> => {
-                        try {
-                          const t = (f as any).text;
-                          if (typeof t === 'function') return t.call(f);
-                        } catch {}
-                        return new Promise((res, rej) => {
+                    <input
+                      type="file"
+                      accept="application/json,.json"
+                      // P1-6: импорт валидного варианта — путь спасения из blocked-плана.
+                      aria-label="Импорт варианта JSON"
+                      onChange={(e) => {
+                        const f = (e.target as HTMLInputElement).files?.[0];
+                        if (!f) return;
+                        (e.target as HTMLInputElement).value = '';
+                        const readText = (): Promise<string> => {
                           try {
-                            const rd = new FileReader();
-                            rd.onload = () => res(String(rd.result || ''));
-                            rd.onerror = () => rej(new Error('read'));
-                            rd.readAsText(f);
-                          } catch (err) { rej(err); }
-                        });
-                      };
-                      readText().then((txt: string) => {
-                        try {
-                          const j = JSON.parse(txt);
-                          const plan = j && Array.isArray(j.weeks) ? j : j?.plan;
-                          if (!plan || !Array.isArray(plan.weeks) || !plan.pattern) { flash('⚠ В файле нет арм-плана'); return; }
-                          const v: ArmPlanVariant = {
-                            id: `armv-${Date.now()}`,
-                            name: String(j?.name || plan?.pattern?.name || 'Импорт').slice(0, 80),
-                            dateIso: new Date().toISOString(),
-                            plan,
-                          };
-                          const next = [v, ...armVariants].slice(0, 10);
-                          setArmVariants(next);
-                          saveArmVariants(next);
-                          flash(`📥 Импортирован: ${v.name}`);
-                        } catch { flash('⚠ Битый JSON-файл'); }
-                      }).catch(()=>flash('⚠ Не удалось прочитать файл'));
-                    }} />
+                            const t = (f as any).text;
+                            if (typeof t === 'function') return t.call(f);
+                          } catch {}
+                          return new Promise((res, rej) => {
+                            try {
+                              const rd = new FileReader();
+                              rd.onload = () => res(String(rd.result || ''));
+                              rd.onerror = () => rej(new Error('read'));
+                              rd.readAsText(f);
+                            } catch (err) {
+                              rej(err);
+                            }
+                          });
+                        };
+                        readText()
+                          .then((txt: string) => {
+                            try {
+                              const j = JSON.parse(txt);
+                              const plan = j && Array.isArray(j.weeks) ? j : j?.plan;
+                              if (!plan || !Array.isArray(plan.weeks) || !plan.pattern) {
+                                flash('⚠ В файле нет арм-плана');
+                                return;
+                              }
+                              const v: ArmPlanVariant = {
+                                id: `armv-${Date.now()}`,
+                                name: String(j?.name || plan?.pattern?.name || 'Импорт').slice(0, 80),
+                                dateIso: new Date().toISOString(),
+                                plan,
+                              };
+                              const next = [v, ...armVariants].slice(0, 10);
+                              setArmVariants(next);
+                              saveArmVariants(next);
+                              flash(`📥 Импортирован: ${v.name}`);
+                            } catch {
+                              flash('⚠ Битый JSON-файл');
+                            }
+                          })
+                          .catch(() => flash('⚠ Не удалось прочитать файл'));
+                      }}
+                    />
                   </AdField>
                 </div>
               </AdSec>
-              <ArmAnnotationsPanel plan={viewPlan} lines={annotationLines} onChanged={()=>setAnnotationTick(t=>t+1)} />
-              <AdSec title="📖 Обоснование" collapsible defaultOpen={false} summary={`${builtPlan.rationale.length} причин`}>
-                <div data-arm="rationale">{builtPlan.rationale.map((r: string, i: number) => <div key={i} className="ad-finding" data-level="info">{r}</div>)}</div>
+              <ArmAnnotationsPanel
+                plan={viewPlan}
+                lines={annotationLines}
+                onChanged={() => setAnnotationTick((t) => t + 1)}
+              />
+              <AdSec
+                title="📖 Обоснование"
+                collapsible
+                defaultOpen={false}
+                summary={`${(builtPlan.rationale || []).length} причин`}
+              >
+                <div data-arm="rationale">
+                  {(builtPlan.rationale || []).map((r: string, i: number) => (
+                    <div key={i} className="ad-finding" data-level="info">
+                      {r}
+                    </div>
+                  ))}
+                </div>
               </AdSec>
               <AdSec title="📊 Сводка" collapsible defaultOpen={false} summary="фазы · объём">
-                <div className="ad-muted"><b>{viewPlan.report?.summary}</b></div>
+                <div className="ad-muted">
+                  <b>{viewPlan.report?.summary}</b>
+                </div>
                 <div data-arm="report-lines">
-                  {viewPlan.report?.techniqueRationale.map((r: string, i: number) => <div key={i} className="ad-finding" data-level="info">{r}</div>)}
-                  {viewPlan.report?.gripRationale.map((r: string, i: number) => <div key={i} className="ad-finding" data-level="info">{r}</div>)}
+                  {viewPlan.report?.techniqueRationale.map((r: string, i: number) => (
+                    <div key={i} className="ad-finding" data-level="info">
+                      {r}
+                    </div>
+                  ))}
+                  {viewPlan.report?.gripRationale.map((r: string, i: number) => (
+                    <div key={i} className="ad-finding" data-level="info">
+                      {r}
+                    </div>
+                  ))}
                 </div>
               </AdSec>
               <AdCta>
-                <AdBtn variant="primary" block hero onClick={() => setStep('year')}>Далее: Год →</AdBtn>
-                <AdBtn variant="ghost" block onClick={() => setStep('quality')}>← Назад</AdBtn>
+                <AdBtn variant="primary" block hero onClick={() => setStep('year')}>
+                  Далее: Год →
+                </AdBtn>
+                <AdBtn variant="ghost" block onClick={() => setStep('quality')}>
+                  ← Назад
+                </AdBtn>
               </AdCta>
             </>
           )}
@@ -3160,102 +5947,200 @@ const GRIP_GROUPS: Array<{ title: string; ids: ArmImplement[] }> = [
       )}
       {step === 'year' && (
         <AdCard className="ad-stepview">
-           <AdSec title="🗓 Год по блокам" hint="Серия → блоки base/strength/peaking (+тейпер A/B) → сборка каждым buildArmBlock. Год собирается в общий годовой план (annual-training, направление «Арм») — плюс остаётся превью здесь.">
+          <AdSec
+            title="🗓 Год по блокам"
+            hint="Серия → блоки base/strength/peaking (+тейпер A/B) → сборка каждым buildArmBlock. Год собирается в общий годовой план (annual-training, направление «Арм») — плюс остаётся превью здесь."
+          >
             <AdGrid cols="2">
               <div>
                 <div className="ad-fl">Серия</div>
                 <div className="ad-chips">
-                  {YEAR_SERIES.map(o=> <AdChip key={o.id} active={yearSeries===o.id} onClick={()=>{ setYearSeries(o.id); setYearBuilt(null); }}>{o.label}</AdChip>)}
+                  {YEAR_SERIES.map((o) => (
+                    <AdChip
+                      key={o.id}
+                      active={yearSeries === o.id}
+                      onClick={() => {
+                        setYearSeries(o.id);
+                        setYearBuilt(null);
+                      }}
+                    >
+                      {o.label}
+                    </AdChip>
+                  ))}
                 </div>
               </div>
               <AdField label="Недель в году">
-                <input type="number" min={4} max={52} value={yearWeeks} onChange={e=>{ setYearWeeks(Math.max(4, Math.min(52, parseInt(e.target.value) || 52))); setYearBuilt(null); }} />
+                <input
+                  type="number"
+                  min={4}
+                  max={52}
+                  value={yearWeeksInput}
+                  onChange={(e) => {
+                    const raw = e.target.value;
+                    setYearWeeksInput(raw);
+                    const n = parseInt(raw, 10);
+                    if (Number.isFinite(n) && n >= 4 && n <= 52) {
+                      setYearWeeks(n);
+                      setYearBuilt(null);
+                    }
+                  }}
+                  onBlur={() => {
+                    const n = parseInt(yearWeeksInput, 10);
+                    const next = Number.isFinite(n) ? Math.max(4, Math.min(52, n)) : yearWeeks;
+                    setYearWeeks(next);
+                    setYearWeeksInput(String(next));
+                  }}
+                />
               </AdField>
             </AdGrid>
-            <AdSwitch checked={yearSuggest} onChange={(v)=>{ setYearSuggest(v); setYearBuilt(null); }} label="Именные циклы в блоках (авто-подгонка вкл)" />
+            <AdSwitch
+              checked={yearSuggest}
+              onChange={(v) => {
+                setYearSuggest(v);
+                setYearBuilt(null);
+              }}
+              label="Именные циклы в блоках (авто-подгонка вкл)"
+            />
             <div className="ad-list" data-arm="year-blocks">
-              {yearBlocks.map((b: any)=>(
+              {yearBlocks.map((b: any) => (
                 <div key={b.blockKey} className="ad-sec ad-bio" data-valid="na">
                   <div className="ad-row" style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
-                    <span><b>{b.phase}</b> <span className="ad-muted">· {b.weeks} нед · приоритет {b.priority}</span></span>
+                    <span>
+                      <b>{b.phase}</b>{' '}
+                      <span className="ad-muted">
+                        · {b.weeks} нед · приоритет {b.priority}
+                      </span>
+                    </span>
                     <span className="ad-tag">{b.focus}</span>
                   </div>
-                  {b.suggestedCycleId && <div className="ad-tip">💡 Цикл: {b.suggestedCycleNote || b.suggestedCycleId}</div>}
+                  {b.suggestedCycleId && (
+                    <div className="ad-tip">💡 Цикл: {b.suggestedCycleNote || b.suggestedCycleId}</div>
+                  )}
                 </div>
               ))}
             </div>
           </AdSec>
           {yearBuilt && (
-            <AdSec title="📊 Итог года" collapsible defaultOpen={true} summary={`${ruCount(yearBuilt.length, RU_BLOCKS)}`}>
+            <AdSec
+              title="📊 Итог года"
+              collapsible
+              defaultOpen={true}
+              summary={`${ruCount(yearBuilt.length, RU_BLOCKS)}`}
+            >
               <div className="ad-list" data-arm="year-result">
-                {yearBuilt.map((r: any)=>(
+                {yearBuilt.map((r: any) => (
                   <div key={r.blockKey} className="ad-sec ad-bio" data-valid={r.warnings.length ? 'warn' : 'ok'}>
                     <div className="ad-row" style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
-                      <span><b>{r.blockKey}</b> <span className="ad-muted">· {r.weeks.length} нед{r.taperApplied ? ' · тейпер' : ''}{r.peakApplied ? ' · пик' : ''}</span></span>
+                      <span>
+                        <b>{r.blockKey}</b>{' '}
+                        <span className="ad-muted">
+                          · {r.weeks.length} нед{r.taperApplied ? ' · тейпер' : ''}
+                          {r.peakApplied ? ' · пик' : ''}
+                        </span>
+                      </span>
                       {r.warnings.length > 0 && <span className="ad-tag">⚠ {r.warnings.length}</span>}
                     </div>
-                    {r.warnings.slice(0, 3).map((w: string, i: number)=><div key={i} className="ad-finding" data-level="warn">{w}</div>)}
+                    {r.warnings.slice(0, 3).map((w: string, i: number) => (
+                      <div key={i} className="ad-finding" data-level="warn">
+                        {w}
+                      </div>
+                    ))}
                   </div>
                 ))}
               </div>
             </AdSec>
           )}
           <AdCta>
-            <AdBtn variant="primary" block hero disabled={yearBusy} onClick={async ()=>{
-              if (yearBusy) return;
-              setYearBusy(true);
-              try {
-                // yield кадра: тяжёлая сборка не фризит UI, видна busy-строка
-                await new Promise(r=>setTimeout(r, 30));
-                const res = yearBlocks.map((b: any)=>{
-                  // 26.10.2026 было→стало: год собирался БЕЗ травм/оборудования/мобильности
-                  // и цели — профиль с исключённым grip_support получал хватовые блоки,
-                  // «Масса предплечья» молча превращалась в strength (buildArmBlock берёт
-                  // цель из фазы). Теперь общий профиль-патч + goal/sex/daysPerWeek едут в блок.
-                  const cfg: any = {
-                    ...armBuilderProfilePatch(profileSnapshot),
-                    discipline, level, technique, gripFocus, workMax,
-                    weakPoints, focusGroup: focusGroup || undefined, specialization,
-                    patternId: patternId || undefined,
-                    goal, sex: profileSnapshot.sex, daysPerWeek,
-                    taperEnabled: b.priority !== 'C',
-                    competitionPriority: b.priority,
-                    cycleId: yearSuggest ? b.suggestedCycleId : undefined,
-                    cycleConsent: yearSuggest ? true : undefined,
-                  };
-                  return buildArmBlock({ blockKey: b.blockKey, weeks: b.weeks, phase: b.phase }, cfg, { level });
-                });
-                 setYearBuilt(res);
-                 const warns = res.reduce((a: number, r: any)=>a + (r.warnings || []).length, 0);
-                 // PRO-7 P0: тот же год уходит в ОБЩИЙ годовой план (annual-training),
-                 // а не остаётся превью внутри конструктора. Макро строится из тех же
-                 // блоков через armYearBlocksToMacro — единый источник, без второй копии.
-                 let annualNote = 'общий годовой план не записан';
-                 try {
-                   const totalWeeks = yearBlocks.reduce((a: number, b: any) => a + (b.weeks || 0), 0);
-                   const macro = armYearBlocksToMacro(yearBlocks as any, totalWeeks || undefined);
-                   let plan = annualPlanFromMacro(macro, { level, workMax, weakPoints });
+            <AdBtn
+              variant="primary"
+              block
+              hero
+              disabled={yearBusy}
+              onClick={async () => {
+                if (yearBusy) return;
+                setYearBusy(true);
+                try {
+                  // yield кадра: тяжёлая сборка не фризит UI, видна busy-строка
+                  await new Promise((r) => setTimeout(r, 30));
+                  const res = yearBlocks.map((b: any) => {
+                    // 26.10.2026 было→стало: год собирался БЕЗ травм/оборудования/мобильности
+                    // и цели — профиль с исключённым grip_support получал хватовые блоки,
+                    // «Масса предплечья» молча превращалась в strength (buildArmBlock берёт
+                    // цель из фазы). Теперь общий профиль-патч + goal/sex/daysPerWeek едут в блок.
+                    const cfg: any = {
+                      ...armBuilderProfilePatch(profileSnapshot),
+                      discipline,
+                      level,
+                      technique,
+                      gripFocus,
+                      workMax,
+                      weakPoints,
+                      focusGroup: specialization ? focusGroup || undefined : undefined,
+                      specialization,
+                      patternId: patternId || undefined,
+                      goal,
+                      sex: profileSnapshot.sex,
+                      daysPerWeek,
+                      taperEnabled: b.priority !== 'C',
+                      competitionPriority: b.priority,
+                      cycleId: yearSuggest ? b.suggestedCycleId : undefined,
+                      cycleConsent: yearSuggest ? true : undefined,
+                    };
+                    return buildArmBlock({ blockKey: b.blockKey, weeks: b.weeks, phase: b.phase }, cfg, { level });
+                  });
+                  setYearBuilt(res);
+                  const warns = res.reduce((a: number, r: any) => a + (r.warnings || []).length, 0);
+                  // PRO-7 P0: тот же год уходит в ОБЩИЙ годовой план (annual-training),
+                  // а не остаётся превью внутри конструктора. Макро строится из тех же
+                  // блоков через armYearBlocksToMacro — единый источник, без второй копии.
+                  let annualNote = 'общий годовой план не записан';
+                  try {
+                    const totalWeeks = yearBlocks.reduce((a: number, b: any) => a + (b.weeks || 0), 0);
+                    const macro = armYearBlocksToMacro(yearBlocks as any, totalWeeks || undefined);
+                    let plan = annualPlanFromMacro(macro, { level, workMax, weakPoints });
                     for (const src of yearBlocks as any[]) {
                       plan = setAnnualBlockConfig(plan, src.blockKey, {
                         ...armBuilderProfilePatch(profileSnapshot),
-                        discipline, level, technique, gripFocus, workMax,
-                        weakPoints, focusGroup: focusGroup || undefined, specialization,
+                        discipline,
+                        level,
+                        technique,
+                        gripFocus,
+                        workMax,
+                        weakPoints,
+                        focusGroup: specialization ? focusGroup || undefined : undefined,
+                        specialization,
                         patternId: patternId || undefined,
-                        goal, sex: profileSnapshot.sex, daysPerWeek,
+                        goal,
+                        sex: profileSnapshot.sex,
+                        daysPerWeek,
                         taper: { enabled: src.priority !== 'C', weeks: src.taperWeeks || 2 },
                         cycleId: yearSuggest ? src.suggestedCycleId : undefined,
                         cycleConsent: yearSuggest ? true : undefined,
                       } as any);
                     }
-                   const outcome = buildAnnualPlan(plan, macro);
-                   saveAnnualTrainingPlan(outcome.plan);
-                   annualNote = `в общий годовой план: собрано ${outcome.built}, пропущено ${outcome.skipped}, ошибок ${outcome.failed}`;
-                   if (outcome.errors.length) annualNote += ` · первая: ${outcome.errors[0].blockKey} — ${outcome.errors[0].message}`;
-                 } catch (ae: any) { annualNote = `в общий годовой план не записан: ${ae?.message || ae}`; }
-                 flash(`🗓 Год собран: ${ruCount(res.length, RU_BLOCKS)} · тейпер ${res.filter((r: any)=>r.taperApplied).length} · предупр. ${warns} · ${annualNote}`);
-              } catch (e: any) { flash(`❌ Год: ${e?.message || e}`); } finally { setYearBusy(false); }
-            }}>{yearBusy ? '⏳ Собираем год…' : '🗓 Собрать год'}</AdBtn>
-            <AdBtn variant="ghost" block onClick={()=>setStep('export')}>← Назад</AdBtn>
+                    const outcome = buildAnnualPlan(plan, macro);
+                    saveAnnualTrainingPlan(outcome.plan);
+                    annualNote = `в общий годовой план: собрано ${outcome.built}, пропущено ${outcome.skipped}, ошибок ${outcome.failed}`;
+                    if (outcome.errors.length)
+                      annualNote += ` · первая: ${outcome.errors[0].blockKey} — ${outcome.errors[0].message}`;
+                  } catch (ae: any) {
+                    annualNote = `в общий годовой план не записан: ${ae?.message || ae}`;
+                  }
+                  flash(
+                    `🗓 Год собран: ${ruCount(res.length, RU_BLOCKS)} · тейпер ${res.filter((r: any) => r.taperApplied).length} · предупр. ${warns} · ${annualNote}`,
+                  );
+                } catch (e: any) {
+                  flash(`❌ Год: ${e?.message || e}`);
+                } finally {
+                  setYearBusy(false);
+                }
+              }}
+            >
+              {yearBusy ? '⏳ Собираем год…' : '🗓 Собрать год'}
+            </AdBtn>
+            <AdBtn variant="ghost" block onClick={() => setStep('export')}>
+              ← Назад
+            </AdBtn>
           </AdCta>
         </AdCard>
       )}

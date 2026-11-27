@@ -8,9 +8,12 @@ import { isArmTendonMuscle } from './arm-tendon-sets.engine';
 
 export function calcArmMetrics(plan: ArmPlan): ArmMetrics {
   const totalSetsPerWeek: Record<number, number> = {};
-  let totalSets = 0, totalRir = 0, cnt = 0, tableSets = 0, tendonSets = 0, sideSets = 0;
+  let totalSets = 0, totalRir = 0, cnt = 0, tableSets = 0;
+  // 26.10.2026 было→стало: tendonLoad/sidePressureLoad суммировали ВЕСЬ план, хотя
+  // это НЕДЕЛЬНЫЕ гарды (22/9) — 8-недельный план давал 64 вместо 8. Теперь пик по неделям.
+  let maxTendonSets = 0, maxSideSets = 0;
   for (const wk of plan.weeks) {
-    let wkSets = 0;
+    let wkSets = 0, wkTendon = 0, wkSide = 0;
     for (const sess of wk.sessions) {
       for (const ex of sess.exercises) {
         wkSets += ex.sets;
@@ -18,11 +21,13 @@ export function calcArmMetrics(plan: ArmPlan): ArmMetrics {
         totalRir += ex.rir * ex.sets;
         cnt += ex.sets;
         if (ex.isTable) tableSets += ex.sets;
-        if (isArmTendonMuscle(ex.muscle)) tendonSets += ex.sets;
-        if (ex.muscle === 'side_pressure') sideSets += ex.sets;
+        if (isArmTendonMuscle(ex.muscle)) wkTendon += ex.sets;
+        if (ex.muscle === 'side_pressure') wkSide += ex.sets;
       }
     }
     totalSetsPerWeek[wk.week] = wkSets;
+    if (wkTendon > maxTendonSets) maxTendonSets = wkTendon;
+    if (wkSide > maxSideSets) maxSideSets = wkSide;
   }
   const avgIntensity = cnt > 0 ? (10 - totalRir / cnt) : 7;
   const tableTimePct = totalSets > 0 ? tableSets / totalSets : 0;
@@ -34,8 +39,8 @@ export function calcArmMetrics(plan: ArmPlan): ArmMetrics {
     tableSessionShare: tableSummary.tableSessionShare,
     tableMinutesShare: tableSummary.tableMinutesShare,
     tableVolumeShare: tableTimePct,
-    tendonLoad: tendonSets,
-    sidePressureLoad: sideSets,
+    tendonLoad: maxTendonSets,
+    sidePressureLoad: maxSideSets,
   };
 }
 
@@ -46,7 +51,7 @@ export function armMetricsSummary(m: ArmMetrics): string[] {
     `Table sessions: ${(m.tableSessionShare*100).toFixed(0)}%`,
     `Table minutes: ${m.tableMinutesShare == null ? 'нет данных' : `${(m.tableMinutesShare*100).toFixed(0)}%`}`,
     `Table volume: ${(m.tableVolumeShare*100).toFixed(0)}%`,
-    `Tendon load: ${ruCount(m.tendonLoad, RU_SETS)}`,
-    `Side pressure: ${ruCount(m.sidePressureLoad, RU_SETS)}`,
+    `Tendon load: ${ruCount(m.tendonLoad, RU_SETS)} (пиковая неделя)`,
+    `Side pressure: ${ruCount(m.sidePressureLoad, RU_SETS)} (пиковая неделя)`,
   ];
 }

@@ -11,13 +11,24 @@ import { injectArmCorrections } from '../arm-diagnostics-injection.engine';
 import type { ArmWeakPoint } from '../arm-biomechanics.engine';
 
 function basePlan(level = 'intermediate', weeks = 4) {
-  const p = buildArmPlan({ discipline: 'armwrestling', patternId: 'arm_3_full', level, goal: 'strength', technique: 'toproll', weeks, gripFocus: 'support' } as any);
+  const p = buildArmPlan({
+    discipline: 'armwrestling',
+    patternId: 'arm_3_full',
+    level,
+    goal: 'strength',
+    technique: 'toproll',
+    weeks,
+    gripFocus: 'support',
+  } as any);
   return finalizeArmPlan(p, { level });
 }
 
 function sess(daysAgo: number, name: string, muscle: string, w: number, r: number, nSets = 2) {
   const d = new Date(Date.now() - daysAgo * 86400000).toISOString().slice(0, 10);
-  return { date: d, exercises: [{ exerciseName: name, muscle, sets: Array.from({ length: nSets }, () => ({ weightKg: w, reps: r })) }] } as any;
+  return {
+    date: d,
+    exercises: [{ exerciseName: name, muscle, sets: Array.from({ length: nSets }, () => ({ weightKg: w, reps: r })) }],
+  } as any;
 }
 
 describe('arm P0: audit', () => {
@@ -105,7 +116,9 @@ describe('arm P0: rank', () => {
   it('уже в плане — деприоритизация', () => {
     const a = rankCorrectionsForArm('pron_open');
     const b = rankCorrectionsForArm('pron_open', { inPlanIds: ['pronation_cable'] });
-    expect(b.find((t) => t.id === 'pronation_cable')!.score).toBeLessThan(a.find((t) => t.id === 'pronation_cable')!.score);
+    expect(b.find((t) => t.id === 'pronation_cable')!.score).toBeLessThan(
+      a.find((t) => t.id === 'pronation_cable')!.score,
+    );
   });
   it('fatigue поднимает iso/strap', () => {
     const a = rankCorrectionsForArm('pron_lock', {});
@@ -113,7 +126,15 @@ describe('arm P0: rank', () => {
     expect(b.find((t) => /strap/i.test(t.id))!.score).toBeGreaterThanOrEqual(a.find((t) => /strap/i.test(t.id))!.score);
   });
   it('детерминирован', () => {
-    expect(rankCorrectionsForArm('side_mid').map((t) => t.id).join(',')).toBe(rankCorrectionsForArm('side_mid').map((t) => t.id).join(','));
+    expect(
+      rankCorrectionsForArm('side_mid')
+        .map((t) => t.id)
+        .join(','),
+    ).toBe(
+      rankCorrectionsForArm('side_mid')
+        .map((t) => t.id)
+        .join(','),
+    );
   });
 });
 
@@ -192,16 +213,27 @@ describe('arm P0: injection v2', () => {
     const w2has = plan.weeks[1].sessions.some((s) => s.exercises.some((e) => e.exerciseId === 'pronation_cable'));
     expect(w2has).toBe(false);
   });
-  it('weekIdxs все недели — инъекция в каждую', () => {
+  it('weekIdxs все недели — инъекция в каждую рабочую (тейпер/пик пропускаются)', () => {
     const plan = basePlan('advanced', 4);
-    const idx = plan.weeks.map((_, i) => i).filter((i) => !(plan.weeks[i] as any).deload);
-    const res = injectArmCorrections(plan, ['cup_start'], { weekIdxs: idx, budget: 500 });
+    // 28.11.2026 (review): инъекция в тейпер/пик более не выполняется — иначе
+    // добавка шла мимо 45%-кривой. Рабочие недели = без deload/taper/peaking.
+    const idx = plan.weeks
+      .map((_, i) => i)
+      .filter((i) => {
+        const w: any = plan.weeks[i];
+        return !w.deload && !w.taper && w.phase !== 'peaking';
+      });
+    expect(idx.length).toBeGreaterThan(0);
+    const res = injectArmCorrections(plan, ['cup_start'], { weekIdxs: plan.weeks.map((_, i) => i), budget: 500 });
     expect(res.injected).toBeGreaterThanOrEqual(idx.length);
+    expect(res.notes.some((n) => /делод\/тейпер\/пик/.test(n))).toBe(true);
   });
   it('targetSets уважается (2 вместо 3)', () => {
     const plan = basePlan('advanced', 2);
     const res = injectArmCorrections(plan, ['pron_open'], { budget: 500, targetSets: { pron_open: 2 } });
-    const found = res.plan.weeks[0].sessions.flatMap((s) => s.exercises).find((e) => e.exerciseId === 'pronation_cable');
+    const found = res.plan.weeks[0].sessions
+      .flatMap((s) => s.exercises)
+      .find((e) => e.exerciseId === 'pronation_cable');
     expect(found?.sets).toBe(2);
   });
   it('deload-неделя пропускается с note', () => {

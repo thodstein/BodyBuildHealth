@@ -30,8 +30,28 @@ describe('arm TOP T7 L/R + Table-IQ', () => {
     expect(ok.withinMrv).toBe(true);
     expect(ok.note).toMatch(/CRITICAL/);
   });
+  it('порог 7%/12% — по сырому %, округление только для вывода', () => {
+    // 28.11.2026 было→стало: 6.6→7 включало добивку, 11.6→12 давало CRITICAL и 2×/нед.
+    const a = planLrSplit({ leftKg: 93.4, rightKg: 100, baseSets: 10, mrvSets: 40 });
+    expect(a.weakSets).toBe(10);
+    expect(a.weakFreq).toBe(1);
+    const b = planLrSplit({ leftKg: 93.1, rightKg: 100, baseSets: 10, mrvSets: 40 });
+    expect(b.weakSets).toBe(10);
+    const c = planLrSplit({ leftKg: 93, rightKg: 100, baseSets: 10, mrvSets: 40 });
+    expect(c.weakSets).toBe(12);
+    expect(c.weakFreq).toBe(1);
+    expect(c.note).toMatch(/≥7%/);
+    const near12 = planLrSplit({ leftKg: 88.4, rightKg: 100, baseSets: 10, mrvSets: 40 });
+    expect(near12.weakFreq).toBe(1);
+    expect(near12.note).not.toMatch(/CRITICAL/);
+  });
   it('Table-IQ: фолы и срывы дают рычаги', () => {
-    const iq = analyzeTableIq({ bouts: [{ fouls: 2, slip: true, strap: true, centerHoldSec: 3, win: false, finishSec: 20 }, { fouls: 1, win: true, centerHoldSec: 8, finishSec: 8 }] });
+    const iq = analyzeTableIq({
+      bouts: [
+        { fouls: 2, slip: true, strap: true, centerHoldSec: 3, win: false, finishSec: 20 },
+        { fouls: 1, win: true, centerHoldSec: 8, finishSec: 8 },
+      ],
+    });
     expect(iq.bouts).toBe(2);
     expect(iq.levers.length).toBeGreaterThanOrEqual(1);
     expect(iq.levers.join(' ')).toMatch(/Фолы|Срывы/);

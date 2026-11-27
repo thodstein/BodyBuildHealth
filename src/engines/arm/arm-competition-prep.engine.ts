@@ -7,6 +7,8 @@
  * мини-блок 1×/нед вместо заглушки LegsCore.
  */
 
+import { parseLocalIsoDate } from '../../core/local-date';
+
 export interface WeightCutPlan {
   startKg: number;
   targetKg: number;
@@ -64,9 +66,13 @@ export function planWeightCut(input: {
 /** Недель до старта по датам (ISO). Минимум 1, прошлое → 1 (срочный пик). */
 export function weeksUntilStart(fromIso?: string, startIso?: string): number {
   try {
-    const from = fromIso ? new Date(fromIso) : new Date();
-    const to = startIso ? new Date(startIso) : new Date();
-    if (Number.isNaN(from.getTime()) || Number.isNaN(to.getTime())) return 8;
+    // 26.10.2026 было→стало: `new Date('YYYY-MM-DD')` = UTC-полночь, в UTC+X
+    // недели округлялись на +1. Date-only — локальная дата (канон), таймстемп — как есть.
+    const DATE_ONLY = /^\d{4}-\d{2}-\d{2}$/;
+    const parseDay = (iso: string): Date | null => (DATE_ONLY.test(iso) ? parseLocalIsoDate(iso) : new Date(iso));
+    const from = fromIso ? parseDay(fromIso) : new Date();
+    const to = startIso ? parseDay(startIso) : new Date();
+    if (!from || !to || Number.isNaN(from.getTime()) || Number.isNaN(to.getTime())) return 8;
     const diffMs = to.getTime() - from.getTime();
     return Math.max(1, Math.ceil(diffMs / (7 * 86400000)));
   } catch {

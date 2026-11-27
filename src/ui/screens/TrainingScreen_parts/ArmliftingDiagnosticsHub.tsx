@@ -14,29 +14,74 @@ import {
   prescriptionForWeakest,
   assessLiftRules,
 } from '../../../engines/arm/armlifting-diagnostics.engine';
-import { auditArmliftPlan, worstArmliftLink, ARMLIFT_AUDIT_LINKS } from '../../../engines/arm/armlift-plan-audit.engine';
+import {
+  auditArmliftPlan,
+  worstArmliftLink,
+  ARMLIFT_AUDIT_LINKS,
+} from '../../../engines/arm/armlift-plan-audit.engine';
 import { buildArmliftingHtml, buildArmliftingCsv } from '../../../engines/arm/armlifting-diagnostics.engine';
 import { buildArmliftIcs } from '../../../engines/arm/armlift-ics.engine';
 import { printHtmlApk, shareOutcomeLabel, saveTextFileApk, saveCsvApk } from '../../../core/apk-share';
 import { armliftClassFor, armliftClassLine } from '../../../engines/arm/armlift-weight-class.engine';
 import { loadPlatformLog, planLastManStanding } from '../../../engines/arm/arm-platform.engine';
-import { failuresFor, faultsFor, movementFor, relevantTestsFor, diagImplementForReportWeakest, ARMLIFT_DIAG_IMPLEMENT_OPTS } from '../../../engines/arm/armlift-failure-modes.engine';
+import {
+  failuresFor,
+  faultsFor,
+  movementFor,
+  relevantTestsFor,
+  diagImplementForReportWeakest,
+  ARMLIFT_DIAG_IMPLEMENT_OPTS,
+} from '../../../engines/arm/armlift-failure-modes.engine';
 import { attemptTimelineFor, phaseForFailurePoint } from '../../../engines/arm/armlift-attempt-timeline.engine';
 import { assessArmliftConditions } from '../../../engines/arm/armlift-conditions.engine';
 import { assessArmliftHand, holdCurveFor } from '../../../engines/arm/armlift-hand.engine';
-import { assessArmliftPainMap, ARMLIFT_PAIN_ZONES, type ArmliftPainZone } from '../../../engines/arm/armlift-pain-map.engine';
+import {
+  assessArmliftPainMap,
+  ARMLIFT_PAIN_ZONES,
+  type ArmliftPainZone,
+} from '../../../engines/arm/armlift-pain-map.engine';
 import { analyzeArmliftVideo } from '../../../engines/arm/armlift-video-flags.engine';
 import { planArmliftAttempts } from '../../../engines/arm/armlift-attempt-plan.engine';
 import { diagnoseArmlift, ARMLIFT_WEAK_LINK_SHORT_RU } from '../../../engines/arm/armlift-diagnosis.engine';
-import { diagnoseArmliftCause, countGripSessions, flexExtRatio, ARMLIFT_CAUSE_RU, ARMLIFT_MOBILITY_FAIL_RU, ARMLIFT_ACWR_ZONE_RU } from '../../../engines/arm/armlift-cause.engine';
-import { benchmarkPinchHold, benchmarkFarmerHold, benchmarkCoc, benchmarkSilverHold, overallGripLevel, ARMLIFT_LEVEL_RU, testProtocolFor } from '../../../engines/arm/armlift-benchmarks.engine';import { saveDiagSnapshot, lastSnapshotFor, retestVerdict, retestReliability, weeksBetween, loadDiagHistory, clearDiagHistory, historyDeltaFor, completenessTrend } from '../../../engines/arm/armlift-history.engine';
+import {
+  diagnoseArmliftCause,
+  countGripSessions,
+  flexExtRatio,
+  ARMLIFT_CAUSE_RU,
+  ARMLIFT_MOBILITY_FAIL_RU,
+  ARMLIFT_ACWR_ZONE_RU,
+} from '../../../engines/arm/armlift-cause.engine';
+import {
+  benchmarkPinchHold,
+  benchmarkFarmerHold,
+  benchmarkCoc,
+  benchmarkSilverHold,
+  overallGripLevel,
+  ARMLIFT_LEVEL_RU,
+  testProtocolFor,
+} from '../../../engines/arm/armlift-benchmarks.engine';
+import {
+  saveDiagSnapshot,
+  lastSnapshotFor,
+  retestVerdict,
+  retestReliability,
+  weeksBetween,
+  loadDiagHistory,
+  clearDiagHistory,
+  historyDeltaFor,
+  completenessTrend,
+} from '../../../engines/arm/armlift-history.engine';
 import { assessArmliftMobility } from '../../../engines/arm/armlift-mobility.engine';
 import { loadSRPESessions } from '../../../engines/pro/srpe-store';
 import { toDailyLoads, acuteChronicRatio } from '../../../engines/pro/training-load.engine';
 import { rankArmliftCorrections, buildArmliftSpecBlock } from '../../../engines/arm/armlift-correction.engine';
 
 import { buildArmliftAnnualOverlay, saveArmliftAnnualOverlay } from '../../../engines/arm/armlift-annual-bridge.engine';
-import { correctionsToInjectionItems, intensityForCause, rirForCause } from '../../../engines/arm/armlift-injection.engine';
+import {
+  correctionsToInjectionItems,
+  intensityForCause,
+  rirForCause,
+} from '../../../engines/arm/armlift-injection.engine';
 import { orderCorrectionsForDay, sessionOrderNote } from '../../../engines/arm/armlift-session-rules.engine';
 import { diagnosticCompleteness } from '../../../engines/arm/armlift-completeness.engine';
 import { applyToPlanner } from './planner-bridge';
@@ -64,16 +109,40 @@ const RULES_CHECK_ITEMS = [
 
 /** PRO-визуал: карточка числового замера 48px (HubNum-стиль).
  *  Контракты 1-в-1: input с тем же aria-label/inputMode/placeholder/value/onChange. */
-function LiftNum({ label, value, onChange, placeholder, aria }: {
-  label: string; value: string; onChange: (v: string) => void; placeholder: string; aria: string;
+function LiftNum({
+  label,
+  value,
+  onChange,
+  placeholder,
+  aria,
+}: {
+  label: string;
+  value: string;
+  onChange: (v: string) => void;
+  placeholder: string;
+  aria: string;
 }) {
   return (
     <div className="lift-num">
       <span className="ad-fl">{label}</span>
       <div className="lift-num-row">
-        <input inputMode="decimal" value={value} onChange={(e) => onChange(e.target.value)} placeholder={placeholder} aria-label={aria} />
+        <input
+          inputMode="decimal"
+          value={value}
+          onChange={(e) => onChange(e.target.value)}
+          placeholder={placeholder}
+          aria-label={aria}
+        />
         {value ? (
-          <button type="button" className="lift-num-clear" aria-label="Очистить" title={`Очистить ${aria}`} onClick={() => onChange('')}>✕</button>
+          <button
+            type="button"
+            className="lift-num-clear"
+            aria-label="Очистить"
+            title={`Очистить ${aria}`}
+            onClick={() => onChange('')}
+          >
+            ✕
+          </button>
         ) : null}
       </div>
     </div>
@@ -81,46 +150,94 @@ function LiftNum({ label, value, onChange, placeholder, aria }: {
 }
 
 const STORAGE_KEY = 'he_armlifting_diag_v1';
+/** Аудит 2026-11: явный отзыв согласия переживает перезагрузку, не перезаписывая сами данные. */
+const CONSENT_KEY = 'he_armlifting_consent_v1';
 /** PRO-5: диагностика движений — отдельный ключ, замеры не трогаем. */
 const DIAG_KEY = 'he_armlifting_diag2_v1';
 type DiagTab = 'pomost' | 'diag' | 'corr';
 type DiagState = {
-  implement: string; failurePoint: string; faultIds: string[];
-  pinchHoldSec: string; farmerHoldSec: string; wristExtWeak: boolean;
-  flexHoldSec: string; extHoldSec: string;
-  thumbStiff: boolean; wristExtLimited: boolean; wristFlexLimited: boolean;
-  wristExtDeg: string; wristFlexDeg: string; thumbOppOk: boolean;
-  hipHingePoor: boolean; pain: boolean; elbowPain: boolean;
-  skinTear: boolean; thumbWebPain: boolean;
+  implement: string;
+  failurePoint: string;
+  faultIds: string[];
+  pinchHoldSec: string;
+  farmerHoldSec: string;
+  wristExtWeak: boolean;
+  flexHoldSec: string;
+  extHoldSec: string;
+  thumbStiff: boolean;
+  wristExtLimited: boolean;
+  wristFlexLimited: boolean;
+  wristExtDeg: string;
+  wristFlexDeg: string;
+  thumbOppOk: boolean;
+  hipHingePoor: boolean;
+  pain: boolean;
+  elbowPain: boolean;
+  skinTear: boolean;
+  thumbWebPain: boolean;
   specWeeks: 4 | 6;
   /** PRO-6 M5: условия замера (режут ложные слабости). */
-  condRtVersion: string; condUncalib: boolean; condLiquid: boolean; condCold: boolean;
-  condDiameterMm: string; condPlateCorrectionKg: string;
+  condRtVersion: string;
+  condUncalib: boolean;
+  condLiquid: boolean;
+  condCold: boolean;
+  condDiameterMm: string;
+  condPlateCorrectionKg: string;
   /** PRO-6 M3/M4: рука + второй холд (опционально, пусто = тихо). */
-  handSpanCm: string; handPalmCm: string; handThumbCm: string;
-  pinchSubSec: string; farmerSubSec: string;
+  handSpanCm: string;
+  handPalmCm: string;
+  handThumbCm: string;
+  pinchSubSec: string;
+  farmerSubSec: string;
   /** PRO-6 M8: карта боли (зоны + красные флаги). */
-  painZones: string[]; condNumb: boolean; condSwell: boolean; condNight: boolean;
+  painZones: string[];
+  condNumb: boolean;
+  condSwell: boolean;
+  condNight: boolean;
   /** Аудит 2026-10: чек-лист «замер по правилам» IronMind (5 пунктов). */
   rulesChecks: Array<boolean | undefined>;
   /** PRO-6 M6: видео-лайт (ручной угломер, пусто = тихо). CSV-импорт убран 2026-09-27. */
-  videoWristDeg: string; videoParallelBad: boolean;
+  videoWristDeg: string;
+  videoParallelBad: boolean;
 };
 const DEFAULT_DIAG: DiagState = {
-  implement: 'rolling_thunder', failurePoint: '', faultIds: [],
-  pinchHoldSec: '', farmerHoldSec: '', wristExtWeak: false,
-  flexHoldSec: '', extHoldSec: '',
-  thumbStiff: false, wristExtLimited: false, wristFlexLimited: false,
-  wristExtDeg: '', wristFlexDeg: '', thumbOppOk: true,
-  hipHingePoor: false, pain: false, elbowPain: false,
-  skinTear: false, thumbWebPain: false,
+  implement: 'rolling_thunder',
+  failurePoint: '',
+  faultIds: [],
+  pinchHoldSec: '',
+  farmerHoldSec: '',
+  wristExtWeak: false,
+  flexHoldSec: '',
+  extHoldSec: '',
+  thumbStiff: false,
+  wristExtLimited: false,
+  wristFlexLimited: false,
+  wristExtDeg: '',
+  wristFlexDeg: '',
+  thumbOppOk: true,
+  hipHingePoor: false,
+  pain: false,
+  elbowPain: false,
+  skinTear: false,
+  thumbWebPain: false,
   specWeeks: 4,
-  condRtVersion: 'unknown', condUncalib: false, condLiquid: false, condCold: false,
-  condDiameterMm: '', condPlateCorrectionKg: '',
-  handSpanCm: '', handPalmCm: '', handThumbCm: '',
-  pinchSubSec: '', farmerSubSec: '',
-  painZones: [], condNumb: false, condSwell: false, condNight: false,
-  videoWristDeg: '', videoParallelBad: false,
+  condRtVersion: 'unknown',
+  condUncalib: false,
+  condLiquid: false,
+  condCold: false,
+  condDiameterMm: '',
+  condPlateCorrectionKg: '',
+  handSpanCm: '',
+  handPalmCm: '',
+  handThumbCm: '',
+  pinchSubSec: '',
+  farmerSubSec: '',
+  painZones: [],
+  condNumb: false,
+  condSwell: false,
+  condNight: false,
+  videoWristDeg: '',
+  videoParallelBad: false,
   /** Аудит 2026-10: чек-лист правил IronMind — был только декларацией в шапке хаба
    *  (`assessLiftRules` без единого UI-потребителя), поэтому «замер по правилам»
    *  нельзя было ни подтвердить, ни отправить в мост. */
@@ -128,11 +245,16 @@ const DEFAULT_DIAG: DiagState = {
 };
 function loadDiag(): DiagState {
   try {
+    // Отзыв согласия — диагностические данные здоровья (боль, зоны) не читаем.
+    if (typeof localStorage !== 'undefined' && localStorage.getItem(CONSENT_KEY) === '0') {
+      return { ...DEFAULT_DIAG };
+    }
     const raw = typeof localStorage !== 'undefined' ? localStorage.getItem(DIAG_KEY) : null;
     const j = raw ? JSON.parse(raw) : {};
     if (!j || typeof j !== 'object') return DEFAULT_DIAG;
     return {
-      ...DEFAULT_DIAG, ...j,
+      ...DEFAULT_DIAG,
+      ...j,
       faultIds: Array.isArray((j as any).faultIds) ? (j as any).faultIds.filter((x: any) => typeof x === 'string') : [],
       specWeeks: (j as any).specWeeks === 6 ? 6 : 4,
       condRtVersion: ['v1', 'v2', 'v3'].includes((j as any).condRtVersion) ? (j as any).condRtVersion : 'unknown',
@@ -142,38 +264,128 @@ function loadDiag(): DiagState {
       painZones: Array.isArray((j as any).painZones)
         ? (j as any).painZones.filter((x: any) => typeof x === 'string' && ARMLIFT_PAIN_ZONES.some((z) => z.id === x))
         : [],
-      condPlateCorrectionKg: typeof (j as any).condPlateCorrectionKg === 'string' ? (j as any).condPlateCorrectionKg : '',
+      condPlateCorrectionKg:
+        typeof (j as any).condPlateCorrectionKg === 'string' ? (j as any).condPlateCorrectionKg : '',
     };
-  } catch { return DEFAULT_DIAG; }
+  } catch {
+    return DEFAULT_DIAG;
+  }
 }
 
 type LiftState = {
-  rtKg: string; rtL: string; rtR: string;
-  axleKg: string; axleImpl: string;
-  pinchSec: string; pinchKg: string; pinchL: string; pinchR: string;
-  cocLevel: string; silverSec: string; silverGripper: string;
-  excalKg: string; hubKg: string; hubL: string; hubR: string;
-  raptorKg: string; crushKg: string; clockKg: string; anvilKg: string; medleyKg: string;
-  sex: string; bwKg: string; age: string; gripKg: string; schemaVersion: number; consent: boolean;
+  rtKg: string;
+  rtL: string;
+  rtR: string;
+  axleKg: string;
+  axleImpl: string;
+  pinchSec: string;
+  pinchKg: string;
+  pinchL: string;
+  pinchR: string;
+  cocLevel: string;
+  silverSec: string;
+  silverGripper: string;
+  excalKg: string;
+  hubKg: string;
+  hubL: string;
+  hubR: string;
+  raptorKg: string;
+  crushKg: string;
+  clockKg: string;
+  anvilKg: string;
+  medleyKg: string;
+  sex: string;
+  bwKg: string;
+  age: string;
+  gripKg: string;
+  schemaVersion: number;
+  consent: boolean;
   /** ROUND-10: старт-неделя года для overlay спец-блока (паритет со стронгом/ТА). */
   annualStartWeek: string;
 };
 
 const DEFAULT_STATE: LiftState = {
-  rtKg: '', rtL: '', rtR: '', axleKg: '', axleImpl: 'saxon',
-  pinchSec: '', pinchKg: '', pinchL: '', pinchR: '', cocLevel: '', silverSec: '', silverGripper: '3',
-  excalKg: '', hubKg: '', hubL: '', hubR: '',
-  raptorKg: '', crushKg: '', clockKg: '', anvilKg: '', medleyKg: '',
-  sex: 'male', bwKg: '80', age: '', gripKg: '', schemaVersion: 1, consent: false, annualStartWeek: '1',
+  rtKg: '',
+  rtL: '',
+  rtR: '',
+  axleKg: '',
+  axleImpl: 'saxon',
+  pinchSec: '',
+  pinchKg: '',
+  pinchL: '',
+  pinchR: '',
+  cocLevel: '',
+  silverSec: '',
+  silverGripper: '3',
+  excalKg: '',
+  hubKg: '',
+  hubL: '',
+  hubR: '',
+  raptorKg: '',
+  crushKg: '',
+  clockKg: '',
+  anvilKg: '',
+  medleyKg: '',
+  sex: 'male',
+  bwKg: '80',
+  age: '',
+  gripKg: '',
+  schemaVersion: 1,
+  consent: false,
+  annualStartWeek: '1',
 };
+
+/** Аудит 2026-11: импорт частичного JSON мержим с defaults — иначе diag.handSpanCm.trim()/painZones.length падали. */
+function safeLiftState(raw: any): LiftState {
+  const o: any = { ...DEFAULT_STATE };
+  if (raw && typeof raw === 'object') {
+    for (const k of Object.keys(DEFAULT_STATE) as Array<keyof LiftState>) {
+      if (typeof (raw as any)[k] === typeof (DEFAULT_STATE as any)[k]) o[k] = (raw as any)[k];
+    }
+  }
+  if (o.sex !== 'female') o.sex = 'male';
+  if (o.axleImpl !== 'apollon') o.axleImpl = 'saxon';
+  if (!['2', '3', '4'].includes(o.silverGripper)) o.silverGripper = '3';
+  o.schemaVersion = typeof o.schemaVersion === 'number' ? o.schemaVersion : 1;
+  return o as LiftState;
+}
+
+function safeDiagState(raw: any): DiagState {
+  const j = raw && typeof raw === 'object' ? raw : {};
+  const o: any = { ...DEFAULT_DIAG };
+  for (const k of Object.keys(DEFAULT_DIAG) as Array<keyof DiagState>) {
+    const dv = (DEFAULT_DIAG as any)[k];
+    if (Array.isArray(dv)) continue;
+    if (typeof (j as any)[k] === typeof dv) o[k] = (j as any)[k];
+  }
+  o.faultIds = Array.isArray(j.faultIds) ? j.faultIds.filter((x: any) => typeof x === 'string') : [];
+  o.specWeeks = j.specWeeks === 6 ? 6 : 4;
+  o.condRtVersion = ['v1', 'v2', 'v3'].includes(j.condRtVersion) ? j.condRtVersion : 'unknown';
+  o.rulesChecks = Array.isArray(j.rulesChecks)
+    ? j.rulesChecks.slice(0, 5).map((x: any) => (typeof x === 'boolean' ? x : undefined))
+    : [];
+  o.painZones = Array.isArray(j.painZones)
+    ? j.painZones.filter((x: any) => typeof x === 'string' && ARMLIFT_PAIN_ZONES.some((z) => z.id === x))
+    : [];
+  o.condPlateCorrectionKg = typeof j.condPlateCorrectionKg === 'string' ? j.condPlateCorrectionKg : '';
+  return o as DiagState;
+}
 
 /** PRO-3 W6: сид из арм-хаба — замеры не дублируются вручную.
  *  Односторонний (сюда, не обратно — петель нет): только если своего ключа ещё нет. */
 const ARM_HUB_KEY = 'he_arm_diagnostics_hub_v4';
 
 function loadState(): LiftState {
-  const pick = (j: any, k: string, fb: string): string =>
-    j && typeof j[k] === 'string' ? (j as any)[k] : fb;
+  const pick = (j: any, k: string, fb: string): string => (j && typeof j[k] === 'string' ? (j as any)[k] : fb);
+  try {
+    // 28.11.2026 (review): отзыв согласия (CONSENT_KEY='0') означает, что сохранённые
+    // данные здоровья не должны даже читаться — иначе после reload замеры снова на экране.
+    if (typeof localStorage !== 'undefined' && localStorage.getItem(CONSENT_KEY) === '0') {
+      return { ...DEFAULT_STATE, consent: false };
+    }
+  } catch {
+    /* noop */
+  }
   try {
     const raw = typeof localStorage !== 'undefined' ? localStorage.getItem(STORAGE_KEY) : null;
     if (raw == null) {
@@ -184,36 +396,58 @@ function loadState(): LiftState {
           const g = (k: string): string => (typeof (a as any)[k] === 'string' ? (a as any)[k] : '');
           const seeded: LiftState = {
             ...DEFAULT_STATE,
-            rtKg: g('rtKg'), axleKg: g('axleKg'),
+            rtKg: g('rtKg'),
+            axleKg: g('axleKg'),
             axleImpl: g('axleImpl') === 'apollon' ? 'apollon' : 'saxon',
-            pinchSec: g('pinchSec'), excalKg: g('excalKg'),
+            pinchSec: g('pinchSec'),
+            excalKg: g('excalKg'),
             sex: g('sex') === 'female' ? 'female' : 'male',
             bwKg: g('bwKg') || '80',
           };
           if (seeded.rtKg || seeded.axleKg || seeded.pinchSec || seeded.excalKg) return seeded;
         }
-      } catch { /* noop → дефолт ниже */ }
+      } catch {
+        /* noop → дефолт ниже */
+      }
     }
     const j = raw ? JSON.parse(raw) : {};
     if (!j || typeof j !== 'object') return DEFAULT_STATE;
     return {
       ...DEFAULT_STATE,
-      rtKg: pick(j, 'rtKg', ''), rtL: pick(j, 'rtL', ''), rtR: pick(j, 'rtR', ''),
-      axleKg: pick(j, 'axleKg', ''), axleImpl: pick(j, 'axleImpl', 'saxon') === 'apollon' ? 'apollon' : 'saxon',
-      pinchSec: pick(j, 'pinchSec', ''), pinchKg: pick(j, 'pinchKg', ''),
-      pinchL: pick(j, 'pinchL', ''), pinchR: pick(j, 'pinchR', ''),
-      cocLevel: pick(j, 'cocLevel', ''), silverSec: pick(j, 'silverSec', ''),
+      rtKg: pick(j, 'rtKg', ''),
+      rtL: pick(j, 'rtL', ''),
+      rtR: pick(j, 'rtR', ''),
+      axleKg: pick(j, 'axleKg', ''),
+      axleImpl: pick(j, 'axleImpl', 'saxon') === 'apollon' ? 'apollon' : 'saxon',
+      pinchSec: pick(j, 'pinchSec', ''),
+      pinchKg: pick(j, 'pinchKg', ''),
+      pinchL: pick(j, 'pinchL', ''),
+      pinchR: pick(j, 'pinchR', ''),
+      cocLevel: pick(j, 'cocLevel', ''),
+      silverSec: pick(j, 'silverSec', ''),
       silverGripper: ['2', '3', '4'].includes(pick(j, 'silverGripper', '3')) ? pick(j, 'silverGripper', '3') : '3',
-      excalKg: pick(j, 'excalKg', ''), hubKg: pick(j, 'hubKg', ''),
-      hubL: pick(j, 'hubL', ''), hubR: pick(j, 'hubR', ''),
-      raptorKg: pick(j, 'raptorKg', ''), crushKg: pick(j, 'crushKg', ''),
-      clockKg: pick(j, 'clockKg', ''), anvilKg: pick(j, 'anvilKg', ''), medleyKg: pick(j, 'medleyKg', ''),
+      excalKg: pick(j, 'excalKg', ''),
+      hubKg: pick(j, 'hubKg', ''),
+      hubL: pick(j, 'hubL', ''),
+      hubR: pick(j, 'hubR', ''),
+      raptorKg: pick(j, 'raptorKg', ''),
+      crushKg: pick(j, 'crushKg', ''),
+      clockKg: pick(j, 'clockKg', ''),
+      anvilKg: pick(j, 'anvilKg', ''),
+      medleyKg: pick(j, 'medleyKg', ''),
       sex: pick(j, 'sex', 'male') === 'female' ? 'female' : 'male',
       bwKg: pick(j, 'bwKg', '80'),
       age: pick(j, 'age', ''),
       gripKg: pick(j, 'gripKg', ''),
       schemaVersion: typeof (j as any).schemaVersion === 'number' ? (j as any).schemaVersion : 1,
-      consent: (j as any).consent === true,
+      consent: (() => {
+        try {
+          if (localStorage.getItem(CONSENT_KEY) === '0') return false;
+        } catch {
+          /* noop */
+        }
+        return (j as any).consent === true;
+      })(),
       annualStartWeek: (() => {
         const v = pick(j, 'annualStartWeek', '1');
         const n = parseInt(v, 10);
@@ -235,13 +469,23 @@ export const ArmliftingDiagnosticsHub: React.FC = () => {
   const [toast, setToast] = useState('');
   // Паритет с ТА/стронгом: ⭐ предпочитаемое упражнение коррекции (первым в мост/план).
   const [armliftPrefCorr, setArmliftPrefCorrState] = useState<string>(() => {
-    try { return localStorage.getItem('he_armlift_preferred_corr_v1') || ''; } catch { return ''; }
+    try {
+      return localStorage.getItem('he_armlift_preferred_corr_v1') || '';
+    } catch {
+      return '';
+    }
   });
-  const setArmliftPrefCorr = (id: string) => setArmliftPrefCorrState((prev) => {
-    const next = prev === id ? '' : id;
-    try { if (next) localStorage.setItem('he_armlift_preferred_corr_v1', next); else localStorage.removeItem('he_armlift_preferred_corr_v1'); } catch { /* noop */ }
-    return next;
-  });
+  const setArmliftPrefCorr = (id: string) =>
+    setArmliftPrefCorrState((prev) => {
+      const next = prev === id ? '' : id;
+      try {
+        if (next) localStorage.setItem('he_armlift_preferred_corr_v1', next);
+        else localStorage.removeItem('he_armlift_preferred_corr_v1');
+      } catch {
+        /* noop */
+      }
+      return next;
+    });
   const [histTick, setHistTick] = useState(0);
   // ROUND-10: аудит собранного плана (план строит Арм-конструктор в дисциплине «Армлифтинг»)
   const [planNonce, setPlanNonce] = useState(0);
@@ -254,14 +498,22 @@ export const ArmliftingDiagnosticsHub: React.FC = () => {
         window.removeEventListener('he-arm-plan-saved', bump as EventListener);
         window.removeEventListener('storage', bump as EventListener);
       };
-    } catch { return; }
+    } catch {
+      return;
+    }
   }, []);
   /** PRO-5 D7: 3 таба — Замеры + Диагностика движений + Коррекция. Соревы удалены из хаба. */
   const [tab, setTab] = useState<DiagTab>('pomost');
   const [diag, setDiag] = useState<DiagState>(loadDiag);
-  const saveDiag = (d: DiagState) => {
+  const saveDiag = (d: DiagState, consentOverride?: boolean) => {
     setDiag(d);
-    try { if (typeof localStorage !== 'undefined') localStorage.setItem(DIAG_KEY, JSON.stringify(d)); } catch { /* noop */ }
+    // Аудит 2026-11: без согласия данные здоровья (боль/замеры) не пишутся.
+    const consent = consentOverride ?? state.consent;
+    try {
+      if (consent && typeof localStorage !== 'undefined') localStorage.setItem(DIAG_KEY, JSON.stringify(d));
+    } catch {
+      /* noop */
+    }
   };
   const setD = (patch: Partial<DiagState>) => saveDiag({ ...diag, ...patch });
   const toggleFault = (id: string) => {
@@ -276,31 +528,82 @@ export const ArmliftingDiagnosticsHub: React.FC = () => {
 
   const save = (s: LiftState) => {
     setState(s);
-    try { if (typeof localStorage !== 'undefined') localStorage.setItem(STORAGE_KEY, JSON.stringify(s)); } catch { /* noop */ }
+    // Аудит 2026-11: без consent персональные данные (замеры/возраст/вес) не пишутся —
+    // состояние живёт в памяти; отзыв согласия фиксируем отдельным маркером, чтобы он
+    // пережил перезагрузку и старый JSON с consent:true не включил запись обратно.
+    try {
+      if (typeof localStorage !== 'undefined') {
+        if (s.consent) {
+          localStorage.setItem(STORAGE_KEY, JSON.stringify(s));
+          localStorage.removeItem(CONSENT_KEY);
+        } else {
+          localStorage.setItem(CONSENT_KEY, '0');
+        }
+      }
+    } catch {
+      /* noop */
+    }
   };
   const set = (patch: Partial<LiftState>) => save({ ...state, ...patch });
 
-  const report = useMemo(() => buildArmliftingReport({
-    rtKg: f(state.rtKg),
-    rtL: f(state.rtL), rtR: f(state.rtR),
-    axleKg: f(state.axleKg),
-    axleImpl: state.axleImpl,
-    pinchSec: f(state.pinchSec),
-    pinchKg: f(state.pinchKg),
-    pinchL: f(state.pinchL), pinchR: f(state.pinchR),
-    cocLevel: state.cocLevel ? parseFloat(state.cocLevel) : undefined,
-    silverSec: f(state.silverSec),
-    silverGripper: state.silverGripper,
-    excalKg: f(state.excalKg),
-    hubKg: f(state.hubKg),
-    hubL: f(state.hubL), hubR: f(state.hubR),
-    raptorKg: f(state.raptorKg), crushKg: f(state.crushKg),
-    clockKg: f(state.clockKg), anvilKg: f(state.anvilKg), saxonMedleyKg: f(state.medleyKg),
-    sex: state.sex,
-  }), [state.rtKg, state.rtL, state.rtR, state.axleKg, state.axleImpl, state.pinchSec, state.pinchKg, state.pinchL, state.pinchR, state.cocLevel, state.silverSec, state.silverGripper, state.excalKg, state.hubKg, state.hubL, state.hubR, state.raptorKg, state.crushKg, state.clockKg, state.anvilKg, state.medleyKg, state.sex]);
+  const report = useMemo(
+    () =>
+      buildArmliftingReport({
+        rtKg: f(state.rtKg),
+        rtL: f(state.rtL),
+        rtR: f(state.rtR),
+        axleKg: f(state.axleKg),
+        axleImpl: state.axleImpl,
+        pinchSec: f(state.pinchSec),
+        pinchKg: f(state.pinchKg),
+        pinchL: f(state.pinchL),
+        pinchR: f(state.pinchR),
+        cocLevel: state.cocLevel ? parseFloat(state.cocLevel) : undefined,
+        silverSec: f(state.silverSec),
+        silverGripper: state.silverGripper,
+        excalKg: f(state.excalKg),
+        hubKg: f(state.hubKg),
+        hubL: f(state.hubL),
+        hubR: f(state.hubR),
+        raptorKg: f(state.raptorKg),
+        crushKg: f(state.crushKg),
+        clockKg: f(state.clockKg),
+        anvilKg: f(state.anvilKg),
+        saxonMedleyKg: f(state.medleyKg),
+        sex: state.sex,
+      }),
+    [
+      state.rtKg,
+      state.rtL,
+      state.rtR,
+      state.axleKg,
+      state.axleImpl,
+      state.pinchSec,
+      state.pinchKg,
+      state.pinchL,
+      state.pinchR,
+      state.cocLevel,
+      state.silverSec,
+      state.silverGripper,
+      state.excalKg,
+      state.hubKg,
+      state.hubL,
+      state.hubR,
+      state.raptorKg,
+      state.crushKg,
+      state.clockKg,
+      state.anvilKg,
+      state.medleyKg,
+      state.sex,
+    ],
+  );
 
   const trend = useMemo(() => {
-    try { return liftTrendFromLog(loadPlatformLog()); } catch { return []; }
+    try {
+      return liftTrendFromLog(loadPlatformLog());
+    } catch {
+      return [];
+    }
   }, []);
   /** Справочная оценка общей силы хвата (Jamar), не снаряды. */
   const gripNorm = useMemo(() => {
@@ -308,8 +611,8 @@ export const ArmliftingDiagnosticsHub: React.FC = () => {
     if (g == null) return null;
     const male = state.sex !== 'female';
     const age = f(state.age) ?? 30;
-    const good = male ? (age < 40 ? g >= 45 : g >= 35) : (age < 40 ? g >= 28 : g >= 22);
-    const weak = male ? (age < 40 ? g < 35 : g < 25) : (age < 40 ? g < 22 : g < 16);
+    const good = male ? (age < 40 ? g >= 45 : g >= 35) : age < 40 ? g >= 28 : g >= 22;
+    const weak = male ? (age < 40 ? g < 35 : g < 25) : age < 40 ? g < 22 : g < 16;
     return weak ? 'ниже нормы (справочно)' : good ? 'норма/выше (справочно)' : 'средний (справочно)';
   }, [state.gripKg, state.sex, state.age]);
 
@@ -323,16 +626,26 @@ export const ArmliftingDiagnosticsHub: React.FC = () => {
       if (j?.plan?.weeks) return j.plan;
       if (j?.weeks) return j;
       return null;
-    } catch { return null; }
+    } catch {
+      return null;
+    }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [planNonce, histTick]);
 
   const liftAudit = useMemo(() => {
-    try { return auditArmliftPlan(liftPlan); } catch { return null; }
+    try {
+      return auditArmliftPlan(liftPlan);
+    } catch {
+      return null;
+    }
   }, [liftPlan]);
 
   const liftWorst = useMemo(() => {
-    try { return worstArmliftLink(liftPlan); } catch { return null; }
+    try {
+      return worstArmliftLink(liftPlan);
+    } catch {
+      return null;
+    }
   }, [liftPlan]);
 
   const prescription = report.prescription || prescriptionForWeakest(report.weakestWr || report.weakest);
@@ -342,31 +655,38 @@ export const ArmliftingDiagnosticsHub: React.FC = () => {
     const all = [report.rtAsymPct, report.hubAsymPct, report.pinchAsymPct].filter((v): v is number => v != null);
     return all.length ? Math.max(...all) : null;
   })();
-  const diagnosis = useMemo(() => diagnoseArmlift({
-    implement: diag.implement,
-    failurePoint: diag.failurePoint || undefined,
-    faultIds: diag.faultIds,
-    pinchHoldSec: diag.pinchHoldSec ? parseFloat(diag.pinchHoldSec) : null,
-    farmerHoldSec: diag.farmerHoldSec ? parseFloat(diag.farmerHoldSec) : null,
-    wristExtWeak: diag.wristExtWeak,
-    asymmetryPct: asymForDiag,
-    thumbStiff: diag.thumbStiff,
-    wristExtLimited: diag.wristExtLimited,
-    wristFlexLimited: diag.wristFlexLimited,
-    hipHingePoor: diag.hipHingePoor,
-    pain: diag.pain,
-  }), [diag, asymForDiag]);
+  const diagnosis = useMemo(
+    () =>
+      diagnoseArmlift({
+        implement: diag.implement,
+        failurePoint: diag.failurePoint || undefined,
+        faultIds: diag.faultIds,
+        pinchHoldSec: diag.pinchHoldSec ? parseFloat(diag.pinchHoldSec) : null,
+        farmerHoldSec: diag.farmerHoldSec ? parseFloat(diag.farmerHoldSec) : null,
+        wristExtWeak: diag.wristExtWeak,
+        asymmetryPct: asymForDiag,
+        thumbStiff: diag.thumbStiff,
+        wristExtLimited: diag.wristExtLimited,
+        wristFlexLimited: diag.wristFlexLimited,
+        hipHingePoor: diag.hipHingePoor,
+        pain: diag.pain,
+      }),
+    [diag, asymForDiag],
+  );
   /** PRO-5 real: архив журнала (только чтение; пустой журнал — null, без ложных флагов объёма). */
   const logStats = useMemo(() => {
     let sessions28d: number | null = null;
     try {
       const log = loadPlatformLog();
       sessions28d = log.length ? countGripSessions(log, diag.implement) : null;
-    } catch { sessions28d = null; }
-    const tr = trend.find((t) => t.implement === diag.implement)
-      || trend.find((t) => t.implement === `${diag.implement}_L`)
-      || trend.find((t) => t.implement === `${diag.implement}_R`)
-      || null;
+    } catch {
+      sessions28d = null;
+    }
+    const tr =
+      trend.find((t) => t.implement === diag.implement) ||
+      trend.find((t) => t.implement === `${diag.implement}_L`) ||
+      trend.find((t) => t.implement === `${diag.implement}_R`) ||
+      null;
     return {
       sessions28d,
       trendDeltaPct: tr ? tr.deltaPct : null,
@@ -379,14 +699,20 @@ export const ArmliftingDiagnosticsHub: React.FC = () => {
       const sess = loadSRPESessions();
       if (!sess.length) return null;
       return acuteChronicRatio(toDailyLoads(sess as any));
-    } catch { return null; }
+    } catch {
+      return null;
+    }
   }, []);
   /** D13: измеренная мобильность — до причины (TDZ-порядок). */
-  const mobility = useMemo(() => assessArmliftMobility({
-    wristExtDeg: diag.wristExtDeg ? parseFloat(diag.wristExtDeg) : null,
-    wristFlexDeg: diag.wristFlexDeg ? parseFloat(diag.wristFlexDeg) : null,
-    thumbOppOk: diag.thumbOppOk,
-  }), [diag.wristExtDeg, diag.wristFlexDeg, diag.thumbOppOk]);
+  const mobility = useMemo(
+    () =>
+      assessArmliftMobility({
+        wristExtDeg: diag.wristExtDeg ? parseFloat(diag.wristExtDeg) : null,
+        wristFlexDeg: diag.wristFlexDeg ? parseFloat(diag.wristFlexDeg) : null,
+        thumbOppOk: diag.thumbOppOk,
+      }),
+    [diag.wristExtDeg, diag.wristFlexDeg, diag.thumbOppOk],
+  );
   /** PRO-6 M4: холд-кривая по релевантному тесту снаряда (выше cause — порядок TDZ). */
   const holdCurve = useMemo(() => {
     const rel = relevantTestsFor(diag.implement);
@@ -395,75 +721,91 @@ export const ArmliftingDiagnosticsHub: React.FC = () => {
       return Number.isFinite(v) && v > 0 ? v : null;
     };
     if (rel.includes('Pinch-hold')) {
-      return holdCurveFor(
-        diag.pinchHoldSec ? parseFloat(diag.pinchHoldSec) : null,
-        num(diag.pinchSubSec),
-      );
+      return holdCurveFor(diag.pinchHoldSec ? parseFloat(diag.pinchHoldSec) : null, num(diag.pinchSubSec));
     }
     if (rel.includes('Farmer-hold')) {
-      return holdCurveFor(
-        diag.farmerHoldSec ? parseFloat(diag.farmerHoldSec) : null,
-        num(diag.farmerSubSec),
-      );
+      return holdCurveFor(diag.farmerHoldSec ? parseFloat(diag.farmerHoldSec) : null, num(diag.farmerSubSec));
     }
     /** Crush-снаряды (CoC/Silver): кривая по холдам в секундах неприменима — тихо. */
     return null;
   }, [diag.implement, diag.pinchHoldSec, diag.pinchSubSec, diag.farmerHoldSec, diag.farmerSubSec]);
   /** PRO-5 real: причина со скорингом и evidence (свой движок, не стол). */
-  const cause = useMemo(() => diagnoseArmliftCause({
-    implement: diag.implement,
-    failurePoint: diag.failurePoint || undefined,
-    faultIds: diag.faultIds,
-    pinchHoldSec: diag.pinchHoldSec ? parseFloat(diag.pinchHoldSec) : null,
-    farmerHoldSec: diag.farmerHoldSec ? parseFloat(diag.farmerHoldSec) : null,
-    wristExtWeak: diag.wristExtWeak,
-    cocLevel: state.cocLevel ? parseFloat(state.cocLevel) : null,
-    silverSec: state.silverSec ? parseFloat(state.silverSec) : null,
-    gripSessions28d: logStats.sessions28d,
-    trendDeltaPct: logStats.trendDeltaPct,
-    asymmetryPct: asymForDiag,
-    thumbStiff: diag.thumbStiff,
-    wristExtLimited: diag.wristExtLimited,
-    wristFlexLimited: diag.wristFlexLimited,
-    hipHingePoor: diag.hipHingePoor,
-    gripFreqPerWeek: logStats.gripFreqPerWeek,
-    flexHoldSec: diag.flexHoldSec ? parseFloat(diag.flexHoldSec) : null,
-    extHoldSec: diag.extHoldSec ? parseFloat(diag.extHoldSec) : null,
-    mobilityFails: mobility.fails,
-    pinchL: state.pinchL ? parseFloat(state.pinchL) : null,
-    pinchR: state.pinchR ? parseFloat(state.pinchR) : null,
-    silverGripper: state.silverGripper,
-    acwrZone: acwr?.zone ?? null,
-    elbowPain: diag.elbowPain,
-    pain: diag.pain,
-    skinTear: diag.skinTear,
-    thumbWebPain: diag.thumbWebPain,
-    /** PRO-6 M4: кривая в скоринг причины (без пары — null, как раньше). */
-    holdCurve: holdCurve ? { curve: holdCurve.curve, ratio: holdCurve.ratio, note: holdCurve.note } : null,
-  }), [diag, asymForDiag, logStats, acwr, state.cocLevel, state.silverSec, state.silverGripper, holdCurve]);
+  const cause = useMemo(
+    () =>
+      diagnoseArmliftCause({
+        implement: diag.implement,
+        failurePoint: diag.failurePoint || undefined,
+        faultIds: diag.faultIds,
+        pinchHoldSec: diag.pinchHoldSec ? parseFloat(diag.pinchHoldSec) : null,
+        farmerHoldSec: diag.farmerHoldSec ? parseFloat(diag.farmerHoldSec) : null,
+        wristExtWeak: diag.wristExtWeak,
+        cocLevel: state.cocLevel ? parseFloat(state.cocLevel) : null,
+        silverSec: state.silverSec ? parseFloat(state.silverSec) : null,
+        gripSessions28d: logStats.sessions28d,
+        trendDeltaPct: logStats.trendDeltaPct,
+        asymmetryPct: asymForDiag,
+        thumbStiff: diag.thumbStiff,
+        wristExtLimited: diag.wristExtLimited,
+        wristFlexLimited: diag.wristFlexLimited,
+        hipHingePoor: diag.hipHingePoor,
+        gripFreqPerWeek: logStats.gripFreqPerWeek,
+        flexHoldSec: diag.flexHoldSec ? parseFloat(diag.flexHoldSec) : null,
+        extHoldSec: diag.extHoldSec ? parseFloat(diag.extHoldSec) : null,
+        mobilityFails: mobility.fails,
+        pinchL: state.pinchL ? parseFloat(state.pinchL) : null,
+        pinchR: state.pinchR ? parseFloat(state.pinchR) : null,
+        silverGripper: state.silverGripper,
+        acwrZone: acwr?.zone ?? null,
+        elbowPain: diag.elbowPain,
+        pain: diag.pain,
+        skinTear: diag.skinTear,
+        thumbWebPain: diag.thumbWebPain,
+        /** PRO-6 M4: кривая в скоринг причины (без пары — null, как раньше). */
+        holdCurve: holdCurve ? { curve: holdCurve.curve, ratio: holdCurve.ratio, note: holdCurve.note } : null,
+      }),
+    [diag, asymForDiag, logStats, acwr, state.cocLevel, state.silverSec, state.silverGripper, holdCurve],
+  );
   const extRatio = flexExtRatio(
     diag.flexHoldSec ? parseFloat(diag.flexHoldSec) : null,
     diag.extHoldSec ? parseFloat(diag.extHoldSec) : null,
   );
   /** PRO-CORR K2: уровень из тест-батареи — advanced-снаряды новичку не едут (единый мемо для топ-3 и запасной). */
-  const corrLevel = useMemo(() => overallGripLevel([
-    benchmarkPinchHold(diag.pinchHoldSec ? parseFloat(diag.pinchHoldSec) : null),
-    benchmarkFarmerHold(diag.farmerHoldSec ? parseFloat(diag.farmerHoldSec) : null),
-    benchmarkCoc(state.cocLevel ? parseFloat(state.cocLevel) : null),
-    benchmarkSilverHold(state.silverSec ? parseFloat(state.silverSec) : null),
-  ]) ?? undefined, [diag.pinchHoldSec, diag.farmerHoldSec, state.cocLevel, state.silverSec]);
-  const corrections = useMemo(() => rankArmliftCorrections(diagnosis.weakLink, diag.implement, {
-    cause: cause.cause === 'pain' ? undefined : cause.cause,
-    asymPct: asymForDiag,
-    failurePoint: diag.failurePoint || undefined,
-    extImbalance: extRatio != null && extRatio > 1.5,
-    cocLevel: state.cocLevel ? parseFloat(state.cocLevel) : null,
-    /** PRO-6 M4: кривая поднимает упражнения под провал. */
-    holdCurve: holdCurve?.curve ?? null,
-    /** PRO-CORR K2: боль — только щадящие. */
-    level: corrLevel,
-    gentleOnly: cause.cause === 'pain',
-  }), [diagnosis.weakLink, diag.implement, cause.cause, asymForDiag, diag.failurePoint, extRatio, state.cocLevel, corrLevel, holdCurve]);
+  const corrLevel = useMemo(
+    () =>
+      overallGripLevel([
+        benchmarkPinchHold(diag.pinchHoldSec ? parseFloat(diag.pinchHoldSec) : null),
+        benchmarkFarmerHold(diag.farmerHoldSec ? parseFloat(diag.farmerHoldSec) : null),
+        benchmarkCoc(state.cocLevel ? parseFloat(state.cocLevel) : null),
+        benchmarkSilverHold(state.silverSec ? parseFloat(state.silverSec) : null),
+      ]) ?? undefined,
+    [diag.pinchHoldSec, diag.farmerHoldSec, state.cocLevel, state.silverSec],
+  );
+  const corrections = useMemo(
+    () =>
+      rankArmliftCorrections(diagnosis.weakLink, diag.implement, {
+        cause: cause.cause === 'pain' ? undefined : cause.cause,
+        asymPct: asymForDiag,
+        failurePoint: diag.failurePoint || undefined,
+        extImbalance: extRatio != null && extRatio > 1.5,
+        cocLevel: state.cocLevel ? parseFloat(state.cocLevel) : null,
+        /** PRO-6 M4: кривая поднимает упражнения под провал. */
+        holdCurve: holdCurve?.curve ?? null,
+        /** PRO-CORR K2: боль — только щадящие. */
+        level: corrLevel,
+        gentleOnly: cause.cause === 'pain',
+      }),
+    [
+      diagnosis.weakLink,
+      diag.implement,
+      cause.cause,
+      asymForDiag,
+      diag.failurePoint,
+      extRatio,
+      state.cocLevel,
+      corrLevel,
+      holdCurve,
+    ],
+  );
   /** ⭐-предпочтение: если выбранное входит в топ-3 — ставим первым (показ = мост = план). */
   const correctionsOrdered = useMemo(() => {
     if (!armliftPrefCorr) return corrections;
@@ -483,18 +825,40 @@ export const ArmliftingDiagnosticsHub: React.FC = () => {
     setTimeout(() => setToast(''), 2500);
   };
   /** PRO-CORR K6: запасная 4-я — «🔁 Запасная» строкой (топ-3 в мост не меняется). */
-  const spareCorrection = useMemo(() => rankArmliftCorrections(diagnosis.weakLink, diag.implement, {
-    cause: cause.cause === 'pain' ? undefined : cause.cause,
-    asymPct: asymForDiag,
-    failurePoint: diag.failurePoint || undefined,
-    extImbalance: extRatio != null && extRatio > 1.5,
-    cocLevel: state.cocLevel ? parseFloat(state.cocLevel) : null,
-    holdCurve: holdCurve?.curve ?? null,
-    level: corrLevel,
-    gentleOnly: cause.cause === 'pain',
-  }, 4)[3] ?? null, [diagnosis.weakLink, diag.implement, cause.cause, asymForDiag, diag.failurePoint, extRatio, state.cocLevel, corrLevel, holdCurve]);
+  const spareCorrection = useMemo(
+    () =>
+      rankArmliftCorrections(
+        diagnosis.weakLink,
+        diag.implement,
+        {
+          cause: cause.cause === 'pain' ? undefined : cause.cause,
+          asymPct: asymForDiag,
+          failurePoint: diag.failurePoint || undefined,
+          extImbalance: extRatio != null && extRatio > 1.5,
+          cocLevel: state.cocLevel ? parseFloat(state.cocLevel) : null,
+          holdCurve: holdCurve?.curve ?? null,
+          level: corrLevel,
+          gentleOnly: cause.cause === 'pain',
+        },
+        4,
+      )[3] ?? null,
+    [
+      diagnosis.weakLink,
+      diag.implement,
+      cause.cause,
+      asymForDiag,
+      diag.failurePoint,
+      extRatio,
+      state.cocLevel,
+      corrLevel,
+      holdCurve,
+    ],
+  );
   const specBlock = useMemo(
-    () => buildArmliftSpecBlock(diagnosis.weakLink, diag.implement, corrections, diag.specWeeks, { fatigueFirst: cause.cause === 'fatigue' || cause.cause === 'pain' }),
+    () =>
+      buildArmliftSpecBlock(diagnosis.weakLink, diag.implement, corrections, diag.specWeeks, {
+        fatigueFirst: cause.cause === 'fatigue' || cause.cause === 'pain',
+      }),
     [diagnosis.weakLink, diag.implement, corrections, diag.specWeeks, cause.cause],
   );
   /** D10 E1: уровни тестов + итог по слабейшему. */
@@ -507,13 +871,22 @@ export const ArmliftingDiagnosticsHub: React.FC = () => {
   }, [diag.pinchHoldSec, diag.farmerHoldSec, state.cocLevel, state.silverSec]);
   /** D15: история диагнозов списком (обновляется после моста). */
   const diagHistory = useMemo(() => {
-    try { return loadDiagHistory(); } catch { return []; }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
+    try {
+      return loadDiagHistory();
+    } catch {
+      return [];
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [histTick]);
   /** D11 E4 / D12 E7: перетест против прошлого снапшота + история. */
   const retests = useMemo(() => {
     const prev = lastSnapshotFor(diag.implement);
-    if (!prev) return { prev: null as null | { date: string }, list: [] as Array<{ test: string; text: string }>, due: null as string | null };
+    if (!prev)
+      return {
+        prev: null as null | { date: string },
+        list: [] as Array<{ test: string; text: string }>,
+        due: null as string | null,
+      };
     const weeks = weeksBetween(prev.date, localIsoDate());
     const num = (s: string): number | null => {
       const v = parseFloat(s);
@@ -555,10 +928,7 @@ export const ArmliftingDiagnosticsHub: React.FC = () => {
    * (`weightClass` / `rulesNote` / `lms`) — приёмник держал за ними мёртвые ветки.
    * Теперь все три считаются из того, что пользователь реально заполнил.
    */
-  const rulesCheck = useMemo(
-    () => assessLiftRules(diag.rulesChecks),
-    [diag.rulesChecks],
-  );
+  const rulesCheck = useMemo(() => assessLiftRules(diag.rulesChecks), [diag.rulesChecks]);
   const weightClass = useMemo(() => {
     const bw = f(state.bwKg);
     if (bw == null) return null;
@@ -583,50 +953,84 @@ export const ArmliftingDiagnosticsHub: React.FC = () => {
     return { label: row.label, steps };
   }, [report]);
   /** PRO-6 M5: условия замера — грязный замер режет слабость. */
-  const conditions = useMemo(() => assessArmliftConditions({
-    implement: diag.implement,
-    rtVersion: (diag.condRtVersion === 'v1' || diag.condRtVersion === 'v2' || diag.condRtVersion === 'v3') ? diag.condRtVersion : 'unknown',
-    uncalibratedPlates: diag.condUncalib,
-    liquidChalk: diag.condLiquid,
-    coldGym: diag.condCold,
-    barDiameterMm: diag.condDiameterMm ? parseFloat(diag.condDiameterMm) : null,
-    plateCorrectionKg: diag.condPlateCorrectionKg ? parseFloat(diag.condPlateCorrectionKg) : null,
-  }), [diag.implement, diag.condRtVersion, diag.condUncalib, diag.condLiquid, diag.condCold, diag.condDiameterMm, diag.condPlateCorrectionKg]);
+  const conditions = useMemo(
+    () =>
+      assessArmliftConditions({
+        implement: diag.implement,
+        rtVersion:
+          diag.condRtVersion === 'v1' || diag.condRtVersion === 'v2' || diag.condRtVersion === 'v3'
+            ? diag.condRtVersion
+            : 'unknown',
+        uncalibratedPlates: diag.condUncalib,
+        liquidChalk: diag.condLiquid,
+        coldGym: diag.condCold,
+        barDiameterMm: diag.condDiameterMm ? parseFloat(diag.condDiameterMm) : null,
+        plateCorrectionKg: diag.condPlateCorrectionKg ? parseFloat(diag.condPlateCorrectionKg) : null,
+      }),
+    [
+      diag.implement,
+      diag.condRtVersion,
+      diag.condUncalib,
+      diag.condLiquid,
+      diag.condCold,
+      diag.condDiameterMm,
+      diag.condPlateCorrectionKg,
+    ],
+  );
   /** PRO-6 M3: рука — только текст, %WR не трогаем. */
-  const hand = useMemo(() => assessArmliftHand({
-    implement: diag.implement,
-    spanCm: diag.handSpanCm ? parseFloat(diag.handSpanCm) : null,
-    palmCm: diag.handPalmCm ? parseFloat(diag.handPalmCm) : null,
-    thumbCm: diag.handThumbCm ? parseFloat(diag.handThumbCm) : null,
-  }), [diag.implement, diag.handSpanCm, diag.handPalmCm, diag.handThumbCm]);
+  const hand = useMemo(
+    () =>
+      assessArmliftHand({
+        implement: diag.implement,
+        spanCm: diag.handSpanCm ? parseFloat(diag.handSpanCm) : null,
+        palmCm: diag.handPalmCm ? parseFloat(diag.handPalmCm) : null,
+        thumbCm: diag.handThumbCm ? parseFloat(diag.handThumbCm) : null,
+      }),
+    [diag.implement, diag.handSpanCm, diag.handPalmCm, diag.handThumbCm],
+  );
   /** PRO-6 M8: карта боли — точечная разгрузка поверх бинарных гейтов. */
-  const painMap = useMemo(() => assessArmliftPainMap({
-    zones: diag.painZones as ArmliftPainZone[],
-    numbness: diag.condNumb,
-    swelling: diag.condSwell,
-    nightPain: diag.condNight,
-  }), [diag.painZones, diag.condNumb, diag.condSwell, diag.condNight]);
+  const painMap = useMemo(
+    () =>
+      assessArmliftPainMap({
+        zones: diag.painZones as ArmliftPainZone[],
+        numbness: diag.condNumb,
+        swelling: diag.condSwell,
+        nightPain: diag.condNight,
+      }),
+    [diag.painZones, diag.condNumb, diag.condSwell, diag.condNight],
+  );
   // PRO-6 M6: видео-лайт. Kinovea-CSV импорт убран 2026-09-27, поэтому работают
   // только ручные поля (угол запястья / параллельность) — трек гуляния недоступен.
-  const videoFlags = useMemo(() => analyzeArmliftVideo({
-    wristDeg: diag.videoWristDeg ? parseFloat(diag.videoWristDeg) : null,
-    parallelOk: diag.videoParallelBad ? false : null,
-  }), [diag.videoWristDeg, diag.videoParallelBad]);
+  const videoFlags = useMemo(
+    () =>
+      analyzeArmliftVideo({
+        wristDeg: diag.videoWristDeg ? parseFloat(diag.videoWristDeg) : null,
+        parallelOk: diag.videoParallelBad ? false : null,
+      }),
+    [diag.videoWristDeg, diag.videoParallelBad],
+  );
   /** D18: полнота диагностики (что довбить для честного вердикта). */
-  const completeness = useMemo(() => diagnosticCompleteness({
-    implement: diag.implement,
-    failurePoint: diag.failurePoint || undefined,
-    pinchHoldSec: diag.pinchHoldSec ? parseFloat(diag.pinchHoldSec) : null,
-    farmerHoldSec: diag.farmerHoldSec ? parseFloat(diag.farmerHoldSec) : null,
-    cocLevel: state.cocLevel ? parseFloat(state.cocLevel) : null,
-    silverSec: state.silverSec ? parseFloat(state.silverSec) : null,
-    hasMobilityData: Boolean(
-      (diag.wristExtDeg && diag.wristExtDeg.trim() !== '')
-      || (diag.wristFlexDeg && diag.wristFlexDeg.trim() !== '')
-      || diag.thumbOppOk === false || diag.thumbStiff || diag.wristExtLimited || diag.wristFlexLimited
-      || mobility.fails.length > 0,
-    ),
-  }), [diag, mobility.fails, state.cocLevel, state.silverSec]);
+  const completeness = useMemo(
+    () =>
+      diagnosticCompleteness({
+        implement: diag.implement,
+        failurePoint: diag.failurePoint || undefined,
+        pinchHoldSec: diag.pinchHoldSec ? parseFloat(diag.pinchHoldSec) : null,
+        farmerHoldSec: diag.farmerHoldSec ? parseFloat(diag.farmerHoldSec) : null,
+        cocLevel: state.cocLevel ? parseFloat(state.cocLevel) : null,
+        silverSec: state.silverSec ? parseFloat(state.silverSec) : null,
+        hasMobilityData: Boolean(
+          (diag.wristExtDeg && diag.wristExtDeg.trim() !== '') ||
+          (diag.wristFlexDeg && diag.wristFlexDeg.trim() !== '') ||
+          diag.thumbOppOk === false ||
+          diag.thumbStiff ||
+          diag.wristExtLimited ||
+          diag.wristFlexLimited ||
+          mobility.fails.length > 0,
+        ),
+      }),
+    [diag, mobility.fails, state.cocLevel, state.silverSec],
+  );
   /** PRO-6 M7: план попыток слабейшего кг-снаряда (read-only от замеров). */
   const attemptPlan = useMemo(() => {
     const target = report.weakestWr || report.weakest;
@@ -645,21 +1049,34 @@ export const ArmliftingDiagnosticsHub: React.FC = () => {
       setTimeout(() => setToast(''), 2500);
       return;
     }
-    try { void haptics('light'); } catch { /* noop */ }
+    try {
+      void haptics('light');
+    } catch {
+      /* noop */
+    }
     const bw = parseFloat(state.bwKg);
     const rtBest = f(state.rtL) ?? f(state.rtR) ?? f(state.rtKg);
     const hubBest = f(state.hubL) ?? f(state.hubR) ?? f(state.hubKg);
     /** PRO-6 M9: движение в мост — отдельным объектом под spread, чтобы не трогать
      *  тип shared `planner-bridge` (приёмник лишнее игнорит, старые поля целы). */
     const movementBridge: Record<string, unknown> = {};
-    if (failPhase) movementBridge.diagTimelinePhase = { id: failPhase.id, label: failPhase.label, weakLinks: failPhase.weakLinks };
-    if (attemptPlan) movementBridge.diagAttemptPlan = { implement: attemptPlan.implement, opener: attemptPlan.opener, second: attemptPlan.second, third: attemptPlan.third };
-    if (diag.handSpanCm.trim() !== '' || diag.handPalmCm.trim() !== '' || diag.handThumbCm.trim() !== '') movementBridge.diagHandNote = hand.handNote;
+    if (failPhase)
+      movementBridge.diagTimelinePhase = { id: failPhase.id, label: failPhase.label, weakLinks: failPhase.weakLinks };
+    if (attemptPlan)
+      movementBridge.diagAttemptPlan = {
+        implement: attemptPlan.implement,
+        opener: attemptPlan.opener,
+        second: attemptPlan.second,
+        third: attemptPlan.third,
+      };
+    if (diag.handSpanCm.trim() !== '' || diag.handPalmCm.trim() !== '' || diag.handThumbCm.trim() !== '')
+      movementBridge.diagHandNote = hand.handNote;
     if (holdCurve) movementBridge.diagHoldCurve = { curve: holdCurve.curve, note: holdCurve.note };
     if (conditions.trainingOnly) movementBridge.diagConditionsNote = conditions.conditionsNote;
     if (videoFlags) movementBridge.diagVideoNote = videoFlags.note;
     if (diag.painZones.length > 0) movementBridge.diagPainZones = diag.painZones;
-    if (diag.painZones.length > 0 || diag.condNumb || diag.condSwell || diag.condNight) movementBridge.diagPainNote = painMap.unloadNote;
+    if (diag.painZones.length > 0 || diag.condNumb || diag.condSwell || diag.condNight)
+      movementBridge.diagPainNote = painMap.unloadNote;
     applyToPlanner({
       kind: 'weakpoints',
       label: `Армлифтинг-диагностика: ${report.verdict}`,
@@ -668,11 +1085,20 @@ export const ArmliftingDiagnosticsHub: React.FC = () => {
         armDiscipline: 'armlifting',
         armLiftingVerdict: report.verdict,
         armLifting: {
-          weakest: report.weakest, weakestWr: report.weakestWr,
-          avgPct: report.avgPct, avgWrPct: report.avgWrPct, avgInternalPct: report.avgInternalPct,
+          weakest: report.weakest,
+          weakestWr: report.weakestWr,
+          avgPct: report.avgPct,
+          avgWrPct: report.avgWrPct,
+          avgInternalPct: report.avgInternalPct,
           totalKg: report.totalKg,
           prescription,
-          rows: report.rows.map((r) => ({ implement: r.implement, display: r.display, scorePct: r.scorePct, level: r.level, internal: r.internal })),
+          rows: report.rows.map((r) => ({
+            implement: r.implement,
+            display: r.display,
+            scorePct: r.scorePct,
+            level: r.level,
+            internal: r.internal,
+          })),
           /** PRO-5: диагноз движений + коррекция (аддитивно, старые поля целы). */
           diagWeakLink: diagnosis.weakLink,
           diagCause: diagnosis.cause,
@@ -684,8 +1110,18 @@ export const ArmliftingDiagnosticsHub: React.FC = () => {
           diagCorrections: correctionsOrdered.map((c) => ({ id: c.id, title: c.title, protocol: c.protocol })),
           diagSpecBlock: specBlock,
           /** PRO-5 real: упражнения в план — только armlifting-ветка конструктора читает. */
-          diagCauseDetail: { cause: cause.cause, confidence: cause.confidence, evidence: cause.evidence, fix: cause.fix },
-          armliftExercises: correctionsToInjectionItems(orderCorrectionsForDay(correctionsOrdered), 3, intensityForCause(cause.cause), rirForCause(cause.cause)),
+          diagCauseDetail: {
+            cause: cause.cause,
+            confidence: cause.confidence,
+            evidence: cause.evidence,
+            fix: cause.fix,
+          },
+          armliftExercises: correctionsToInjectionItems(
+            orderCorrectionsForDay(correctionsOrdered),
+            3,
+            intensityForCause(cause.cause),
+            rirForCause(cause.cause),
+          ),
           armliftOrderNote: sessionOrderNote(correctionsOrdered),
           armliftCompleteness: completeness,
           armliftSpec: specBlock.map((w) => ({ week: w.week, targetSets: w.targetSets, dayMap: w.dayMap })),
@@ -693,7 +1129,9 @@ export const ArmliftingDiagnosticsHub: React.FC = () => {
           /** Аудит 2026-10 было→стало: три поля, которые тип моста объявлял, а хаб
            *  не отправлял — конструктор держал за ними мёртвые ветки («когда отправят»). */
           ...(weightClass ? { weightClass } : {}),
-          ...(rulesCheck.note ? { rulesNote: rulesCheck.official ? rulesCheck.note : `Замер НЕ зачётный: ${rulesCheck.note}` } : {}),
+          ...(rulesCheck.note
+            ? { rulesNote: rulesCheck.official ? rulesCheck.note : `Замер НЕ зачётный: ${rulesCheck.note}` }
+            : {}),
           ...(lmsForWeakest ? { lms: lmsForWeakest } : {}),
           ...movementBridge,
         },
@@ -708,40 +1146,63 @@ export const ArmliftingDiagnosticsHub: React.FC = () => {
       source: 'intellectual',
     });
     try {
-      saveDiagSnapshot({
-        date: localIsoDate(),
-        implement: diag.implement,
-        weakLink: diagnosis.weakLink,
-        cause: cause.cause,
-        pinchHoldSec: diag.pinchHoldSec ? parseFloat(diag.pinchHoldSec) : null,
-        farmerHoldSec: diag.farmerHoldSec ? parseFloat(diag.farmerHoldSec) : null,
-        cocLevel: state.cocLevel ? parseFloat(state.cocLevel) : null,
-        silverSec: state.silverSec ? parseFloat(state.silverSec) : null,
-        completenessPct: completeness.pct,
-      });
-    } catch { /* noop */ }
+      if (state.consent)
+        saveDiagSnapshot({
+          date: localIsoDate(),
+          implement: diag.implement,
+          weakLink: diagnosis.weakLink,
+          cause: cause.cause,
+          pinchHoldSec: diag.pinchHoldSec ? parseFloat(diag.pinchHoldSec) : null,
+          farmerHoldSec: diag.farmerHoldSec ? parseFloat(diag.farmerHoldSec) : null,
+          cocLevel: state.cocLevel ? parseFloat(state.cocLevel) : null,
+          silverSec: state.silverSec ? parseFloat(state.silverSec) : null,
+          completenessPct: completeness.pct,
+        });
+    } catch {
+      /* noop */
+    }
     setHistTick((x) => x + 1);
     setToast(`✓ В Арм-конструктор (армлифтинг): ${report.verdict}`);
     setTimeout(() => setToast(''), 3000);
     try {
       window.dispatchEvent(new CustomEvent('planning-track-open', { detail: 'arm' } as any));
       localStorage.setItem('he_training_planning_track', 'arm');
-    } catch { /* noop */ }
+    } catch {
+      /* noop */
+    }
   };
 
   /** PRO-6 M9: строки движения в экспорт (только заполненное). */
   const diagExtra = useMemo(() => {
     const out: string[] = [];
     if (failPhase) out.push(`Фаза срыва: ${failPhase.label}`);
-    if (attemptPlan) out.push(`Попытки (${attemptPlan.label}): ${attemptPlan.opener}/${attemptPlan.second}/${attemptPlan.third}`);
-    const handMeasured = (diag.handSpanCm.trim() !== '' || diag.handPalmCm.trim() !== '' || diag.handThumbCm.trim() !== '');
+    if (attemptPlan)
+      out.push(`Попытки (${attemptPlan.label}): ${attemptPlan.opener}/${attemptPlan.second}/${attemptPlan.third}`);
+    const handMeasured =
+      diag.handSpanCm.trim() !== '' || diag.handPalmCm.trim() !== '' || diag.handThumbCm.trim() !== '';
     if (handMeasured) out.push(`Рука: ${hand.handNote}`);
     if (holdCurve) out.push(`Кривая: ${holdCurve.note}`);
     if (conditions.trainingOnly) out.push(conditions.conditionsNote);
     if (videoFlags) out.push(`Видео: ${videoFlags.note}`);
-    if (diag.painZones.length > 0 || diag.condNumb || diag.condSwell || diag.condNight) out.push(`Боль: ${painMap.unloadNote}`);
+    if (diag.painZones.length > 0 || diag.condNumb || diag.condSwell || diag.condNight)
+      out.push(`Боль: ${painMap.unloadNote}`);
     return out;
-  }, [failPhase, attemptPlan, hand, holdCurve, conditions, videoFlags, painMap, diag.handSpanCm, diag.handPalmCm, diag.handThumbCm, diag.painZones, diag.condNumb, diag.condSwell, diag.condNight]);
+  }, [
+    failPhase,
+    attemptPlan,
+    hand,
+    holdCurve,
+    conditions,
+    videoFlags,
+    painMap,
+    diag.handSpanCm,
+    diag.handPalmCm,
+    diag.handThumbCm,
+    diag.painZones,
+    diag.condNumb,
+    diag.condSwell,
+    diag.condNight,
+  ]);
 
   const exportData = () => ({
     date: localIsoDate(),
@@ -749,9 +1210,13 @@ export const ArmliftingDiagnosticsHub: React.FC = () => {
     report,
     /** PRO-5 добивка: диагноз + коррекция в экспорт (аддитивно). */
     diagTitle: `${diagnosis.title} · ${diagnosis.cause}/${diagnosis.confidence}${conditions.trainingOnly ? ' · замер тренировочный' : ''}`,
-    diagCorrections: correctionsOrdered.map((c) => `${c.title} — ${c.protocol} · ${c.dose}${c.cues?.length ? ` · кью: ${c.cues.join(', ')}` : ''}`),
+    diagCorrections: correctionsOrdered.map(
+      (c) => `${c.title} — ${c.protocol} · ${c.dose}${c.cues?.length ? ` · кью: ${c.cues.join(', ')}` : ''}`,
+    ),
     diagSpec: specBlock.map((w) => `Нед ${w.week}: ${w.focus}${w.detail ? ` · ${w.detail}` : ''}`),
     diagExtra,
+    /** Аудит 2026-11: last-man-standing поддерживается HTML/CSV, но не передавался — не попадал в экспорт. */
+    ...(lmsForWeakest ? { lmsAttempts: lmsForWeakest.steps, lmsLabel: lmsForWeakest.label } : {}),
   });
 
   // ROUND-10: ICS спец-блока (паритет с ТА/стронгом — у армлифтинга календаря не было)
@@ -768,7 +1233,10 @@ export const ArmliftingDiagnosticsHub: React.FC = () => {
       const o = await saveTextFileApk(`armlift-spec-block-${localIsoDate()}.ics`, ics, 'text/calendar;charset=utf-8');
       setToast(shareOutcomeLabel(o));
       setTimeout(() => setToast(''), 2500);
-    } catch { setToast('⚠ Не удалось создать календарь .ics'); setTimeout(() => setToast(''), 2500); }
+    } catch {
+      setToast('⚠ Не удалось создать календарь .ics');
+      setTimeout(() => setToast(''), 2500);
+    }
   };
 
   // ROUND-10: годовой overlay спец-блока (паритет со стронгом/ТА — односторонний ключ)
@@ -786,17 +1254,28 @@ export const ArmliftingDiagnosticsHub: React.FC = () => {
       // 26.10.2026 было→стало: тост обещал «в недели года», но he_armlift_annual_sync_v1
       // не читает ни один прод-потребитель (годовой план свой) — фича была no-op.
       // Теперь честно: снапшот сохранён для переноса (ручной/внешний перенос).
-      setToast(`✓ Годовой overlay: ${weeks.length} нед сохранено снапшотом (старт Н${parseInt(state.annualStartWeek) || 1}) — перенесите вручную в годовой план`);
+      setToast(
+        `✓ Годовой overlay: ${weeks.length} нед сохранено снапшотом (старт Н${parseInt(state.annualStartWeek) || 1}) — перенесите вручную в годовой план`,
+      );
       setTimeout(() => setToast(''), 2500);
-    } catch { /* noop */ }
+    } catch {
+      /* noop */
+    }
   };
 
   const handleExportHtml = async () => {
     try {
-      const o = await saveTextFileApk(`armlifting-${localIsoDate()}.html`, buildArmliftingHtml(exportData()), 'text/html;charset=utf-8');
+      const o = await saveTextFileApk(
+        `armlifting-${localIsoDate()}.html`,
+        buildArmliftingHtml(exportData()),
+        'text/html;charset=utf-8',
+      );
       setToast(shareOutcomeLabel(o));
       setTimeout(() => setToast(''), 2500);
-    } catch { setToast('⚠ HTML не собран'); setTimeout(() => setToast(''), 2500); }
+    } catch {
+      setToast('⚠ HTML не собран');
+      setTimeout(() => setToast(''), 2500);
+    }
   };
 
   const handleExportCsv = async () => {
@@ -804,17 +1283,27 @@ export const ArmliftingDiagnosticsHub: React.FC = () => {
       const o = await saveCsvApk(`armlifting-${localIsoDate()}.csv`, buildArmliftingCsv(exportData()));
       setToast(shareOutcomeLabel(o));
       setTimeout(() => setToast(''), 2500);
-    } catch { setToast('⚠ CSV не собран'); setTimeout(() => setToast(''), 2500); }
+    } catch {
+      setToast('⚠ CSV не собран');
+      setTimeout(() => setToast(''), 2500);
+    }
   };
 
   /** Волна 5: бэкап/импорт полного профиля (замеры + диагностика) в JSON. */
   const handleExportProfile = async () => {
     try {
       const payload = { schemaVersion: 1, state, diag };
-      const o = await saveTextFileApk(`armlifting-profile-${localIsoDate()}.json`, JSON.stringify(payload, null, 2), 'application/json;charset=utf-8');
+      const o = await saveTextFileApk(
+        `armlifting-profile-${localIsoDate()}.json`,
+        JSON.stringify(payload, null, 2),
+        'application/json;charset=utf-8',
+      );
       setToast(shareOutcomeLabel(o));
       setTimeout(() => setToast(''), 2500);
-    } catch { setToast('⚠ Профиль не собран'); setTimeout(() => setToast(''), 2500); }
+    } catch {
+      setToast('⚠ Профиль не собран');
+      setTimeout(() => setToast(''), 2500);
+    }
   };
   const handleImportProfile = async (file: File | null) => {
     if (!file) return;
@@ -822,12 +1311,20 @@ export const ArmliftingDiagnosticsHub: React.FC = () => {
       const text = await file.text();
       const j = JSON.parse(text);
       if (!j || j.schemaVersion !== 1 || typeof j.state !== 'object' || typeof j.diag !== 'object') {
-        setToast('⚠ Неверный файл профиля'); setTimeout(() => setToast(''), 2500); return;
+        setToast('⚠ Неверный файл профиля');
+        setTimeout(() => setToast(''), 2500);
+        return;
       }
-      save(j.state as LiftState);
-      saveDiag(j.diag as DiagState);
-      setToast('✓ Профиль импортирован'); setTimeout(() => setToast(''), 2500);
-    } catch { setToast('⚠ Не удалось импортировать профиль'); setTimeout(() => setToast(''), 2500); }
+      // Аудит 2026-11: частичный JSON мержим с defaults — без этого падали handSpanCm.trim()/painZones.length.
+      const nextState = safeLiftState(j.state);
+      save(nextState);
+      saveDiag(safeDiagState(j.diag), nextState.consent);
+      setToast('✓ Профиль импортирован');
+      setTimeout(() => setToast(''), 2500);
+    } catch {
+      setToast('⚠ Не удалось импортировать профиль');
+      setTimeout(() => setToast(''), 2500);
+    }
   };
 
   /** АПК-безопасная печать: window.open().print() в Capacitor WebView не работает
@@ -837,14 +1334,41 @@ export const ArmliftingDiagnosticsHub: React.FC = () => {
       const o = await printHtmlApk(buildArmliftingHtml(exportData()), `armlifting-diagnostics-${localIsoDate()}.html`);
       setToast(shareOutcomeLabel(o));
       setTimeout(() => setToast(''), 2500);
-    } catch { /* noop */ }
+    } catch {
+      /* noop */
+    }
   };
 
-  const avgShown = report.avgWrPct != null
-    ? report.avgWrPct
-    : report.avgPct != null ? report.avgPct : null;
-  const weakestLabel = report.rows.find((r) => r.implement === (report.weakestWr || report.weakest))?.label
-    || report.weakestWr || report.weakest || '—';
+  const avgShown = report.avgWrPct != null ? report.avgWrPct : report.avgPct != null ? report.avgPct : null;
+  const weakestLabel =
+    report.rows.find((r) => r.implement === (report.weakestWr || report.weakest))?.label ||
+    report.weakestWr ||
+    report.weakest ||
+    '—';
+  const hasStoredHealth = (() => {
+    try {
+      if (typeof localStorage === 'undefined') return false;
+      return !!(
+        localStorage.getItem(STORAGE_KEY) ||
+        localStorage.getItem(DIAG_KEY) ||
+        localStorage.getItem('he_armlifting_diag_history')
+      );
+    } catch {
+      return false;
+    }
+  })();
+  const wipeStoredHealth = () => {
+    try {
+      localStorage.removeItem(STORAGE_KEY);
+      localStorage.removeItem(DIAG_KEY);
+      localStorage.removeItem('he_armlifting_diag_history');
+      localStorage.removeItem(CONSENT_KEY);
+      setToast('✓ Сохранённые данные здоровья удалены');
+      setTimeout(() => setToast(''), 2500);
+    } catch {
+      /* noop */
+    }
+  };
 
   return (
     <AdRoot rootClass="train-armdiag" maxWidth={860}>
@@ -887,7 +1411,9 @@ export const ArmliftingDiagnosticsHub: React.FC = () => {
       `}</style>
       <AdCard>
         <div className="ad-head" data-arm="lift-head">
-          <div className="ad-head-ic" aria-hidden>🏋️</div>
+          <div className="ad-head-ic" aria-hidden>
+            🏋️
+          </div>
           <div className="ad-head-tx">
             <h2 className="ad-head-title">Армлифтинг — диагностика</h2>
             <p className="ad-head-sub">RT · Axle · Pinch · CoC · Hub · Excalibur · %WR · движения · коррекция</p>
@@ -918,20 +1444,42 @@ export const ArmliftingDiagnosticsHub: React.FC = () => {
               { id: 'excalibur', label: 'Excalibur', ids: ['excalibur'] },
             ];
             const rows = (report.rows || []) as Array<{ implement?: string }>;
-            const isOn = (f: { ids: string[] }) => rows.some((r) => f.ids.some((id) => String(r.implement || '').startsWith(id)));
+            const isOn = (f: { ids: string[] }) =>
+              rows.some((r) => f.ids.some((id) => String(r.implement || '').startsWith(id)));
             const on = FAMILIES.filter(isOn);
             return (
-              <div className="ad-row" data-arm="lift-coverage" aria-label="Покрытие снарядов" style={{ flexWrap: 'wrap', gap: 6 }}>
-                <span className="ad-muted">Покрытие снарядов: {on.length}/{FAMILIES.length}</span>
+              <div
+                className="ad-row"
+                data-arm="lift-coverage"
+                aria-label="Покрытие снарядов"
+                style={{ flexWrap: 'wrap', gap: 6 }}
+              >
+                <span className="ad-muted">
+                  Покрытие снарядов: {on.length}/{FAMILIES.length}
+                </span>
                 {FAMILIES.map((f) => {
                   const hit = isOn(f);
                   return (
-                    <span key={f.id} className="ad-tag" data-covered={hit ? 'true' : 'false'} style={{ background: hit ? 'rgba(34,197,94,0.12)' : '#0a1629', border: `1px solid ${hit ? 'rgba(34,197,94,0.3)' : '#1f3a5f'}`, color: hit ? '#22c55e' : '#fff' }}>{hit ? '✓ ' : '— '}{f.label}</span>
+                    <span
+                      key={f.id}
+                      className="ad-tag"
+                      data-covered={hit ? 'true' : 'false'}
+                      style={{
+                        background: hit ? 'rgba(34,197,94,0.12)' : '#0a1629',
+                        border: `1px solid ${hit ? 'rgba(34,197,94,0.3)' : '#1f3a5f'}`,
+                        color: hit ? '#22c55e' : '#fff',
+                      }}
+                    >
+                      {hit ? '✓ ' : '— '}
+                      {f.label}
+                    </span>
                   );
                 })}
               </div>
             );
-          } catch { return null; }
+          } catch {
+            return null;
+          }
         })()}
         {/* ROUND-10: аудит собранного плана — вынесен ИЗ шапки-окна в компактную
             сворачиваемую секцию ниже. Раньше герой = шапка + чипы мастера +
@@ -940,556 +1488,1377 @@ export const ArmliftingDiagnosticsHub: React.FC = () => {
             как в ТА/арм-хабе, а аудит плана лежит своей карточкой после ряда
             табов (контент хаба виден сразу). */}
       </AdCard>
-
       <AdCard>
-        <div data-arm="lift-plan-audit" style={{ margin: 0, padding: '8px 10px', borderRadius: 10, background: '#0a1629', border: '1px solid rgba(59,130,246,0.28)', fontSize: 11, lineHeight: 1.5 }}>
+        <div
+          data-arm="lift-plan-audit"
+          style={{
+            margin: 0,
+            padding: '8px 10px',
+            borderRadius: 10,
+            background: '#0a1629',
+            border: '1px solid rgba(59,130,246,0.28)',
+            fontSize: 11,
+            lineHeight: 1.5,
+          }}
+        >
           {liftAudit ? (
             <>
-              <b style={{ color: '#fff' }}>📋 Аудит плана: покрытие звеньев {liftAudit.covered.length}/{ARMLIFT_AUDIT_LINKS.length} ({liftAudit.coveragePct}%) · сетов {liftAudit.totalSets} · стол {Math.round(liftAudit.tableRatio * 100)}%</b>
+              <b style={{ color: '#fff' }}>
+                📋 Аудит плана: покрытие звеньев {liftAudit.covered.length}/{ARMLIFT_AUDIT_LINKS.length} (
+                {liftAudit.coveragePct}%) · сетов {liftAudit.totalSets} · стол {Math.round(liftAudit.tableRatio * 100)}%
+              </b>
               <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap', marginTop: 6 }}>
                 {ARMLIFT_AUDIT_LINKS.map((link) => {
                   const sets = liftAudit.byLink[link]?.sets ?? 0;
                   const worst = liftWorst === link;
                   return (
-                    <span key={link} data-covered={sets > 0 ? 'true' : 'false'} data-worst={worst ? 'true' : 'false'} className="ad-tag" style={{ background: worst ? 'rgba(239,68,68,0.12)' : sets > 0 ? 'rgba(34,197,94,0.1)' : '#0a1629', border: `1px solid ${worst ? 'rgba(239,68,68,0.35)' : sets > 0 ? 'rgba(34,197,94,0.25)' : '#1f3a5f'}`, color: worst ? '#ef4444' : sets > 0 ? '#22c55e' : '#fff' }}>
+                    <span
+                      key={link}
+                      data-covered={sets > 0 ? 'true' : 'false'}
+                      data-worst={worst ? 'true' : 'false'}
+                      className="ad-tag"
+                      style={{
+                        background: worst ? 'rgba(239,68,68,0.12)' : sets > 0 ? 'rgba(34,197,94,0.1)' : '#0a1629',
+                        border: `1px solid ${worst ? 'rgba(239,68,68,0.35)' : sets > 0 ? 'rgba(34,197,94,0.25)' : '#1f3a5f'}`,
+                        color: worst ? '#ef4444' : sets > 0 ? '#22c55e' : '#fff',
+                      }}
+                    >
                       {ARMLIFT_WEAK_LINK_SHORT_RU[link]} {sets}
                     </span>
                   );
                 })}
               </div>
-              {liftAudit.duplicates.length > 0 && <div className="ad-muted" style={{ marginTop: 4 }}>⚠ Дубли (3+ сессии): {liftAudit.duplicates.slice(0, 4).join(', ')}</div>}
+              {liftAudit.duplicates.length > 0 && (
+                <div className="ad-muted" style={{ marginTop: 4 }}>
+                  ⚠ Дубли (3+ сессии): {liftAudit.duplicates.slice(0, 4).join(', ')}
+                </div>
+              )}
               {liftWorst && (liftAudit.byLink[liftWorst]?.sets ?? 0) === 0 && (
-                <button data-arm="lift-audit-go" onClick={() => setTab('corr')} style={{ marginTop: 6, minHeight: 44, padding: '8px 12px', borderRadius: 10, background: 'linear-gradient(135deg,#3b82f6,#a855f7)', border: '1px solid rgba(59,130,246,0.45)', color: '#fff', fontSize: 12, fontWeight: 800, cursor: 'pointer' }}>
+                <button
+                  data-arm="lift-audit-go"
+                  onClick={() => setTab('corr')}
+                  style={{
+                    marginTop: 6,
+                    minHeight: 44,
+                    padding: '8px 12px',
+                    borderRadius: 10,
+                    background: 'linear-gradient(135deg,#3b82f6,#a855f7)',
+                    border: '1px solid rgba(59,130,246,0.45)',
+                    color: '#fff',
+                    fontSize: 12,
+                    fontWeight: 800,
+                    cursor: 'pointer',
+                  }}
+                >
                   🎯 Дыра: {ARMLIFT_WEAK_LINK_SHORT_RU[liftWorst]} — не закрыта планом → Коррекция
                 </button>
               )}
               {/* Паритет с ТА `data-wl="worst"`: связка закрыта, но слабейшая — разбираем её (не дубль «дыры») */}
               {liftWorst && (liftAudit.byLink[liftWorst]?.sets ?? 0) > 0 && (
-                <button data-arm="lift-worst" onClick={selectWorstLink} style={{ marginTop: 6, minHeight: 44, padding: '8px 12px', borderRadius: 10, background: 'rgba(59,130,246,0.14)', border: '1px solid #1f3a5f', color: '#60a5fa', fontSize: 12, fontWeight: 800, cursor: 'pointer' }}>
-                  🎯 Слабейшая связка: {ARMLIFT_WEAK_LINK_SHORT_RU[liftWorst]} ({ruCount(liftAudit.byLink[liftWorst].sets, RU_SETS)}) → разобрать
+                <button
+                  data-arm="lift-worst"
+                  onClick={selectWorstLink}
+                  style={{
+                    marginTop: 6,
+                    minHeight: 44,
+                    padding: '8px 12px',
+                    borderRadius: 10,
+                    background: 'rgba(59,130,246,0.14)',
+                    border: '1px solid #1f3a5f',
+                    color: '#60a5fa',
+                    fontSize: 12,
+                    fontWeight: 800,
+                    cursor: 'pointer',
+                  }}
+                >
+                  🎯 Слабейшая связка: {ARMLIFT_WEAK_LINK_SHORT_RU[liftWorst]} (
+                  {ruCount(liftAudit.byLink[liftWorst].sets, RU_SETS)}) → разобрать
                 </button>
               )}
             </>
           ) : (
-            <span className="ad-muted" data-arm="lift-plan-empty">📋 Аудит плана: план армлифтинга не собран — построй в Арм-конструкторе (дисциплина «Армлифтинг»), и здесь появится покрытие 5 звеньев.</span>
+            <span className="ad-muted" data-arm="lift-plan-empty">
+              📋 Аудит плана: план армлифтинга не собран — построй в Арм-конструкторе (дисциплина «Армлифтинг»), и здесь
+              появится покрытие 5 звеньев.
+            </span>
           )}
         </div>
         <AdSec title="ℹ️ Как пользоваться" collapsible defaultOpen={false} summary="3 шага до коррекции">
-          <div className="ad-muted"><b>1 Замеры</b> — вбей снаряды ниже · <b>2 Диагностика</b> — точка срыва, фолы, тесты, причина · <b>3 Коррекция</b> — упражнения волной в план через мост внизу.</div>
+          <div className="ad-muted">
+            <b>1 Замеры</b> — вбей снаряды ниже · <b>2 Диагностика</b> — точка срыва, фолы, тесты, причина ·{' '}
+            <b>3 Коррекция</b> — упражнения волной в план через мост внизу.
+          </div>
         </AdSec>
         {toast && <AdBanner tone="ok">{toast}</AdBanner>}
       </AdCard>
-
       <AdCard>
-        <div className="ad-sec-t" data-arm="lift-movement-head">🧭 Режим и снаряд</div>
-        <div className="ad-row" data-arm="lift-tabs" aria-label="Режим хаба">
-          {([['pomost', '📏 Замеры'], ['diag', '🔍 Диагностика'], ['corr', '🔧 Коррекция']] as Array<[DiagTab, string]>).map(([id, label]) => (
-            <AdChip key={id} active={tab === id} onClick={() => setTab(id)}>{label}</AdChip>
-          ))}
-          <AdBtn variant="amber" data-arm="lift-apply-top" aria-label="Применить замеры в конструктор" onClick={applyToConstructor}>→ Применить</AdBtn>
+        <div className="ad-sec-t" data-arm="lift-movement-head">
+          🧭 Режим и снаряд
         </div>
-        <div className="ad-muted">📏 Замеры — вход диагностики (%WR, слабейший). 🔍 Диагностика — точка срыва + фолы + тесты + причина. 🔧 Коррекция — упражнения + спец-блок волной.</div>
-      </AdCard>      {tab === 'pomost' && (<>
-      <AdCard>
-        <div id="lift-measures" />
-        <AdSec title="🏋️ Армлифтинг — замеры снарядов" defaultOpen summary="RT · Axle · Pinch · CoC · Hub · Excalibur">
-          <div className="lift-group">✊ Основные</div>
-          <AdGrid cols="auto-sm">
-            <LiftNum label="RT кг" value={state.rtKg} onChange={(v) => set({ rtKg: v })} placeholder="60" aria="RT кг" />
-            <LiftNum label="Axle кг" value={state.axleKg} onChange={(v) => set({ axleKg: v })} placeholder="100" aria="Axle кг" />
-            <LiftNum label="Pinch кг" value={state.pinchKg} onChange={(v) => set({ pinchKg: v })} placeholder="макс кг" aria="Pinch кг" />
-            <LiftNum label="Pinch сек" value={state.pinchSec} onChange={(v) => set({ pinchSec: v })} placeholder="15" aria="Pinch сек" />
-            <LiftNum label="CoC уровень" value={state.cocLevel} onChange={(v) => set({ cocLevel: v })} placeholder="1.5" aria="CoC уровень" />
-            <LiftNum label="Silver сек" value={state.silverSec} onChange={(v) => set({ silverSec: v })} placeholder="время" aria="Silver сек" />
-            <LiftNum label="Hub кг" value={state.hubKg} onChange={(v) => set({ hubKg: v })} placeholder="30" aria="Hub кг" />
-            <LiftNum label="Excalibur кг" value={state.excalKg} onChange={(v) => set({ excalKg: v })} placeholder="40" aria="Excalibur кг" />
-          </AdGrid>
-          <div className="lift-group">↔️ Асимметрия L/R</div>
-          <AdGrid cols="auto-sm">
-            <LiftNum label="RT левая кг" value={state.rtL} onChange={(v) => set({ rtL: v })} placeholder="L" aria="RT левая кг" />
-            <LiftNum label="RT правая кг" value={state.rtR} onChange={(v) => set({ rtR: v })} placeholder="R" aria="RT правая кг" />
-            <LiftNum label="Hub левая кг" value={state.hubL} onChange={(v) => set({ hubL: v })} placeholder="L" aria="Hub левая кг" />
-            <LiftNum label="Hub правая кг" value={state.hubR} onChange={(v) => set({ hubR: v })} placeholder="R" aria="Hub правая кг" />
-            <LiftNum label="Pinch левая кг" value={state.pinchL} onChange={(v) => set({ pinchL: v })} placeholder="L" aria="Pinch левая кг" />
-            <LiftNum label="Pinch правая кг" value={state.pinchR} onChange={(v) => set({ pinchR: v })} placeholder="R" aria="Pinch правая кг" />
-          </AdGrid>
-          <div className="lift-group">⚖️ Вес тела (едет в конструктор)</div>
-          <AdGrid cols="auto-sm">
-            <LiftNum label="Вес тела кг" value={state.bwKg} onChange={(v) => set({ bwKg: v })} placeholder="80" aria="Вес тела кг" />
-            <LiftNum label="Возраст лет" value={state.age} onChange={(v) => set({ age: v })} placeholder="30" aria="Возраст лет" />
-            <LiftNum label="Общая сила хвата кг (Jamar)" value={state.gripKg} onChange={(v) => set({ gripKg: v })} placeholder="45" aria="Общая сила хвата кг" />
-          </AdGrid>
-          <div className="ad-row">
-            <AdChip active={state.axleImpl !== 'apollon'} onClick={() => set({ axleImpl: 'saxon' })}>Saxon (ориентир)</AdChip>
-            <AdChip active={state.axleImpl === 'apollon'} onClick={() => set({ axleImpl: 'apollon' })}>Apollon (WR)</AdChip>
-            <AdChip active={state.sex !== 'female'} onClick={() => set({ sex: 'male' })}>М</AdChip>
-            <AdChip active={state.sex === 'female'} onClick={() => set({ sex: 'female' })}>Ж</AdChip>
-            {['2', '3', '4'].map((g) => (
-              <AdChip key={g} active={state.silverGripper === g} onClick={() => set({ silverGripper: g })}>Silver №{g}</AdChip>
-            ))}
-          </div>
-          <div className="ad-muted">CoC — ordinal (№1≈140 … №3≈280 фунтов, не калибровка) · Excalibur — факт без % (SAR по весовой) · Saxon — внутренний ориентир (лидерборд) · Apollon WR М237.5/Ж137.9 · Hub WR М44.8/Ж28.51</div>
-          <div className="ad-muted">Замеры подтягиваются из арм-хаба при первом входе (свой ввод приоритетнее, обратно не пишем)</div>
-        </AdSec>
-      </AdCard>
+        <div className="ad-row" data-arm="lift-tabs" aria-label="Режим хаба">
+          {(
+            [
+              ['pomost', '📏 Замеры'],
+              ['diag', '🔍 Диагностика'],
+              ['corr', '🔧 Коррекция'],
+            ] as Array<[DiagTab, string]>
+          ).map(([id, label]) => (
+            <AdChip key={id} active={tab === id} onClick={() => setTab(id)}>
+              {label}
+            </AdChip>
+          ))}
+          <AdBtn
+            variant="amber"
+            data-arm="lift-apply-top"
+            aria-label="Применить замеры в конструктор"
+            onClick={applyToConstructor}
+          >
+            → Применить
+          </AdBtn>
+        </div>
+        <div className="ad-muted">
+          📏 Замеры — вход диагностики (%WR, слабейший). 🔍 Диагностика — точка срыва + фолы + тесты + причина. 🔧
+          Коррекция — упражнения + спец-блок волной.
+        </div>
+      </AdCard>{' '}
+      {tab === 'pomost' && (
+        <>
+          <AdCard>
+            <div id="lift-measures" />
+            <AdSec
+              title="🏋️ Армлифтинг — замеры снарядов"
+              defaultOpen
+              summary="RT · Axle · Pinch · CoC · Hub · Excalibur"
+            >
+              <div className="lift-group">✊ Основные</div>
+              <AdGrid cols="auto-sm">
+                <LiftNum
+                  label="RT кг"
+                  value={state.rtKg}
+                  onChange={(v) => set({ rtKg: v })}
+                  placeholder="60"
+                  aria="RT кг"
+                />
+                <LiftNum
+                  label="Axle кг"
+                  value={state.axleKg}
+                  onChange={(v) => set({ axleKg: v })}
+                  placeholder="100"
+                  aria="Axle кг"
+                />
+                <LiftNum
+                  label="Pinch кг"
+                  value={state.pinchKg}
+                  onChange={(v) => set({ pinchKg: v })}
+                  placeholder="макс кг"
+                  aria="Pinch кг"
+                />
+                <LiftNum
+                  label="Pinch сек"
+                  value={state.pinchSec}
+                  onChange={(v) => set({ pinchSec: v })}
+                  placeholder="15"
+                  aria="Pinch сек"
+                />
+                <LiftNum
+                  label="CoC уровень"
+                  value={state.cocLevel}
+                  onChange={(v) => set({ cocLevel: v })}
+                  placeholder="1.5"
+                  aria="CoC уровень"
+                />
+                <LiftNum
+                  label="Silver сек"
+                  value={state.silverSec}
+                  onChange={(v) => set({ silverSec: v })}
+                  placeholder="время"
+                  aria="Silver сек"
+                />
+                <LiftNum
+                  label="Hub кг"
+                  value={state.hubKg}
+                  onChange={(v) => set({ hubKg: v })}
+                  placeholder="30"
+                  aria="Hub кг"
+                />
+                <LiftNum
+                  label="Excalibur кг"
+                  value={state.excalKg}
+                  onChange={(v) => set({ excalKg: v })}
+                  placeholder="40"
+                  aria="Excalibur кг"
+                />
+              </AdGrid>
+              <div className="lift-group">↔️ Асимметрия L/R</div>
+              <AdGrid cols="auto-sm">
+                <LiftNum
+                  label="RT левая кг"
+                  value={state.rtL}
+                  onChange={(v) => set({ rtL: v })}
+                  placeholder="L"
+                  aria="RT левая кг"
+                />
+                <LiftNum
+                  label="RT правая кг"
+                  value={state.rtR}
+                  onChange={(v) => set({ rtR: v })}
+                  placeholder="R"
+                  aria="RT правая кг"
+                />
+                <LiftNum
+                  label="Hub левая кг"
+                  value={state.hubL}
+                  onChange={(v) => set({ hubL: v })}
+                  placeholder="L"
+                  aria="Hub левая кг"
+                />
+                <LiftNum
+                  label="Hub правая кг"
+                  value={state.hubR}
+                  onChange={(v) => set({ hubR: v })}
+                  placeholder="R"
+                  aria="Hub правая кг"
+                />
+                <LiftNum
+                  label="Pinch левая кг"
+                  value={state.pinchL}
+                  onChange={(v) => set({ pinchL: v })}
+                  placeholder="L"
+                  aria="Pinch левая кг"
+                />
+                <LiftNum
+                  label="Pinch правая кг"
+                  value={state.pinchR}
+                  onChange={(v) => set({ pinchR: v })}
+                  placeholder="R"
+                  aria="Pinch правая кг"
+                />
+              </AdGrid>
+              <div className="lift-group">⚖️ Вес тела (едет в конструктор)</div>
+              <AdGrid cols="auto-sm">
+                <LiftNum
+                  label="Вес тела кг"
+                  value={state.bwKg}
+                  onChange={(v) => set({ bwKg: v })}
+                  placeholder="80"
+                  aria="Вес тела кг"
+                />
+                <LiftNum
+                  label="Возраст лет"
+                  value={state.age}
+                  onChange={(v) => set({ age: v })}
+                  placeholder="30"
+                  aria="Возраст лет"
+                />
+                <LiftNum
+                  label="Общая сила хвата кг (Jamar)"
+                  value={state.gripKg}
+                  onChange={(v) => set({ gripKg: v })}
+                  placeholder="45"
+                  aria="Общая сила хвата кг"
+                />
+              </AdGrid>
+              <div className="ad-row">
+                <AdChip active={state.axleImpl !== 'apollon'} onClick={() => set({ axleImpl: 'saxon' })}>
+                  Saxon (ориентир)
+                </AdChip>
+                <AdChip active={state.axleImpl === 'apollon'} onClick={() => set({ axleImpl: 'apollon' })}>
+                  Apollon (WR)
+                </AdChip>
+                <AdChip active={state.sex !== 'female'} onClick={() => set({ sex: 'male' })}>
+                  М
+                </AdChip>
+                <AdChip active={state.sex === 'female'} onClick={() => set({ sex: 'female' })}>
+                  Ж
+                </AdChip>
+                {['2', '3', '4'].map((g) => (
+                  <AdChip key={g} active={state.silverGripper === g} onClick={() => set({ silverGripper: g })}>
+                    Silver №{g}
+                  </AdChip>
+                ))}
+              </div>
+              <div className="ad-muted">
+                CoC — ordinal (№1≈140 … №3≈280 фунтов, не калибровка) · Excalibur — факт без % (SAR по весовой) · Saxon
+                — внутренний ориентир (лидерборд) · Apollon WR М237.5/Ж137.9 · Hub WR М44.8/Ж28.51
+              </div>
+              <div className="ad-muted">
+                Замеры подтягиваются из арм-хаба при первом входе (свой ввод приоритетнее, обратно не пишем)
+              </div>
+            </AdSec>
+          </AdCard>
 
-      <AdCard>
-        <AdSec title="🧲 Новые снаряды 2025–2026" collapsible defaultOpen={false} summary="Raptor · Crush · Clock · Anvil · Medley">
-          <AdGrid cols="auto-sm">
-            <LiftNum label="Raptor 1.75 кг" value={state.raptorKg} onChange={(v) => set({ raptorKg: v })} placeholder="факт" aria="Raptor кг" />
-            <LiftNum label="Country Crush кг" value={state.crushKg} onChange={(v) => set({ crushKg: v })} placeholder="факт" aria="Country Crush кг" />
-            <LiftNum label="Clock кг" value={state.clockKg} onChange={(v) => set({ clockKg: v })} placeholder="факт" aria="Grandfather Clock кг" />
-            <LiftNum label="Anvil кг" value={state.anvilKg} onChange={(v) => set({ anvilKg: v })} placeholder="факт" aria="Anvil кг" />
-            <LiftNum label="Saxon medley кг" value={state.medleyKg} onChange={(v) => set({ medleyKg: v })} placeholder="факт" aria="Saxon medley кг" />
-          </AdGrid>
-          <div className="ad-muted">Факт без %: разрядных таблиц нет, только живые лидерборды Armlifting USA</div>
-        </AdSec>
-      </AdCard>
+          <AdCard>
+            <AdSec
+              title="🧲 Новые снаряды 2025–2026"
+              collapsible
+              defaultOpen={false}
+              summary="Raptor · Crush · Clock · Anvil · Medley"
+            >
+              <AdGrid cols="auto-sm">
+                <LiftNum
+                  label="Raptor 1.75 кг"
+                  value={state.raptorKg}
+                  onChange={(v) => set({ raptorKg: v })}
+                  placeholder="факт"
+                  aria="Raptor кг"
+                />
+                <LiftNum
+                  label="Country Crush кг"
+                  value={state.crushKg}
+                  onChange={(v) => set({ crushKg: v })}
+                  placeholder="факт"
+                  aria="Country Crush кг"
+                />
+                <LiftNum
+                  label="Clock кг"
+                  value={state.clockKg}
+                  onChange={(v) => set({ clockKg: v })}
+                  placeholder="факт"
+                  aria="Grandfather Clock кг"
+                />
+                <LiftNum
+                  label="Anvil кг"
+                  value={state.anvilKg}
+                  onChange={(v) => set({ anvilKg: v })}
+                  placeholder="факт"
+                  aria="Anvil кг"
+                />
+                <LiftNum
+                  label="Saxon medley кг"
+                  value={state.medleyKg}
+                  onChange={(v) => set({ medleyKg: v })}
+                  placeholder="факт"
+                  aria="Saxon medley кг"
+                />
+              </AdGrid>
+              <div className="ad-muted">Факт без %: разрядных таблиц нет, только живые лидерборды Armlifting USA</div>
+            </AdSec>
+          </AdCard>
 
-      <AdCard>
-        <div id="lift-verdict-sec" />
-        <AdSec title="📊 Вердикт по снарядам" defaultOpen summary={report.filled ? `${report.filled} сн.` : 'введи замеры'}>
-          <div data-arm="lift-verdict"><b>{report.verdict}</b></div>
-          <div className="ad-muted" data-arm="lift-norm-source" style={{ fontSize: 11, marginTop: 4 }}>{report.normSource}</div>
-          {trend.length > 0 && (
-            <div className="ad-muted" data-arm="lift-trend" style={{ fontSize: 11, marginTop: 4 }}>
-              Тренд: {trend.map((t) => `${t.implement} ${t.deltaKg > 0 ? '+' : ''}${t.deltaKg} кг (${t.deltaPct > 0 ? '+' : ''}${t.deltaPct}%)`).join(' · ')}
-            </div>
-          )}
-          {gripNorm && (
-            <div className="ad-muted" data-arm="lift-grip-norm" style={{ fontSize: 11, marginTop: 4 }}>
-              Общая сила хвата: {state.gripKg} кг — {gripNorm} (Jamar-ориентир, не снаряд)
-            </div>
-          )}
-          {!report.filled && (
-            <AdBanner tone="info">Введи хотя бы один снаряд выше — %WR и слабейший снаряд появятся здесь, дальше иди в Диагностику.</AdBanner>
-          )}
-          <div data-arm="lift-tiles">
-            <AdStat value={report.filled ? `${report.filled} сн.` : '—'} label="Замерено" />
-            <AdStat value={avgShown != null ? `${avgShown}%` : '—'} label={report.avgWrPct != null ? 'Среднее %WR' : 'Среднее %'} />
-            <AdStat value={report.filled ? weakestLabel : '—'} label="Слабейший" />
-            <AdStat value={report.totalKg != null && report.totalKg > 0 ? `${report.totalKg}` : '—'} label="Тотал кг" />
-          </div>
-          {report.rtAsymPct != null && (
-            <div className="ad-muted">RT-асимметрия L/R: {report.rtAsymPct}% (фон щипка 5–10%; &gt;15% — на осмотр)</div>
-          )}
-          {report.hubAsymPct != null && (
-            <div className="ad-muted">Hub-асимметрия L/R: {report.hubAsymPct}%</div>
-          )}
-          {report.pinchAsymPct != null && (
-            <div className="ad-muted">Pinch-асимметрия L/R: {report.pinchAsymPct}%</div>
-          )}
-          {prescription && <div className="ad-muted" data-arm="lift-recipe">Рецепт: {prescription}</div>}
-          {attemptPlan && (
-            <div className="ad-muted" data-arm="lift-attempt-plan">
-              План попыток ({attemptPlan.label}): {attemptPlan.opener} / {attemptPlan.second} / {attemptPlan.third} кг — {attemptPlan.note}
-            </div>
-          )}
-          {(() => {
-            const target = diagImplementForReportWeakest(report.weakestWr || report.weakest);
-            if (!target) return null;
-            return (
-              <AdCta>
-                <AdBtn
-                  variant="amber" block hero
-                  onClick={() => { setD({ implement: target, failurePoint: '', faultIds: [] }); setTab('diag'); }}
-                >
-                  → Диагностировать слабейший: {(ARMLIFT_DIAG_IMPLEMENT_OPTS.find((o) => o.id === target)?.label) || target}
-                </AdBtn>
-              </AdCta>
-            );
-          })()}
-          {report.rows.length > 0 && (
-            <div className="ad-list" data-arm="lift-table">
-              {report.rows.map((r) => (
-                <div key={r.implement} className="ad-row">
-                  <span className="lift-row-main">
-                    <span className="lift-dot" style={{ background: liftLevelColor(r.level) }} aria-hidden />
-                    <span><b>{r.label}</b> {r.display}</span>
-                  </span>
-                  {r.scorePct != null && (
-                    <span className="lift-bar" aria-hidden>
-                      <span style={{ width: `${Math.max(0, Math.min(100, r.scorePct))}%`, background: liftLevelColor(r.level) }} />
-                    </span>
-                  )}
-                  <span className="ad-muted lift-row-meta">{r.scorePct != null ? `${r.scorePct}% ${r.internal ? '(ориентир)' : 'WR'}` : 'без %'} · {r.level === 'none' ? 'факт' : r.level === 'elite' ? 'элита' : r.level === 'comp' ? 'соревн.' : 'база'}</span>
-                  <span className="ad-muted">{r.note}</span>
+          <AdCard>
+            <div id="lift-verdict-sec" />
+            <AdSec
+              title="📊 Вердикт по снарядам"
+              defaultOpen
+              summary={report.filled ? `${report.filled} сн.` : 'введи замеры'}
+            >
+              <div data-arm="lift-verdict">
+                <b>{report.verdict}</b>
+              </div>
+              <div className="ad-muted" data-arm="lift-norm-source" style={{ fontSize: 11, marginTop: 4 }}>
+                {report.normSource}
+              </div>
+              {trend.length > 0 && (
+                <div className="ad-muted" data-arm="lift-trend" style={{ fontSize: 11, marginTop: 4 }}>
+                  Тренд:{' '}
+                  {trend
+                    .map(
+                      (t) =>
+                        `${t.implement} ${t.deltaKg > 0 ? '+' : ''}${t.deltaKg} кг (${t.deltaPct > 0 ? '+' : ''}${t.deltaPct}%)`,
+                    )
+                    .join(' · ')}
                 </div>
-              ))}
-            </div>
-          )}
-        </AdSec>
-      </AdCard>
-
-      </>)}
-      {tab === 'diag' && (<>
-      <AdCard>
-        <AdSec title="🔍 Диагностика движений" defaultOpen summary="снаряд → срыв → фолы → тесты">
-          <div className="lift-group">Снаряд</div>
-          <div className="ad-row" aria-label="Диагностика: снаряд">
-            {ARMLIFT_DIAG_IMPLEMENT_OPTS.map((o) => (
-              <AdChip key={o.id} active={diag.implement === o.id} onClick={() => setD({ implement: o.id, failurePoint: '', faultIds: [] })}>{o.label}</AdChip>
-            ))}
-          </div>
-          <div className="lift-group">Где срыв</div>
-          <div className="ad-row" aria-label="Диагностика: точка срыва">
-            {diagFailures.map((fp) => (
-              <AdChip key={fp.id} active={diag.failurePoint === fp.id} onClick={() => setD({ failurePoint: fp.id })}>{fp.label}</AdChip>
-            ))}
-          </div>
-          {diag.failurePoint && <div className="ad-muted">{diagFailures.find((x) => x.id === diag.failurePoint)?.hint}</div>}
-          <div className="lift-group">Движение (где рвётся)</div>
-          <div className="ad-row" data-arm="lift-chain" aria-label="Диагностика: цепочка движения">
-            {moveChain.map((ph, idx) => {
-              const failed = diag.failurePoint === ph.id;
-              const phaseFaults = diagFaults.filter((fl) => ph.faultIds.includes(fl.id));
-              const marked = phaseFaults.filter((fl) => diag.faultIds.includes(fl.id));
-              return (
-                <span key={ph.id} className="ad-tag" title={`${ph.good}${phaseFaults.length ? ` · Фолы: ${phaseFaults.map((fl) => fl.label).join(', ')}` : ''}`}>
-                  {idx + 1}. {ph.label}{failed ? ' ✗' : ''}{marked.length ? ` (${marked.length})` : ''}
-                </span>
-              );
-            })}
-          </div>
-          <div className="lift-group">Лента попытки (по времени)</div>
-          <div className="ad-row" data-arm="lift-timeline" aria-label="Диагностика: лента попытки">
-            {timeline.map((ph) => {
-              const failed = diag.failurePoint === ph.id;
-              if (!ph.isFailurePhase) {
-                return (
-                  <span key={ph.id} className="ad-tag" title={ph.good}>
-                    {ph.order}. {ph.label}
-                  </span>
-                );
-              }
-              return (
-                <AdChip key={ph.id} active={failed} onClick={() => setD({ failurePoint: ph.id })}>{ph.order}. {ph.label}{failed ? ' ✗' : ''}</AdChip>
-              );
-            })}
-          </div>
-          {failPhase && (
-            <div className="ad-muted">Фаза срыва «{failPhase.label}»: норма — {failPhase.good}. Чинят звенья: {failPhase.weakLinks.map((w) => ARMLIFT_WEAK_LINK_SHORT_RU[w] || w).join(', ')}.</div>
-          )}
-          {diag.failurePoint && (
-            <div className="ad-muted">
+              )}
+              {gripNorm && (
+                <div className="ad-muted" data-arm="lift-grip-norm" style={{ fontSize: 11, marginTop: 4 }}>
+                  Общая сила хвата: {state.gripKg} кг — {gripNorm} (Jamar-ориентир, не снаряд)
+                </div>
+              )}
+              {!report.filled && (
+                <AdBanner tone="info">
+                  Введи хотя бы один снаряд выше — %WR и слабейший снаряд появятся здесь, дальше иди в Диагностику.
+                </AdBanner>
+              )}
+              <div data-arm="lift-tiles">
+                <AdStat value={report.filled ? `${report.filled} сн.` : '—'} label="Замерено" />
+                <AdStat
+                  value={avgShown != null ? `${avgShown}%` : '—'}
+                  label={report.avgWrPct != null ? 'Среднее %WR' : 'Среднее %'}
+                />
+                <AdStat value={report.filled ? weakestLabel : '—'} label="Слабейший" />
+                <AdStat
+                  value={report.totalKg != null && report.totalKg > 0 ? `${report.totalKg}` : '—'}
+                  label="Тотал кг"
+                />
+              </div>
+              {report.rtAsymPct != null && (
+                <div className="ad-muted">
+                  RT-асимметрия L/R: {report.rtAsymPct}% (фон щипка 5–10%; &gt;15% — на осмотр)
+                </div>
+              )}
+              {report.hubAsymPct != null && <div className="ad-muted">Hub-асимметрия L/R: {report.hubAsymPct}%</div>}
+              {report.pinchAsymPct != null && (
+                <div className="ad-muted">Pinch-асимметрия L/R: {report.pinchAsymPct}%</div>
+              )}
+              {prescription && (
+                <div className="ad-muted" data-arm="lift-recipe">
+                  Рецепт: {prescription}
+                </div>
+              )}
+              {attemptPlan && (
+                <div className="ad-muted" data-arm="lift-attempt-plan">
+                  План попыток ({attemptPlan.label}): {attemptPlan.opener} / {attemptPlan.second} / {attemptPlan.third}{' '}
+                  кг — {attemptPlan.note}
+                </div>
+              )}
               {(() => {
-                const ph = moveChain.find((x) => x.id === diag.failurePoint);
-                if (!ph) return null;
-                return (<>Фаза «{ph.label}»: норма — {ph.good}. Фолы фазы: {ph.faultIds.length ? ph.faultIds.map((fid) => diagFaults.find((fl) => fl.id === fid)?.label || fid).join(', ') : 'чистая сила, без фолов'}.</>);
+                const target = diagImplementForReportWeakest(report.weakestWr || report.weakest);
+                if (!target) return null;
+                return (
+                  <AdCta>
+                    <AdBtn
+                      variant="amber"
+                      block
+                      hero
+                      onClick={() => {
+                        setD({ implement: target, failurePoint: '', faultIds: [] });
+                        setTab('diag');
+                      }}
+                    >
+                      → Диагностировать слабейший:{' '}
+                      {ARMLIFT_DIAG_IMPLEMENT_OPTS.find((o) => o.id === target)?.label || target}
+                    </AdBtn>
+                  </AdCta>
+                );
               })()}
-            </div>
-          )}
-          <div className="lift-group">Фолы техники (честно — с фолами замер тренировочный)</div>
-          <div className="ad-row" aria-label="Диагностика: фолы">
-            {diagFaults.map((fl) => (
-              <AdChip key={fl.id} active={diag.faultIds.includes(fl.id)} onClick={() => toggleFault(fl.id)} aria-label={`Фол: ${fl.label}`}>{diag.faultIds.includes(fl.id) ? '✓ ' : ''}{fl.label}</AdChip>
-            ))}
-          </div>
-          {diag.faultIds.length > 0 && (
-            <div className="ad-muted">Кью: {diagFaults.filter((x) => diag.faultIds.includes(x.id)).map((x) => x.cue).join(' · ')}</div>
-          )}
-          <div className="lift-group">Тест-батарея (холды) · релевантны: {relevantTestsFor(diag.implement).join(' + ')}</div>
-          <div className="ad-muted">Протокол: {relevantTestsFor(diag.implement).map((t) => `${t} — ${testProtocolFor(t)}`).join(' · ')}</div>
-          <AdGrid cols="auto-sm">
-            <LiftNum label="Pinch-hold сек" value={diag.pinchHoldSec} onChange={(v) => setD({ pinchHoldSec: v })} placeholder="20" aria="Pinch-hold сек" />
-            <LiftNum label="Farmer-hold сек" value={diag.farmerHoldSec} onChange={(v) => setD({ farmerHoldSec: v })} placeholder="30" aria="Farmer-hold сек" />
-            <LiftNum label="Сгибатели холд сек" value={diag.flexHoldSec} onChange={(v) => setD({ flexHoldSec: v })} placeholder="кулак" aria="Сгибатели холд сек" />
-            <LiftNum label="Разгибатели холд сек" value={diag.extHoldSec} onChange={(v) => setD({ extHoldSec: v })} placeholder="раскрытие" aria="Разгибатели холд сек" />
-          </AdGrid>
-          <div className="ad-row" data-arm="lift-levels" aria-label="Диагностика: уровни тестов">
-            {levels.pinch && <span className="ad-tag">Pinch: {ARMLIFT_LEVEL_RU[levels.pinch]}</span>}
-            {levels.farmer && <span className="ad-tag">Farmer: {ARMLIFT_LEVEL_RU[levels.farmer]}</span>}
-            {levels.coc && <span className="ad-tag">CoC: {ARMLIFT_LEVEL_RU[levels.coc]}</span>}
-            {levels.silver && <span className="ad-tag">Silver: {ARMLIFT_LEVEL_RU[levels.silver]}</span>}
-            {levels.overall && <span className="ad-tag">Итог (по слабейшему): {ARMLIFT_LEVEL_RU[levels.overall]}</span>}
-            {extRatio != null && <span className="ad-tag">Сгиб/разгиб {extRatio}{extRatio > 1.5 ? ' — дисбаланс' : ''}</span>}
-          </div>
-          <div className="ad-row">
-            <AdChip active={diag.wristExtWeak} onClick={() => setD({ wristExtWeak: !diag.wristExtWeak })}>Слабая экстензия запястья</AdChip>
-            {asymForDiag != null && <span className="ad-tag">Асимметрия из замеров: {asymForDiag}%</span>}
-          </div>
-          <div className="lift-group">Рука + второй холд (по желанию)</div>
-          <AdGrid cols="auto-sm">
-            <LiftNum label="Размах кисти см" value={diag.handSpanCm} onChange={(v) => setD({ handSpanCm: v })} placeholder="21" aria="Размах кисти см" />
-            <LiftNum label="Ладонь см" value={diag.handPalmCm} onChange={(v) => setD({ handPalmCm: v })} placeholder="19" aria="Ладонь см" />
-            <LiftNum label="Большой см" value={diag.handThumbCm} onChange={(v) => setD({ handThumbCm: v })} placeholder="12" aria="Большой палец см" />
-            <LiftNum label="Холд 70% сек" value={relevantTestsFor(diag.implement).includes('Pinch-hold') ? diag.pinchSubSec : diag.farmerSubSec} onChange={(v) => setD(relevantTestsFor(diag.implement).includes('Pinch-hold') ? { pinchSubSec: v } : { farmerSubSec: v })} placeholder="60" aria="Холд 70 процентов сек" />
-            {/* 26.10.2026: у медли релевантны ОБА холда (Pinch + Farmer), но поля было
-                одно — farmer-холд некуда ввести, а кривая его не видела. Добавлено второе. */}
-            {relevantTestsFor(diag.implement).includes('Pinch-hold') && relevantTestsFor(diag.implement).includes('Farmer-hold') && (
-              <LiftNum label="Farmer-холд 70% сек" value={diag.farmerSubSec} onChange={(v) => setD({ farmerSubSec: v })} placeholder="60" aria="Farmer холд 70 процентов сек" />
-            )}
-          </AdGrid>
-          <div className="ad-muted" data-arm="lift-hand">{hand.handNote}</div>
-          {holdCurve && <div className="ad-muted" data-arm="lift-hold-curve">Кривая: {holdCurve.note}</div>}
-          {retests.prev && retests.list.length > 0 && (
-            <div className="ad-muted" data-arm="lift-retest">
-              Прошлый замер {retests.prev.date}: {retests.list.map((r) => r.text).join(' · ')}
-            </div>
-          )}
-          {retests.reliabilityWarnings && retests.reliabilityWarnings.length > 0 && (
-            <div className="ad-muted" data-arm="lift-retest-reliability" style={{ color: '#f59e0b' }}>
-              ⚠ {retests.reliabilityWarnings.join(' · ')}
-            </div>
-          )}
-          {completeness.missing.includes('мобильность') && (
-            <div className="ad-muted" data-arm="lift-mob-hint">Для честного вердикта — вбей градусы разгибания/сгибания и проверь мизинец большим</div>
-          )}
-          {retests.due && (
-            <div className="ad-muted" data-arm="lift-retest-due">{retests.due}</div>
-          )}
-          {(() => {
-            const delta = historyDeltaFor(diagHistory, diag.implement);
-            const trend = completenessTrend(diagHistory, diag.implement);
-            return (
-              <>
-                {delta ? (<div className="ad-muted" data-arm="lift-history-delta">Динамика: {delta}</div>) : null}
-                {trend.length >= 2 ? (<div className="ad-muted" data-arm="lift-completeness-trend">Полнота: {trend.slice(-5).join(' → ')}%</div>) : null}
-              </>
-            );
-          })()}
-          {diagHistory.length > 0 && (
-            <div className="ad-list" data-arm="lift-history" aria-label="Диагностика: история диагнозов">
-              {diagHistory.slice(-5).reverse().map((s, idx) => (
-                <div key={`${s.date}-${s.implement}-${idx}`} className="ad-row">
-                  <span>{s.date} · {s.implement}</span>
-                  <span className="ad-muted">{ARMLIFT_WEAK_LINK_SHORT_RU[s.weakLink as keyof typeof ARMLIFT_WEAK_LINK_SHORT_RU] || s.weakLink} / {ARMLIFT_CAUSE_RU[s.cause] || s.cause}</span>
+              {report.rows.length > 0 && (
+                <div className="ad-list" data-arm="lift-table">
+                  {report.rows.map((r) => (
+                    <div key={r.implement} className="ad-row">
+                      <span className="lift-row-main">
+                        <span className="lift-dot" style={{ background: liftLevelColor(r.level) }} aria-hidden />
+                        <span>
+                          <b>{r.label}</b> {r.display}
+                        </span>
+                      </span>
+                      {r.scorePct != null && (
+                        <span className="lift-bar" aria-hidden>
+                          <span
+                            style={{
+                              width: `${Math.max(0, Math.min(100, r.scorePct))}%`,
+                              background: liftLevelColor(r.level),
+                            }}
+                          />
+                        </span>
+                      )}
+                      <span className="ad-muted lift-row-meta">
+                        {r.scorePct != null ? `${r.scorePct}% ${r.internal ? '(ориентир)' : 'WR'}` : 'без %'} ·{' '}
+                        {r.level === 'none'
+                          ? 'факт'
+                          : r.level === 'elite'
+                            ? 'элита'
+                            : r.level === 'comp'
+                              ? 'соревн.'
+                              : 'база'}
+                      </span>
+                      <span className="ad-muted">{r.note}</span>
+                    </div>
+                  ))}
                 </div>
-              ))}
-              <AdBtn variant="ghost" onClick={() => { clearDiagHistory(); setHistTick((x) => x + 1); }}>✕ Очистить историю</AdBtn>
-            </div>
-          )}
-          <div className="lift-group">Мобильность (градусы, норма разгиб 70 / сгиб 75)</div>
-          <AdGrid cols="auto-sm">
-            <LiftNum label="Разгибание запястья °" value={diag.wristExtDeg} onChange={(v) => setD({ wristExtDeg: v })} placeholder="70" aria="Разгибание запястья градусы" />
-            <LiftNum label="Сгибание запястья °" value={diag.wristFlexDeg} onChange={(v) => setD({ wristFlexDeg: v })} placeholder="75" aria="Сгибание запястья градусы" />
-          </AdGrid>
-          <div className="ad-row" aria-label="Диагностика: мобильность">
-            <AdChip active={diag.thumbOppOk} onClick={() => setD({ thumbOppOk: !diag.thumbOppOk })}>{diag.thumbOppOk ? '✓ Большой достаёт до мизинца' : 'Большой до мизинца: проверить'}</AdChip>
-            <AdChip active={diag.hipHingePoor} onClick={() => setD({ hipHingePoor: !diag.hipHingePoor })}>Hip hinge слабый</AdChip>
-            {mobility.fails.length > 0 && <span className="ad-tag">ROM-провал: {mobility.fails.map((f: string) => ARMLIFT_MOBILITY_FAIL_RU[f] || f).join(', ')} · ретест через 2 нед</span>}
-          </div>
-          <div className="ad-row">
-            <AdChip active={diag.pain} tone={diag.pain ? 'red' : undefined} onClick={() => setD({ pain: !diag.pain })}>{diag.pain ? '🔴 Боль есть — стоп' : 'Боли нет'}</AdChip>
-            <AdChip active={diag.elbowPain} tone={diag.elbowPain ? 'red' : undefined} onClick={() => setD({ elbowPain: !diag.elbowPain })}>{diag.elbowPain ? '🔴 Локоть/запястье болит' : 'Локоть в норме'}</AdChip>
-            <AdChip active={diag.skinTear} tone={diag.skinTear ? 'red' : undefined} onClick={() => setD({ skinTear: !diag.skinTear })}>{diag.skinTear ? '🔴 Сорвана кожа — щипок стоп' : 'Кожа цела'}</AdChip>
-            <AdChip active={diag.thumbWebPain} tone={diag.thumbWebPain ? 'red' : undefined} onClick={() => setD({ thumbWebPain: !diag.thumbWebPain })}>{diag.thumbWebPain ? '🔴 Перепонка болит' : 'Перепонка в норме'}</AdChip>
-            {logStats.sessions28d != null && <span className="ad-tag">Журнал: {logStats.sessions28d} хват-сессий/28д</span>}
-            {acwr && <span className="ad-tag">ACWR {acwr.ratio} ({ARMLIFT_ACWR_ZONE_RU[acwr.zone] || acwr.zone})</span>}
-          </div>
-          <div className="lift-group">Карта боли (где — что разгрузить)</div>
-          <div className="ad-row" aria-label="Диагностика: карта боли">
-            {ARMLIFT_PAIN_ZONES.map((z) => (
-              <AdChip key={z.id} active={diag.painZones.includes(z.id)} tone={diag.painZones.includes(z.id) ? 'red' : undefined} onClick={() => togglePainZone(z.id)}>{z.label}</AdChip>
-            ))}
-          </div>
-          <div className="ad-row" aria-label="Диагностика: красные флаги">
-            <AdChip active={diag.condNumb} tone={diag.condNumb ? 'red' : undefined} onClick={() => setD({ condNumb: !diag.condNumb })}>Онемение</AdChip>
-            <AdChip active={diag.condSwell} tone={diag.condSwell ? 'red' : undefined} onClick={() => setD({ condSwell: !diag.condSwell })}>Отёк</AdChip>
-            <AdChip active={diag.condNight} tone={diag.condNight ? 'red' : undefined} onClick={() => setD({ condNight: !diag.condNight })}>Ночная боль</AdChip>
-          </div>
-          {(diag.painZones.length > 0 || diag.condNumb || diag.condSwell || diag.condNight) && (
-            <div className="ad-muted" data-arm="lift-pain-map">{painMap.unloadNote}</div>
-          )}
-          <div className="lift-group">Видео-разбор — углы и положение снаряда вручную</div>
-          <AdGrid cols="auto-sm">
-            <LiftNum label="Угол запястья °" value={diag.videoWristDeg} onChange={(v) => setD({ videoWristDeg: v })} placeholder="180" aria="Угол запястья видео градусы" />
-          </AdGrid>
-          <div className="ad-row" aria-label="Диагностика: видео">
-            <AdChip active={diag.videoParallelBad} onClick={() => setD({ videoParallelBad: !diag.videoParallelBad })}>Снаряд не параллелен</AdChip>
-          </div>
-          {videoFlags && <div className="ad-muted" data-arm="lift-video-flags">🎥 {videoFlags.note}</div>}
-          <div className="lift-group">Условия замера (режут ложные слабости)</div>
-          <div className="ad-row" aria-label="Диагностика: условия">
-            {(['v1', 'v2', 'v3'] as const).map((v) => (
-              <AdChip key={v} active={diag.condRtVersion === v} onClick={() => setD({ condRtVersion: v })}>RT {v.toUpperCase()}</AdChip>
-            ))}
-            <AdChip active={diag.condRtVersion === 'unknown'} onClick={() => setD({ condRtVersion: 'unknown' })}>RT версия: не знаю</AdChip>
-            <AdChip active={diag.condUncalib} onClick={() => setD({ condUncalib: !diag.condUncalib })}>Диски не калиброваны</AdChip>
-            <AdChip active={diag.condLiquid} onClick={() => setD({ condLiquid: !diag.condLiquid })}>Жидкий мел</AdChip>
-            <AdChip active={diag.condCold} onClick={() => setD({ condCold: !diag.condCold })}>Холодно в зале</AdChip>
-          </div>
-          <AdGrid cols="auto-sm">
-            <LiftNum label="Диаметр грифа мм" value={diag.condDiameterMm} onChange={(v) => setD({ condDiameterMm: v })} placeholder="60.3" aria="Диаметр грифа мм" />
-            <LiftNum label="Поправка дисков кг" value={diag.condPlateCorrectionKg} onChange={(v) => setD({ condPlateCorrectionKg: v })} placeholder="0" aria="Поправка дисков кг" />
-          </AdGrid>
-          <div className="ad-muted" data-arm="lift-conditions">{conditions.conditionsNote}</div>
-          {/* Аудит 2026-10: чек-лист правил IronMind наконец получил ввод — раньше
+              )}
+            </AdSec>
+          </AdCard>
+        </>
+      )}
+      {tab === 'diag' && (
+        <>
+          <AdCard>
+            <AdSec title="🔍 Диагностика движений" defaultOpen summary="снаряд → срыв → фолы → тесты">
+              <div className="lift-group">Снаряд</div>
+              <div className="ad-row" aria-label="Диагностика: снаряд">
+                {ARMLIFT_DIAG_IMPLEMENT_OPTS.map((o) => (
+                  <AdChip
+                    key={o.id}
+                    active={diag.implement === o.id}
+                    onClick={() => setD({ implement: o.id, failurePoint: '', faultIds: [] })}
+                  >
+                    {o.label}
+                  </AdChip>
+                ))}
+              </div>
+              <div className="lift-group">Где срыв</div>
+              <div className="ad-row" aria-label="Диагностика: точка срыва">
+                {diagFailures.map((fp) => (
+                  <AdChip
+                    key={fp.id}
+                    active={diag.failurePoint === fp.id}
+                    onClick={() => setD({ failurePoint: fp.id })}
+                  >
+                    {fp.label}
+                  </AdChip>
+                ))}
+              </div>
+              {diag.failurePoint && (
+                <div className="ad-muted">{diagFailures.find((x) => x.id === diag.failurePoint)?.hint}</div>
+              )}
+              <div className="lift-group">Движение (где рвётся)</div>
+              <div className="ad-row" data-arm="lift-chain" aria-label="Диагностика: цепочка движения">
+                {moveChain.map((ph, idx) => {
+                  const failed = diag.failurePoint === ph.id;
+                  const phaseFaults = diagFaults.filter((fl) => ph.faultIds.includes(fl.id));
+                  const marked = phaseFaults.filter((fl) => diag.faultIds.includes(fl.id));
+                  return (
+                    <span
+                      key={ph.id}
+                      className="ad-tag"
+                      title={`${ph.good}${phaseFaults.length ? ` · Фолы: ${phaseFaults.map((fl) => fl.label).join(', ')}` : ''}`}
+                    >
+                      {idx + 1}. {ph.label}
+                      {failed ? ' ✗' : ''}
+                      {marked.length ? ` (${marked.length})` : ''}
+                    </span>
+                  );
+                })}
+              </div>
+              <div className="lift-group">Лента попытки (по времени)</div>
+              <div className="ad-row" data-arm="lift-timeline" aria-label="Диагностика: лента попытки">
+                {timeline.map((ph) => {
+                  const failed = diag.failurePoint === ph.id;
+                  if (!ph.isFailurePhase) {
+                    return (
+                      <span key={ph.id} className="ad-tag" title={ph.good}>
+                        {ph.order}. {ph.label}
+                      </span>
+                    );
+                  }
+                  return (
+                    <AdChip key={ph.id} active={failed} onClick={() => setD({ failurePoint: ph.id })}>
+                      {ph.order}. {ph.label}
+                      {failed ? ' ✗' : ''}
+                    </AdChip>
+                  );
+                })}
+              </div>
+              {failPhase && (
+                <div className="ad-muted">
+                  Фаза срыва «{failPhase.label}»: норма — {failPhase.good}. Чинят звенья:{' '}
+                  {failPhase.weakLinks.map((w) => ARMLIFT_WEAK_LINK_SHORT_RU[w] || w).join(', ')}.
+                </div>
+              )}
+              {diag.failurePoint && (
+                <div className="ad-muted">
+                  {(() => {
+                    const ph = moveChain.find((x) => x.id === diag.failurePoint);
+                    if (!ph) return null;
+                    return (
+                      <>
+                        Фаза «{ph.label}»: норма — {ph.good}. Фолы фазы:{' '}
+                        {ph.faultIds.length
+                          ? ph.faultIds.map((fid) => diagFaults.find((fl) => fl.id === fid)?.label || fid).join(', ')
+                          : 'чистая сила, без фолов'}
+                        .
+                      </>
+                    );
+                  })()}
+                </div>
+              )}
+              <div className="lift-group">Фолы техники (честно — с фолами замер тренировочный)</div>
+              <div className="ad-row" aria-label="Диагностика: фолы">
+                {diagFaults.map((fl) => (
+                  <AdChip
+                    key={fl.id}
+                    active={diag.faultIds.includes(fl.id)}
+                    onClick={() => toggleFault(fl.id)}
+                    aria-label={`Фол: ${fl.label}`}
+                  >
+                    {diag.faultIds.includes(fl.id) ? '✓ ' : ''}
+                    {fl.label}
+                  </AdChip>
+                ))}
+              </div>
+              {diag.faultIds.length > 0 && (
+                <div className="ad-muted">
+                  Кью:{' '}
+                  {diagFaults
+                    .filter((x) => diag.faultIds.includes(x.id))
+                    .map((x) => x.cue)
+                    .join(' · ')}
+                </div>
+              )}
+              <div className="lift-group">
+                Тест-батарея (холды) · релевантны: {relevantTestsFor(diag.implement).join(' + ')}
+              </div>
+              <div className="ad-muted">
+                Протокол:{' '}
+                {relevantTestsFor(diag.implement)
+                  .map((t) => `${t} — ${testProtocolFor(t)}`)
+                  .join(' · ')}
+              </div>
+              <AdGrid cols="auto-sm">
+                <LiftNum
+                  label="Pinch-hold сек"
+                  value={diag.pinchHoldSec}
+                  onChange={(v) => setD({ pinchHoldSec: v })}
+                  placeholder="20"
+                  aria="Pinch-hold сек"
+                />
+                <LiftNum
+                  label="Farmer-hold сек"
+                  value={diag.farmerHoldSec}
+                  onChange={(v) => setD({ farmerHoldSec: v })}
+                  placeholder="30"
+                  aria="Farmer-hold сек"
+                />
+                <LiftNum
+                  label="Сгибатели холд сек"
+                  value={diag.flexHoldSec}
+                  onChange={(v) => setD({ flexHoldSec: v })}
+                  placeholder="кулак"
+                  aria="Сгибатели холд сек"
+                />
+                <LiftNum
+                  label="Разгибатели холд сек"
+                  value={diag.extHoldSec}
+                  onChange={(v) => setD({ extHoldSec: v })}
+                  placeholder="раскрытие"
+                  aria="Разгибатели холд сек"
+                />
+              </AdGrid>
+              <div className="ad-row" data-arm="lift-levels" aria-label="Диагностика: уровни тестов">
+                {levels.pinch && <span className="ad-tag">Pinch: {ARMLIFT_LEVEL_RU[levels.pinch]}</span>}
+                {levels.farmer && <span className="ad-tag">Farmer: {ARMLIFT_LEVEL_RU[levels.farmer]}</span>}
+                {levels.coc && <span className="ad-tag">CoC: {ARMLIFT_LEVEL_RU[levels.coc]}</span>}
+                {levels.silver && <span className="ad-tag">Silver: {ARMLIFT_LEVEL_RU[levels.silver]}</span>}
+                {levels.overall && (
+                  <span className="ad-tag">Итог (по слабейшему): {ARMLIFT_LEVEL_RU[levels.overall]}</span>
+                )}
+                {extRatio != null && (
+                  <span className="ad-tag">
+                    Сгиб/разгиб {extRatio}
+                    {extRatio > 1.5 ? ' — дисбаланс' : ''}
+                  </span>
+                )}
+              </div>
+              <div className="ad-row">
+                <AdChip active={diag.wristExtWeak} onClick={() => setD({ wristExtWeak: !diag.wristExtWeak })}>
+                  Слабая экстензия запястья
+                </AdChip>
+                {asymForDiag != null && <span className="ad-tag">Асимметрия из замеров: {asymForDiag}%</span>}
+              </div>
+              <div className="lift-group">Рука + второй холд (по желанию)</div>
+              <AdGrid cols="auto-sm">
+                <LiftNum
+                  label="Размах кисти см"
+                  value={diag.handSpanCm}
+                  onChange={(v) => setD({ handSpanCm: v })}
+                  placeholder="21"
+                  aria="Размах кисти см"
+                />
+                <LiftNum
+                  label="Ладонь см"
+                  value={diag.handPalmCm}
+                  onChange={(v) => setD({ handPalmCm: v })}
+                  placeholder="19"
+                  aria="Ладонь см"
+                />
+                <LiftNum
+                  label="Большой см"
+                  value={diag.handThumbCm}
+                  onChange={(v) => setD({ handThumbCm: v })}
+                  placeholder="12"
+                  aria="Большой палец см"
+                />
+                <LiftNum
+                  label="Холд 70% сек"
+                  value={relevantTestsFor(diag.implement).includes('Pinch-hold') ? diag.pinchSubSec : diag.farmerSubSec}
+                  onChange={(v) =>
+                    setD(
+                      relevantTestsFor(diag.implement).includes('Pinch-hold')
+                        ? { pinchSubSec: v }
+                        : { farmerSubSec: v },
+                    )
+                  }
+                  placeholder="60"
+                  aria="Холд 70 процентов сек"
+                />
+                {/* 26.10.2026: у медли релевантны ОБА холда (Pinch + Farmer), но поля было
+                одно — farmer-холд некуда ввести, а кривая его не видела. Добавлено второе. */}
+                {relevantTestsFor(diag.implement).includes('Pinch-hold') &&
+                  relevantTestsFor(diag.implement).includes('Farmer-hold') && (
+                    <LiftNum
+                      label="Farmer-холд 70% сек"
+                      value={diag.farmerSubSec}
+                      onChange={(v) => setD({ farmerSubSec: v })}
+                      placeholder="60"
+                      aria="Farmer холд 70 процентов сек"
+                    />
+                  )}
+              </AdGrid>
+              <div className="ad-muted" data-arm="lift-hand">
+                {hand.handNote}
+              </div>
+              {holdCurve && (
+                <div className="ad-muted" data-arm="lift-hold-curve">
+                  Кривая: {holdCurve.note}
+                </div>
+              )}
+              {retests.prev && retests.list.length > 0 && (
+                <div className="ad-muted" data-arm="lift-retest">
+                  Прошлый замер {retests.prev.date}: {retests.list.map((r) => r.text).join(' · ')}
+                </div>
+              )}
+              {retests.reliabilityWarnings && retests.reliabilityWarnings.length > 0 && (
+                <div className="ad-muted" data-arm="lift-retest-reliability" style={{ color: '#f59e0b' }}>
+                  ⚠ {retests.reliabilityWarnings.join(' · ')}
+                </div>
+              )}
+              {completeness.missing.includes('мобильность') && (
+                <div className="ad-muted" data-arm="lift-mob-hint">
+                  Для честного вердикта — вбей градусы разгибания/сгибания и проверь мизинец большим
+                </div>
+              )}
+              {retests.due && (
+                <div className="ad-muted" data-arm="lift-retest-due">
+                  {retests.due}
+                </div>
+              )}
+              {(() => {
+                const delta = historyDeltaFor(diagHistory, diag.implement);
+                const trend = completenessTrend(diagHistory, diag.implement);
+                return (
+                  <>
+                    {delta ? (
+                      <div className="ad-muted" data-arm="lift-history-delta">
+                        Динамика: {delta}
+                      </div>
+                    ) : null}
+                    {trend.length >= 2 ? (
+                      <div className="ad-muted" data-arm="lift-completeness-trend">
+                        Полнота: {trend.slice(-5).join(' → ')}%
+                      </div>
+                    ) : null}
+                  </>
+                );
+              })()}
+              {diagHistory.length > 0 && (
+                <div className="ad-list" data-arm="lift-history" aria-label="Диагностика: история диагнозов">
+                  {diagHistory
+                    .slice(-5)
+                    .reverse()
+                    .map((s, idx) => (
+                      <div key={`${s.date}-${s.implement}-${idx}`} className="ad-row">
+                        <span>
+                          {s.date} · {s.implement}
+                        </span>
+                        <span className="ad-muted">
+                          {ARMLIFT_WEAK_LINK_SHORT_RU[s.weakLink as keyof typeof ARMLIFT_WEAK_LINK_SHORT_RU] ||
+                            s.weakLink}{' '}
+                          / {ARMLIFT_CAUSE_RU[s.cause] || s.cause}
+                        </span>
+                      </div>
+                    ))}
+                  <AdBtn
+                    variant="ghost"
+                    onClick={() => {
+                      clearDiagHistory();
+                      setHistTick((x) => x + 1);
+                    }}
+                  >
+                    ✕ Очистить историю
+                  </AdBtn>
+                </div>
+              )}
+              <div className="lift-group">Мобильность (градусы, норма разгиб 70 / сгиб 75)</div>
+              <AdGrid cols="auto-sm">
+                <LiftNum
+                  label="Разгибание запястья °"
+                  value={diag.wristExtDeg}
+                  onChange={(v) => setD({ wristExtDeg: v })}
+                  placeholder="70"
+                  aria="Разгибание запястья градусы"
+                />
+                <LiftNum
+                  label="Сгибание запястья °"
+                  value={diag.wristFlexDeg}
+                  onChange={(v) => setD({ wristFlexDeg: v })}
+                  placeholder="75"
+                  aria="Сгибание запястья градусы"
+                />
+              </AdGrid>
+              <div className="ad-row" aria-label="Диагностика: мобильность">
+                <AdChip active={diag.thumbOppOk} onClick={() => setD({ thumbOppOk: !diag.thumbOppOk })}>
+                  {diag.thumbOppOk ? '✓ Большой достаёт до мизинца' : 'Большой до мизинца: проверить'}
+                </AdChip>
+                <AdChip active={diag.hipHingePoor} onClick={() => setD({ hipHingePoor: !diag.hipHingePoor })}>
+                  Hip hinge слабый
+                </AdChip>
+                {mobility.fails.length > 0 && (
+                  <span className="ad-tag">
+                    ROM-провал: {mobility.fails.map((f: string) => ARMLIFT_MOBILITY_FAIL_RU[f] || f).join(', ')} ·
+                    ретест через 2 нед
+                  </span>
+                )}
+              </div>
+              <div className="ad-row">
+                <AdChip
+                  active={diag.pain}
+                  tone={diag.pain ? 'red' : undefined}
+                  onClick={() => setD({ pain: !diag.pain })}
+                >
+                  {diag.pain ? '🔴 Боль есть — стоп' : 'Боли нет'}
+                </AdChip>
+                <AdChip
+                  active={diag.elbowPain}
+                  tone={diag.elbowPain ? 'red' : undefined}
+                  onClick={() => setD({ elbowPain: !diag.elbowPain })}
+                >
+                  {diag.elbowPain ? '🔴 Локоть/запястье болит' : 'Локоть в норме'}
+                </AdChip>
+                <AdChip
+                  active={diag.skinTear}
+                  tone={diag.skinTear ? 'red' : undefined}
+                  onClick={() => setD({ skinTear: !diag.skinTear })}
+                >
+                  {diag.skinTear ? '🔴 Сорвана кожа — щипок стоп' : 'Кожа цела'}
+                </AdChip>
+                <AdChip
+                  active={diag.thumbWebPain}
+                  tone={diag.thumbWebPain ? 'red' : undefined}
+                  onClick={() => setD({ thumbWebPain: !diag.thumbWebPain })}
+                >
+                  {diag.thumbWebPain ? '🔴 Перепонка болит' : 'Перепонка в норме'}
+                </AdChip>
+                {logStats.sessions28d != null && (
+                  <span className="ad-tag">Журнал: {logStats.sessions28d} хват-сессий/28д</span>
+                )}
+                {acwr && (
+                  <span className="ad-tag">
+                    ACWR {acwr.ratio} ({ARMLIFT_ACWR_ZONE_RU[acwr.zone] || acwr.zone})
+                  </span>
+                )}
+              </div>
+              <div className="lift-group">Карта боли (где — что разгрузить)</div>
+              <div className="ad-row" aria-label="Диагностика: карта боли">
+                {ARMLIFT_PAIN_ZONES.map((z) => (
+                  <AdChip
+                    key={z.id}
+                    active={diag.painZones.includes(z.id)}
+                    tone={diag.painZones.includes(z.id) ? 'red' : undefined}
+                    onClick={() => togglePainZone(z.id)}
+                  >
+                    {z.label}
+                  </AdChip>
+                ))}
+              </div>
+              <div className="ad-row" aria-label="Диагностика: красные флаги">
+                <AdChip
+                  active={diag.condNumb}
+                  tone={diag.condNumb ? 'red' : undefined}
+                  onClick={() => setD({ condNumb: !diag.condNumb })}
+                >
+                  Онемение
+                </AdChip>
+                <AdChip
+                  active={diag.condSwell}
+                  tone={diag.condSwell ? 'red' : undefined}
+                  onClick={() => setD({ condSwell: !diag.condSwell })}
+                >
+                  Отёк
+                </AdChip>
+                <AdChip
+                  active={diag.condNight}
+                  tone={diag.condNight ? 'red' : undefined}
+                  onClick={() => setD({ condNight: !diag.condNight })}
+                >
+                  Ночная боль
+                </AdChip>
+              </div>
+              {(diag.painZones.length > 0 || diag.condNumb || diag.condSwell || diag.condNight) && (
+                <div className="ad-muted" data-arm="lift-pain-map">
+                  {painMap.unloadNote}
+                </div>
+              )}
+              <div className="lift-group">Видео-разбор — углы и положение снаряда вручную</div>
+              <AdGrid cols="auto-sm">
+                <LiftNum
+                  label="Угол запястья °"
+                  value={diag.videoWristDeg}
+                  onChange={(v) => setD({ videoWristDeg: v })}
+                  placeholder="180"
+                  aria="Угол запястья видео градусы"
+                />
+              </AdGrid>
+              <div className="ad-row" aria-label="Диагностика: видео">
+                <AdChip
+                  active={diag.videoParallelBad}
+                  onClick={() => setD({ videoParallelBad: !diag.videoParallelBad })}
+                >
+                  Снаряд не параллелен
+                </AdChip>
+              </div>
+              {videoFlags && (
+                <div className="ad-muted" data-arm="lift-video-flags">
+                  🎥 {videoFlags.note}
+                </div>
+              )}
+              <div className="lift-group">Условия замера (режут ложные слабости)</div>
+              <div className="ad-row" aria-label="Диагностика: условия">
+                {(['v1', 'v2', 'v3'] as const).map((v) => (
+                  <AdChip key={v} active={diag.condRtVersion === v} onClick={() => setD({ condRtVersion: v })}>
+                    RT {v.toUpperCase()}
+                  </AdChip>
+                ))}
+                <AdChip active={diag.condRtVersion === 'unknown'} onClick={() => setD({ condRtVersion: 'unknown' })}>
+                  RT версия: не знаю
+                </AdChip>
+                <AdChip active={diag.condUncalib} onClick={() => setD({ condUncalib: !diag.condUncalib })}>
+                  Диски не калиброваны
+                </AdChip>
+                <AdChip active={diag.condLiquid} onClick={() => setD({ condLiquid: !diag.condLiquid })}>
+                  Жидкий мел
+                </AdChip>
+                <AdChip active={diag.condCold} onClick={() => setD({ condCold: !diag.condCold })}>
+                  Холодно в зале
+                </AdChip>
+              </div>
+              <AdGrid cols="auto-sm">
+                <LiftNum
+                  label="Диаметр грифа мм"
+                  value={diag.condDiameterMm}
+                  onChange={(v) => setD({ condDiameterMm: v })}
+                  placeholder="60.3"
+                  aria="Диаметр грифа мм"
+                />
+                <LiftNum
+                  label="Поправка дисков кг"
+                  value={diag.condPlateCorrectionKg}
+                  onChange={(v) => setD({ condPlateCorrectionKg: v })}
+                  placeholder="0"
+                  aria="Поправка дисков кг"
+                />
+              </AdGrid>
+              <div className="ad-muted" data-arm="lift-conditions">
+                {conditions.conditionsNote}
+              </div>
+              {/* Аудит 2026-10: чек-лист правил IronMind наконец получил ввод — раньше
               движок assessLiftRules существовал, но «замер по правилам» нельзя было
               ни отметить, ни отправить (шапка хаба это обещала). */}
-          <div className="lift-group">Замер по правилам (IronMind/AUSA)</div>
-          <div className="ad-row" aria-label="Диагностика: правила замера">
-            {RULES_CHECK_ITEMS.map((label, i) => (
-              <AdChip
-                key={label}
-                active={diag.rulesChecks[i] === true}
-                onClick={() => {
-                  const next = RULES_CHECK_ITEMS.map((_, j) => (j === i ? !(diag.rulesChecks[j] === true) : diag.rulesChecks[j]));
-                  setD({ rulesChecks: next });
-                }}
-              >
-                {diag.rulesChecks[i] === true ? '✓ ' : ''}{label}
-              </AdChip>
-            ))}
-          </div>
-          <div className="ad-muted" data-arm="lift-rules">{rulesCheck.note}</div>
-          {lmsForWeakest && (
-            <div className="ad-muted" data-arm="lift-lms">
-              LMS ({lmsForWeakest.label}): {lmsForWeakest.steps.join(' → ')} — только вверх, промах = выбыл.
-            </div>
-          )}
-          <div data-arm="lift-completeness" aria-label="Диагностика: полнота">
-            Полнота диагностики: {completeness.pct}%{completeness.missing.length > 0 ? ` — довбей: ${completeness.missing.join(', ')}` : ' — вердикт честный'}
-          </div>
-          <div data-arm="lift-diag-result"><b>{diagnosis.title}</b> · {ARMLIFT_CAUSE_RU[cause.cause] || cause.cause} ({Math.round(cause.confidence * 100)}%)</div>
-          <div className="ad-muted">Факты: {cause.evidence.join(' · ')}</div>
-          <div className="ad-muted">Чинить: {cause.fix} · {diagnosis.cues.join(' · ')}</div>
-          <div className="ad-muted">{diagnosis.ruleNote}</div>
-          {correctionsOrdered.length > 0 && (
-            <div data-arm="lift-diag-top3" style={{ marginTop: 8, padding: '8px 10px', borderRadius: 10, background: '#0a1629', border: '1px solid rgba(59,130,246,0.3)' }}>
-              <div style={{ fontSize: 11, fontWeight: 800, color: '#93c5fd', marginBottom: 2 }}>🏋️ Методы с выбором упражнения {armliftPrefCorr ? '· ⭐ выбрано' : '· нажми — пойдёт первым в план'}</div>
-              {correctionsOrdered.map((c) => {
-                const sel = armliftPrefCorr === c.id;
-                return (
-                  <button
-                    key={c.id}
-                    type="button"
-                    data-arm="lift-diag-pick"
-                    data-selected={sel ? 'true' : 'false'}
-                    aria-pressed={sel}
-                    aria-label={`${sel ? 'Выбрано' : 'Выбрать'}: ${c.title}`}
-                    onClick={() => setArmliftPrefCorr(c.id)}
-                    style={{ display: 'flex', alignItems: 'center', gap: 8, width: '100%', minHeight: 44, marginTop: 4, padding: '6px 8px', borderRadius: 10, cursor: 'pointer', textAlign: 'left', color: '#fff', background: sel ? 'linear-gradient(135deg, rgba(59,130,246,0.18), rgba(168,85,247,0.08))' : 'transparent', border: sel ? '2px solid rgba(59,130,246,0.7)' : '1px solid #1f3a5f' }}
+              <div className="lift-group">Замер по правилам (IronMind/AUSA)</div>
+              <div className="ad-row" aria-label="Диагностика: правила замера">
+                {RULES_CHECK_ITEMS.map((label, i) => (
+                  <AdChip
+                    key={label}
+                    active={diag.rulesChecks[i] === true}
+                    onClick={() => {
+                      const next = RULES_CHECK_ITEMS.map((_, j) =>
+                        j === i ? !(diag.rulesChecks[j] === true) : diag.rulesChecks[j],
+                      );
+                      setD({ rulesChecks: next });
+                    }}
                   >
-                    <span aria-hidden style={{ minWidth: 32, minHeight: 32, borderRadius: 8, border: '1px solid rgba(59,130,246,0.45)', background: sel ? 'rgba(59,130,246,0.22)' : 'transparent', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 14, flexShrink: 0 }}>{sel ? '⭐' : '☆'}</span>
-                    <b style={{ flex: 1, minWidth: 0, fontSize: 12 }}>{c.title}</b>
-                    <span style={{ fontSize: 11, color: '#93c5fd', fontWeight: 800, whiteSpace: 'nowrap', flexShrink: 0 }}>{c.protocol}</span>
-                    <span style={{ fontSize: 11, fontWeight: 800, color: sel ? '#93c5fd' : '#fff', whiteSpace: 'nowrap', flexShrink: 0 }}>{sel ? '✓' : 'Выбрать'}</span>
-                  </button>
-                );
-              })}
-            </div>
-          )}
-          <AdCta>
-            <AdBtn variant="amber" block hero onClick={() => setTab('corr')}>→ К коррекции ({corrections[0]?.title})</AdBtn>
-          </AdCta>
-        </AdSec>
-      </AdCard>
-      </>)}
-      {tab === 'corr' && (<>
-      <AdCard>
-        <AdSec title="🔧 Коррекция" defaultOpen summary={`выбор снаряда → причина → методы с выбором упражнения`}>
-          <div data-arm="lift-corr-result"><b>{diagnosis.title}</b> · причина {ARMLIFT_CAUSE_RU[cause.cause] || cause.cause} ({Math.round(cause.confidence * 100)}%)</div>
-          <div className="ad-muted">Чинить: {cause.fix}</div>
-          <div className="ad-muted" data-arm="lift-corr-why">Почему: {cause.evidence.join(' · ')}</div>
-          <div className="ad-list" data-arm="lift-corr-top">
-            {correctionsOrdered.map((c, idx) => {
-              const sel = armliftPrefCorr === c.id;
-              return (
-              <div key={c.id} className="ad-row" data-arm="lift-corr-row" data-selected={sel ? 'true' : 'false'} style={{ alignItems: 'center', borderRadius: 10, padding: '6px 8px', background: sel ? 'linear-gradient(135deg, rgba(59,130,246,0.18), rgba(168,85,247,0.08))' : 'transparent', border: sel ? '2px solid rgba(59,130,246,0.7)' : '1px solid transparent' }}>
-                <button
-                  data-arm="lift-corr-star"
-                  data-active={sel ? 'true' : 'false'}
-                  aria-pressed={sel}
-                  aria-label={`${sel ? 'Выбрано' : 'Выбрать'}: ${c.title}`}
-                  onClick={() => setArmliftPrefCorr(c.id)}
-                  style={{ display: 'flex', alignItems: 'center', gap: 8, flex: 1, minWidth: 0, minHeight: 44, padding: 0, cursor: 'pointer', border: 'none', background: 'transparent', color: '#fff', textAlign: 'left' }}
+                    {diag.rulesChecks[i] === true ? '✓ ' : ''}
+                    {label}
+                  </AdChip>
+                ))}
+              </div>
+              <div className="ad-muted" data-arm="lift-rules">
+                {rulesCheck.note}
+              </div>
+              {lmsForWeakest && (
+                <div className="ad-muted" data-arm="lift-lms">
+                  LMS ({lmsForWeakest.label}): {lmsForWeakest.steps.join(' → ')} — только вверх, промах = выбыл.
+                </div>
+              )}
+              <div data-arm="lift-completeness" aria-label="Диагностика: полнота">
+                Полнота диагностики: {completeness.pct}%
+                {completeness.missing.length > 0
+                  ? ` — довбей: ${completeness.missing.join(', ')}`
+                  : ' — вердикт честный'}
+              </div>
+              <div data-arm="lift-diag-result">
+                <b>{diagnosis.title}</b> · {ARMLIFT_CAUSE_RU[cause.cause] || cause.cause} (
+                {Math.round(cause.confidence * 100)}%)
+              </div>
+              <div className="ad-muted">Факты: {cause.evidence.join(' · ')}</div>
+              <div className="ad-muted">
+                Чинить: {cause.fix} · {diagnosis.cues.join(' · ')}
+              </div>
+              <div className="ad-muted">{diagnosis.ruleNote}</div>
+              {correctionsOrdered.length > 0 && (
+                <div
+                  data-arm="lift-diag-top3"
+                  style={{
+                    marginTop: 8,
+                    padding: '8px 10px',
+                    borderRadius: 10,
+                    background: '#0a1629',
+                    border: '1px solid rgba(59,130,246,0.3)',
+                  }}
                 >
-                  <span aria-hidden style={{ minWidth: 36, minHeight: 36, borderRadius: 9, border: '1px solid rgba(59,130,246,0.45)', background: sel ? 'rgba(59,130,246,0.22)' : 'transparent', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 15, flexShrink: 0 }}>{sel ? '⭐' : '☆'}</span>
-                  <b style={{ flex: 1, minWidth: 0 }}>{idx + 1}. {c.title}</b> — {c.protocol}
-                  <span style={{ fontSize: 11, fontWeight: 800, color: sel ? '#93c5fd' : '#fff', whiteSpace: 'nowrap', flexShrink: 0 }}>{sel ? '✓ Выбрано' : 'Выбрать'}</span>
-                </button>
-                <span className="ad-muted">{c.sets}×{c.holdSeconds != null ? `${c.holdSeconds}с холд` : `${c.reps[0]}–${c.reps[1]} повт`} · отдых {c.restSec}с · {c.freq} · {c.source} · день {c.dayTag} · чинит: {c.fixesPhase.map((fid) => diagFailures.find((fp) => fp.id === fid)?.label || fid).join(', ')}</span>
-                {c.cues && c.cues.length > 0 && (
-                  <span className="ad-muted" data-arm="lift-corr-cues">Кью: {c.cues.join(' · ')}</span>
-                )}
-          {c.progression && (
-            <span className="ad-muted">📈 Прогрессия: {c.progression}</span>
-          )}
-          {/* Источник и разминка — поля движка (source обязателен, warmup опционален), как в ТА-карточке */}
-          <span className="ad-muted" data-arm="lift-corr-source">🏷 Источник: {c.source}</span>
-          {c.warmup && (
-            <span className="ad-muted" data-arm="lift-corr-warmup">🔥 Разминка: {c.warmup}</span>
-          )}
+                  <div style={{ fontSize: 11, fontWeight: 800, color: '#93c5fd', marginBottom: 2 }}>
+                    🏋️ Методы с выбором упражнения {armliftPrefCorr ? '· ⭐ выбрано' : '· нажми — пойдёт первым в план'}
+                  </div>
+                  {correctionsOrdered.map((c) => {
+                    const sel = armliftPrefCorr === c.id;
+                    return (
+                      <button
+                        key={c.id}
+                        type="button"
+                        data-arm="lift-diag-pick"
+                        data-selected={sel ? 'true' : 'false'}
+                        aria-pressed={sel}
+                        aria-label={`${sel ? 'Выбрано' : 'Выбрать'}: ${c.title}`}
+                        onClick={() => setArmliftPrefCorr(c.id)}
+                        style={{
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: 8,
+                          width: '100%',
+                          minHeight: 44,
+                          marginTop: 4,
+                          padding: '6px 8px',
+                          borderRadius: 10,
+                          cursor: 'pointer',
+                          textAlign: 'left',
+                          color: '#fff',
+                          background: sel
+                            ? 'linear-gradient(135deg, rgba(59,130,246,0.18), rgba(168,85,247,0.08))'
+                            : 'transparent',
+                          border: sel ? '2px solid rgba(59,130,246,0.7)' : '1px solid #1f3a5f',
+                        }}
+                      >
+                        <span
+                          aria-hidden
+                          style={{
+                            minWidth: 32,
+                            minHeight: 32,
+                            borderRadius: 8,
+                            border: '1px solid rgba(59,130,246,0.45)',
+                            background: sel ? 'rgba(59,130,246,0.22)' : 'transparent',
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            fontSize: 14,
+                            flexShrink: 0,
+                          }}
+                        >
+                          {sel ? '⭐' : '☆'}
+                        </span>
+                        <b style={{ flex: 1, minWidth: 0, fontSize: 12 }}>{c.title}</b>
+                        <span
+                          style={{
+                            fontSize: 11,
+                            color: '#93c5fd',
+                            fontWeight: 800,
+                            whiteSpace: 'nowrap',
+                            flexShrink: 0,
+                          }}
+                        >
+                          {c.protocol}
+                        </span>
+                        <span
+                          style={{
+                            fontSize: 11,
+                            fontWeight: 800,
+                            color: sel ? '#93c5fd' : '#fff',
+                            whiteSpace: 'nowrap',
+                            flexShrink: 0,
+                          }}
+                        >
+                          {sel ? '✓' : 'Выбрать'}
+                        </span>
+                      </button>
+                    );
+                  })}
+                </div>
+              )}
+              <AdCta>
+                <AdBtn variant="amber" block hero onClick={() => setTab('corr')}>
+                  → К коррекции ({corrections[0]?.title})
+                </AdBtn>
+              </AdCta>
+            </AdSec>
+          </AdCard>
+        </>
+      )}
+      {tab === 'corr' && (
+        <>
+          <AdCard>
+            <AdSec title="🔧 Коррекция" defaultOpen summary={`выбор снаряда → причина → методы с выбором упражнения`}>
+              <div data-arm="lift-corr-result">
+                <b>{diagnosis.title}</b> · причина {ARMLIFT_CAUSE_RU[cause.cause] || cause.cause} (
+                {Math.round(cause.confidence * 100)}%)
               </div>
-              );
-            })}
-          </div>
-          {spareCorrection && (
-            <div className="ad-muted" data-arm="lift-corr-spare">🔁 Запасная: {spareCorrection.title} — {spareCorrection.protocol} (та же группа, замена без смены дозы)</div>
-          )}
-          {corrections.some((c) => c.warmup) && (
-            <div className="ad-muted" data-arm="lift-corr-warmup">
-              Разминка: {corrections.filter((c) => c.warmup).map((c) => c.warmup).join(' · ')}
-            </div>
-          )}
-          <div className="ad-muted" data-arm="lift-corr-order">{sessionOrderNote(correctionsOrdered)}</div>
-          <div className="lift-group">Спец-блок волной</div>
-          <div className="ad-row" aria-label="Длина спец-блока">
-            <AdChip active={diag.specWeeks !== 6} onClick={() => setD({ specWeeks: 4 })}>4 нед</AdChip>
-            <AdChip active={diag.specWeeks === 6} onClick={() => setD({ specWeeks: 6 })}>6 нед</AdChip>
-          </div>
-          <div className="ad-list" data-arm="lift-corr-spec">
-            {specBlock.map((w) => (
-              <div key={w.week} className="ad-row">
-                <span><b>Нед {w.week}</b> — {w.focus}</span>
-                <span className="ad-muted">{w.volume}</span>
-                {w.detail && (
-                  <span className="ad-muted" data-arm="lift-corr-wave">{w.detail}</span>
-                )}
+              <div className="ad-muted">Чинить: {cause.fix}</div>
+              <div className="ad-muted" data-arm="lift-corr-why">
+                Почему: {cause.evidence.join(' · ')}
               </div>
-            ))}
-          </div>
-          <div className="ad-muted">Мост внизу несёт диагноз + топ-3 + спец-блок в Арм-конструктор (старые поля %WR целы). Боль = стоп, в план не едет нагрузка.</div>
-          <AdCta>
-            <AdBtn variant="dark" block hero onClick={() => setTab('pomost')}>→ Назад к замерам (мост внизу)</AdBtn>
-          </AdCta>
-        </AdSec>
-      </AdCard>
-      </>)}
+              <div className="ad-list" data-arm="lift-corr-top">
+                {correctionsOrdered.map((c, idx) => {
+                  const sel = armliftPrefCorr === c.id;
+                  return (
+                    <div
+                      key={c.id}
+                      className="ad-row"
+                      data-arm="lift-corr-row"
+                      data-selected={sel ? 'true' : 'false'}
+                      style={{
+                        alignItems: 'center',
+                        borderRadius: 10,
+                        padding: '6px 8px',
+                        background: sel
+                          ? 'linear-gradient(135deg, rgba(59,130,246,0.18), rgba(168,85,247,0.08))'
+                          : 'transparent',
+                        border: sel ? '2px solid rgba(59,130,246,0.7)' : '1px solid transparent',
+                      }}
+                    >
+                      <button
+                        data-arm="lift-corr-star"
+                        data-active={sel ? 'true' : 'false'}
+                        aria-pressed={sel}
+                        aria-label={`${sel ? 'Выбрано' : 'Выбрать'}: ${c.title}`}
+                        onClick={() => setArmliftPrefCorr(c.id)}
+                        style={{
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: 8,
+                          flex: 1,
+                          minWidth: 0,
+                          minHeight: 44,
+                          padding: 0,
+                          cursor: 'pointer',
+                          border: 'none',
+                          background: 'transparent',
+                          color: '#fff',
+                          textAlign: 'left',
+                        }}
+                      >
+                        <span
+                          aria-hidden
+                          style={{
+                            minWidth: 36,
+                            minHeight: 36,
+                            borderRadius: 9,
+                            border: '1px solid rgba(59,130,246,0.45)',
+                            background: sel ? 'rgba(59,130,246,0.22)' : 'transparent',
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            fontSize: 15,
+                            flexShrink: 0,
+                          }}
+                        >
+                          {sel ? '⭐' : '☆'}
+                        </span>
+                        <b style={{ flex: 1, minWidth: 0 }}>
+                          {idx + 1}. {c.title}
+                        </b>{' '}
+                        — {c.protocol}
+                        <span
+                          style={{
+                            fontSize: 11,
+                            fontWeight: 800,
+                            color: sel ? '#93c5fd' : '#fff',
+                            whiteSpace: 'nowrap',
+                            flexShrink: 0,
+                          }}
+                        >
+                          {sel ? '✓ Выбрано' : 'Выбрать'}
+                        </span>
+                      </button>
+                      <span className="ad-muted">
+                        {c.sets}×{c.holdSeconds != null ? `${c.holdSeconds}с холд` : `${c.reps[0]}–${c.reps[1]} повт`} ·
+                        отдых {c.restSec}с · {c.freq} · {c.source} · день {c.dayTag} · чинит:{' '}
+                        {c.fixesPhase.map((fid) => diagFailures.find((fp) => fp.id === fid)?.label || fid).join(', ')}
+                      </span>
+                      {c.cues && c.cues.length > 0 && (
+                        <span className="ad-muted" data-arm="lift-corr-cues">
+                          Кью: {c.cues.join(' · ')}
+                        </span>
+                      )}
+                      {c.progression && <span className="ad-muted">📈 Прогрессия: {c.progression}</span>}
+                      {/* Источник и разминка — поля движка (source обязателен, warmup опционален), как в ТА-карточке */}
+                      <span className="ad-muted" data-arm="lift-corr-source">
+                        🏷 Источник: {c.source}
+                      </span>
+                      {c.warmup && (
+                        <span className="ad-muted" data-arm="lift-corr-warmup">
+                          🔥 Разминка: {c.warmup}
+                        </span>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+              {spareCorrection && (
+                <div className="ad-muted" data-arm="lift-corr-spare">
+                  🔁 Запасная: {spareCorrection.title} — {spareCorrection.protocol} (та же группа, замена без смены
+                  дозы)
+                </div>
+              )}
+              {corrections.some((c) => c.warmup) && (
+                <div className="ad-muted" data-arm="lift-corr-warmup">
+                  Разминка:{' '}
+                  {corrections
+                    .filter((c) => c.warmup)
+                    .map((c) => c.warmup)
+                    .join(' · ')}
+                </div>
+              )}
+              <div className="ad-muted" data-arm="lift-corr-order">
+                {sessionOrderNote(correctionsOrdered)}
+              </div>
+              <div className="lift-group">Спец-блок волной</div>
+              <div className="ad-row" aria-label="Длина спец-блока">
+                <AdChip active={diag.specWeeks !== 6} onClick={() => setD({ specWeeks: 4 })}>
+                  4 нед
+                </AdChip>
+                <AdChip active={diag.specWeeks === 6} onClick={() => setD({ specWeeks: 6 })}>
+                  6 нед
+                </AdChip>
+              </div>
+              <div className="ad-list" data-arm="lift-corr-spec">
+                {specBlock.map((w) => (
+                  <div key={w.week} className="ad-row">
+                    <span>
+                      <b>Нед {w.week}</b> — {w.focus}
+                    </span>
+                    <span className="ad-muted">{w.volume}</span>
+                    {w.detail && (
+                      <span className="ad-muted" data-arm="lift-corr-wave">
+                        {w.detail}
+                      </span>
+                    )}
+                  </div>
+                ))}
+              </div>
+              <div className="ad-muted">
+                Мост внизу несёт диагноз + топ-3 + спец-блок в Арм-конструктор (старые поля %WR целы). Боль = стоп, в
+                план не едет нагрузка.
+              </div>
+              <AdCta>
+                <AdBtn variant="dark" block hero onClick={() => setTab('pomost')}>
+                  → Назад к замерам (мост внизу)
+                </AdBtn>
+              </AdCta>
+            </AdSec>
+          </AdCard>
+        </>
+      )}
       <AdCard>
         <div id="lift-bridge" />
-        <AdSec title="📦 Что уедет в конструктор" collapsible defaultOpen={false} summary={report.filled ? 'армлифтинг' : 'пока пусто'}>
-          <div className="ad-muted">Bridge: <code>weakpoints</code> + <code>armDiscipline: armlifting</code> → конструктор встанет в дисциплину «Армлифтинг». В payload: слабейший снаряд, рецепт, last-man-standing{lmsForWeakest ? ` (${lmsForWeakest.steps.join(' → ')})` : ''}, вердикт правил замера{rulesCheck.official ? ' (зачётный)' : ' (не зачётный)'} и весовая категория. Упражнения коррекции ({correctionsOrdered.map((c) => c.exId).join(', ') || '—'}) встанут в недели плана при сборке в дисциплине «Армлифтинг».
+        <AdSec
+          title="📦 Что уедет в конструктор"
+          collapsible
+          defaultOpen={false}
+          summary={report.filled ? 'армлифтинг' : 'пока пусто'}
+        >
+          <div className="ad-muted">
+            Bridge: <code>weakpoints</code> + <code>armDiscipline: armlifting</code> → конструктор встанет в дисциплину
+            «Армлифтинг». В payload: слабейший снаряд, рецепт, last-man-standing
+            {lmsForWeakest ? ` (${lmsForWeakest.steps.join(' → ')})` : ''}, вердикт правил замера
+            {rulesCheck.official ? ' (зачётный)' : ' (не зачётный)'} и весовая категория. Упражнения коррекции (
+            {correctionsOrdered.map((c) => c.exId).join(', ') || '—'}) встанут в недели плана при сборке в дисциплине
+            «Армлифтинг».
             {/* Аудит 2026-10 было→стало: этот текст обещал класс/рецепт/LMS, которые фактически не отправлялись — «показано ≠ применяется». Теперь все читаются из заполненных полей. Сами классы хабу не показываем (соревновательная часть удалена осознанно). */}
           </div>
           {correctionsOrdered.length > 0 && (
-            <div data-arm="lift-bridge-preview" style={{ marginTop: 6, padding: '10px 12px', borderRadius: 10, background: 'rgba(34,197,94,0.06)', border: '1px solid rgba(34,197,94,0.18)' }}>
-              <div style={{ fontSize: 13, fontWeight: 800, color: '#22c55e' }}>📋 Что встанет в план ({Math.min(3, correctionsOrdered.length)} упр. · {specBlock.length || 1} нед)</div>
+            <div
+              data-arm="lift-bridge-preview"
+              style={{
+                marginTop: 6,
+                padding: '10px 12px',
+                borderRadius: 10,
+                background: 'rgba(34,197,94,0.06)',
+                border: '1px solid rgba(34,197,94,0.18)',
+              }}
+            >
+              <div style={{ fontSize: 13, fontWeight: 800, color: '#22c55e' }}>
+                📋 Что встанет в план ({Math.min(3, correctionsOrdered.length)} упр. · {specBlock.length || 1} нед)
+              </div>
               {correctionsOrdered.slice(0, 3).map((c, i) => (
-                <div key={c.id} style={{ fontSize: 11, color: '#fff', marginTop: 3 }}>{i + 1}. {c.title} — {c.sets}×{c.holdSeconds != null ? `${c.holdSeconds}с холд` : `${c.reps[0]}–${c.reps[1]} повт`} · отдых {c.restSec}с · {c.freq}{c.exId ? ` · id ${c.exId}` : ''}{armliftPrefCorr === c.id ? ' · ⭐ первым' : ''}</div>
+                <div key={c.id} style={{ fontSize: 11, color: '#fff', marginTop: 3 }}>
+                  {i + 1}. {c.title} — {c.sets}×
+                  {c.holdSeconds != null ? `${c.holdSeconds}с холд` : `${c.reps[0]}–${c.reps[1]} повт`} · отдых{' '}
+                  {c.restSec}с · {c.freq}
+                  {c.exId ? ` · id ${c.exId}` : ''}
+                  {armliftPrefCorr === c.id ? ' · ⭐ первым' : ''}
+                </div>
               ))}
               {asymForDiag != null && asymForDiag > 15 && (
-                <div style={{ fontSize: 11, color: '#f59e0b', marginTop: 4 }}>↔ Слабой рукой первой (асимметрия {asymForDiag}%)</div>
+                <div style={{ fontSize: 11, color: '#f59e0b', marginTop: 4 }}>
+                  ↔ Слабой рукой первой (асимметрия {asymForDiag}%)
+                </div>
               )}
               {specBlock.length > 0 && (
-                <div style={{ fontSize: 11, color: '#fff', marginTop: 4 }}>🌊 Волна {specBlock.length} нед: {specBlock.map((w) => `Н${w.week} ${String(w.focus).split(' — ')[0]}`).join(' → ')}</div>
+                <div style={{ fontSize: 11, color: '#fff', marginTop: 4 }}>
+                  🌊 Волна {specBlock.length} нед:{' '}
+                  {specBlock.map((w) => `Н${w.week} ${String(w.focus).split(' — ')[0]}`).join(' → ')}
+                </div>
               )}
             </div>
           )}
         </AdSec>
       </AdCard>
-
+      {/* Аудит 2026-11: без согласия — предложение удалить ранее сохранённое (не удаляем молча). */}
+      {!state.consent && hasStoredHealth && (
+        <AdBanner tone="warn" hook="lift-consent-offer">
+          <div>Согласие не дано: новые данные здоровья не сохраняются. Ранее сохранённое можно удалить.</div>
+          <AdBtn variant="ghost" data-arm="lift-consent-wipe" onClick={wipeStoredHealth}>
+            🗑 Удалить сохранённое
+          </AdBtn>
+        </AdBanner>
+      )}
       {/* Нижняя панель действий — 1-в-1 с ТА-хабом: «Применить» + экспорт.
           data-arm="lift-export" — прежний хук экспортов (контракт apk-arm-pack). */}
       <div className="ad-cta lift-action-bar" data-arm="lift-export">
-        <AdBtn variant="amber" hero data-arm="lift-apply-bottom" aria-label="Применить в Арм-конструктор" onClick={applyToConstructor} style={{ flex: '1 1 200px', minWidth: 0 }}>→ В Арм-конструктор (армлифтинг)</AdBtn>
-        <AdBtn variant="ghost" data-arm="export-html" onClick={handleExportHtml}>🖨 HTML</AdBtn>
-        <AdBtn variant="ghost" data-arm="export-csv" onClick={handleExportCsv}>📥 CSV</AdBtn>
-        <AdBtn variant="ghost" data-arm="lift-export-ics" onClick={handleExportIcs}>📅 Календарь (.ics)</AdBtn>
+        <AdBtn
+          variant="amber"
+          hero
+          data-arm="lift-apply-bottom"
+          aria-label="Применить в Арм-конструктор"
+          onClick={applyToConstructor}
+          style={{ flex: '1 1 200px', minWidth: 0 }}
+        >
+          → В Арм-конструктор (армлифтинг)
+        </AdBtn>
+        <AdBtn variant="ghost" data-arm="export-html" onClick={handleExportHtml}>
+          🖨 HTML
+        </AdBtn>
+        <AdBtn variant="ghost" data-arm="export-csv" onClick={handleExportCsv}>
+          📥 CSV
+        </AdBtn>
+        <AdBtn variant="ghost" data-arm="lift-export-ics" onClick={handleExportIcs}>
+          📅 Календарь (.ics)
+        </AdBtn>
         <span data-arm="lift-annual" style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>
-          <input aria-label="Год: старт-неделя" inputMode="numeric" value={state.annualStartWeek} onChange={(e) => set({ annualStartWeek: e.target.value.replace(/[^0-9]/g, '').slice(0, 2) })} placeholder="1" style={{ width: 56, minHeight: 44, borderRadius: 10, fontSize: 14, fontWeight: 700, textAlign: 'center' }} />
-          <AdBtn variant="ghost" onClick={handleSaveAnnual}>🗓 В годовой план</AdBtn>
+          <input
+            aria-label="Год: старт-неделя"
+            inputMode="numeric"
+            value={state.annualStartWeek}
+            onChange={(e) => set({ annualStartWeek: e.target.value.replace(/[^0-9]/g, '').slice(0, 2) })}
+            placeholder="1"
+            style={{ width: 56, minHeight: 44, borderRadius: 10, fontSize: 14, fontWeight: 700, textAlign: 'center' }}
+          />
+          <AdBtn variant="ghost" onClick={handleSaveAnnual}>
+            🗓 В годовой план
+          </AdBtn>
         </span>
-        <AdBtn variant="ghost" data-arm="export-print" onClick={handlePrint}>🖨 Печать</AdBtn>
+        <AdBtn variant="ghost" data-arm="export-print" onClick={handlePrint}>
+          🖨 Печать
+        </AdBtn>
         <label style={{ display: 'inline-flex', alignItems: 'center', gap: 6, fontSize: 12, color: '#fff' }}>
           <input type="checkbox" checked={state.consent} onChange={(e) => set({ consent: e.target.checked })} />
           Согласие на хранение данных здоровья
         </label>
-        <AdBtn variant="ghost" data-arm="export-profile" onClick={handleExportProfile}>📤 Профиль JSON</AdBtn>
+        <AdBtn variant="ghost" data-arm="export-profile" onClick={handleExportProfile}>
+          📤 Профиль JSON
+        </AdBtn>
         <label style={{ display: 'inline-flex' }}>
-          <AdBtn variant="ghost" data-arm="import-profile" onClick={() => document.getElementById('lift-profile-import')?.click()}>📥 Импорт профиля</AdBtn>
-          <input id="lift-profile-import" type="file" accept="application/json" style={{ display: 'none' }} onChange={(e) => handleImportProfile(e.target.files?.[0] ?? null)} />
+          <AdBtn
+            variant="ghost"
+            data-arm="import-profile"
+            onClick={() => document.getElementById('lift-profile-import')?.click()}
+          >
+            📥 Импорт профиля
+          </AdBtn>
+          <input
+            id="lift-profile-import"
+            type="file"
+            accept="application/json"
+            style={{ display: 'none' }}
+            onChange={(e) => handleImportProfile(e.target.files?.[0] ?? null)}
+          />
         </label>
       </div>
     </AdRoot>

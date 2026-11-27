@@ -89,27 +89,60 @@ export function applyPro5Safety(input: Pro5SafetyInput = {}): Pro5SafetyResult {
   return res;
 }
 
-/** Недельный hook-объём (supinators + wrist_flexors в sup-режиме) против капа. */
-export function hookVolumeOf(week: {
-  sessions: Array<{ exercises: Array<{ muscle: string; sets: number }> }>;
-}): number {
+/** Упражнение, которое несёт hook-специфичную нагрузку (Marotta: hook = flexor-pronator +
+ *  супинированное/нейтральное предплечье, а не pronated-cup toproll). */
+export interface HookVolumeExercise {
+  muscle: string;
+  sets: number;
+  substitutionGroup?: string;
+  workingAngle?: { forearm?: string };
+}
+
+/**
+ * 28.11.2026 было→стало: hookVolumeOf суммировал ВСЕ wrist_flexors и supinators,
+ * включая cup/toproll — hook-кап ругался на плане без hook-объёма. Теперь считается
+ * только hook-специфика: substitutionGroup supination/hammer + wrist_flexors с
+ * супинированным/нейтральным предплечьем (workingAngle.forearm !== 'pronated').
+ * Поле угла отсутствует — фолбэк по группе замены (supination); cup_iso без
+ * подтверждённого супинированного предплечья не засчитывается.
+ */
+export function isHookVolumeExercise(ex: HookVolumeExercise): boolean {
+  const sg = String(ex?.substitutionGroup || '').toLowerCase();
+  if (sg === 'supination' || sg === 'hammer') return true;
+  if (String(ex?.muscle || '').toLowerCase() !== 'wrist_flexors') return false;
+  const forearm = String(ex?.workingAngle?.forearm || '').toLowerCase();
+  if (forearm === 'pronated') return false;
+  return forearm === 'supinated' || forearm === 'neutral';
+}
+
+/** Недельный hook-объём (hook-специфичные сеты) против капа. */
+export function hookVolumeOf(week: { sessions: Array<{ exercises: HookVolumeExercise[] }> }): number {
   let s = 0;
   for (const sess of week.sessions)
-    for (const ex of sess.exercises)
-      if (ex.muscle === 'supinators' || ex.muscle === 'wrist_flexors') s += ex.sets;
+    for (const ex of sess.exercises) if (isHookVolumeExercise(ex)) s += Number(ex.sets) || 0;
   return s;
 }
 
 export function checkHookCap(
-  weeks: Array<{ week: number; sessions: Array<{ exercises: Array<{ muscle: string; sets: number }> }> }>,
+  weeks: Array<{ week: number; sessions: Array<{ exercises: HookVolumeExercise[] }> }>,
   cap = 12,
 ): string[] {
-  const out: string[] = [];
+  // Одна строка на план (пиковая неделя), не 8–12 дублей: иначе предупреждение
+  // перестают читать (аудит 2026-11, класс «шум гардов»).
+  let peak = 0;
+  let peakWeek = 0;
   for (const wk of weeks) {
     const vol = hookVolumeOf(wk);
-    if (vol > cap) out.push(`Н${wk.week}: hook-объём ${vol} > капа ${cap} — flexor-pronator перегруз (Marotta 2026), часть перенести в toproll.`);
+    if (vol > peak) {
+      peak = vol;
+      peakWeek = wk.week;
+    }
   }
-  return out;
+  if (peak > cap)
+    return [
+      `Н${peakWeek}: hook-объём ${peak} > капа ${cap} — flexor-pronator перегруз (Marotta 2026), часть перенести в toproll.`,
+    ];
+  return [];
 }
 
 /** Эксцентрик flexor-pronator (Marotta-реабилитация как назначаемый блок, не диагноз). */
@@ -146,7 +179,9 @@ export function humerusChecksToAxis(failedIds: string[]): { axisCheck?: Pro5Axis
 }
 
 /** Чтение моста из стора: нет записи → null (неизвестно ≠ сделано). */
-export function readHumerusBridge(getItem: (key: string) => string | null): { armAxisCheck?: Pro5AxisInput; armWarmupDone?: true } | null {
+export function readHumerusBridge(
+  getItem: (key: string) => string | null,
+): { armAxisCheck?: Pro5AxisInput; armWarmupDone?: true } | null {
   try {
     const raw = getItem('he_arm_humerus_checks');
     if (!raw) return null;

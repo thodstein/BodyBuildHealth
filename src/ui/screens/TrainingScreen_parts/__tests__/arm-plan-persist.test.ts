@@ -7,7 +7,11 @@ const SRC = readFileSync(resolve(__dirname, '../ArmAutoConstructor.tsx'), 'utf8'
 
 describe('ROUND-10: конструктор арма пишет план в ключи, которые читают хабы', () => {
   beforeEach(() => {
-    try { localStorage.clear(); } catch { /* noop */ }
+    try {
+      localStorage.clear();
+    } catch {
+      /* noop */
+    }
   });
 
   it('persistArmPlan пишет оба ключа (хабы читают he_arm_plan_saved)', () => {
@@ -22,7 +26,9 @@ describe('ROUND-10: конструктор арма пишет план в кл�
 
   it('persistArmPlan шлёт событие he-arm-plan-saved (живой аудит хаба)', () => {
     let fired = 0;
-    const h = () => { fired++; };
+    const h = () => {
+      fired++;
+    };
     window.addEventListener('he-arm-plan-saved', h);
     try {
       persistArmPlan({ weeks: [] });
@@ -42,10 +48,20 @@ describe('ROUND-10: конструктор арма пишет план в кл�
     expect((SRC.match(/persistArmPlan\(/g) || []).length).toBeGreaterThanOrEqual(3);
   });
 
-  it('source-guard: blocked-план отключает все операции с вариантами', () => {
-    expect(SRC).toMatch(/AdBtn variant="primary" disabled=\{exportBlocked\}[\s\S]*?💾 Сохранить вариант/);
-    expect(SRC).toMatch(/AdBtn variant="ghost" disabled=\{exportBlocked\} aria-label=\{`Загрузить \$\{v\.name\}`\}/);
-    expect(SRC).toMatch(/AdBtn variant="ghost" disabled=\{exportBlocked\} aria-label=\{`Скачать \$\{v\.name\} JSON`\}/);
-    expect(SRC).toMatch(/<input type="file" accept="application\/json,\.json" disabled=\{exportBlocked\} aria-label="Импорт варианта JSON"/);
+  it('source-guard: blocked-план блокирует экспорт/скачивание, но не загрузку сохранённого варианта', () => {
+    // было→стало (P1-6): exportBlocked гейтит «Скачать/Pdf/ICS», но НЕ «Загрузить/Импорт» —
+    // иначе из blocked-плана нельзя выйти, загрузив валидный вариант.
+    // Регэкспы терпимы к переносу атрибутов (файл проходит Prettier).
+    expect(SRC).toMatch(/<AdBtn\s+variant="primary"\s+disabled=\{exportBlocked\}/);
+    expect(SRC).toContain('💾 Сохранить вариант');
+    expect(SRC).toMatch(
+      /<AdBtn\s+variant="ghost"\s+disabled=\{exportBlocked\}\s+aria-label=\{`Скачать \$\{v\.name\} JSON`\}/,
+    );
+    expect(SRC).not.toMatch(/disabled=\{exportBlocked\}\s*aria-label=\{`Загрузить/);
+    expect(SRC).toMatch(/aria-label=\{`Загрузить \$\{v\.name\}`\}/);
+    expect(SRC).not.toMatch(/<input\s+type="file"\s+accept="application\/json,\.json"\s+disabled=\{exportBlocked\}/);
+    expect(SRC).toMatch(
+      /<input\s+type="file"\s+accept="application\/json,\.json"[\s\S]{0,220}aria-label="Импорт варианта JSON"/,
+    );
   });
 });

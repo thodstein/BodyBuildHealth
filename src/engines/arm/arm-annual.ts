@@ -28,7 +28,14 @@ export interface ArmAnnualBuildResult {
 export function armPlanToUserWeeks(plan: ArmPlan): UserWeek[] {
   return plan.weeks.map((wk, idx) => ({
     week: idx + 1,
-    phase: wk.phase === 'accumulation' ? 'accumulation' : wk.phase === 'intensification' ? 'intensification' : wk.phase === 'peaking' ? 'peaking' : 'deload',
+    phase:
+      wk.phase === 'accumulation'
+        ? 'accumulation'
+        : wk.phase === 'intensification'
+          ? 'intensification'
+          : wk.phase === 'peaking'
+            ? 'peaking'
+            : 'deload',
     deload: !!wk.deload,
     armMetadata: {
       tableRatio: wk.tableRatio ?? null,
@@ -112,8 +119,19 @@ export function armPlanToUserProgram(
 }
 
 export function buildArmBlock(
-  block: { blockKey: string; weeks: number; phase: string; description?: string; competitionId?: string; weightClass?: string },
-  config: Partial<ArmBuilderInput> & { taperWeeks?: number; taperEnabled?: boolean; competitionPriority?: 'A'|'B'|'C' },
+  block: {
+    blockKey: string;
+    weeks: number;
+    phase: string;
+    description?: string;
+    competitionId?: string;
+    weightClass?: string;
+  },
+  config: Partial<ArmBuilderInput> & {
+    taperWeeks?: number;
+    taperEnabled?: boolean;
+    competitionPriority?: 'A' | 'B' | 'C';
+  },
   opts?: { level?: string },
 ): ArmAnnualBuildResult {
   const weeks = Math.max(1, Math.min(52, block.weeks || 4));
@@ -124,7 +142,9 @@ export function buildArmBlock(
     discipline: (config.discipline as any) || 'armwrestling',
     patternId: config.patternId || (config.discipline === 'armlifting' ? 'grip_3_support' : 'arm_4_upper_lower'),
     level: config.level || opts?.level || 'intermediate',
-    goal: (config.goal as any) || (block.phase === 'peaking' ? 'peaking' : block.phase === 'transition' ? 'maintenance' : 'strength'),
+    goal:
+      (config.goal as any) ||
+      (block.phase === 'peaking' ? 'peaking' : block.phase === 'transition' ? 'maintenance' : 'strength'),
     technique: (config.technique as any) || 'balanced',
     weeks,
     gripFocus: config.gripFocus as any,
@@ -199,11 +219,41 @@ export function buildArmBlock(
     try {
       const preset = getArmCycle(String((config as any).cycleId || ''))?.taperPreset;
       cycleOwnsTaper = !!preset && preset !== 'classic' && preset !== 'none';
-    } catch { cycleOwnsTaper = false; }
+    } catch {
+      cycleOwnsTaper = false;
+    }
     if (cycleOwnsTaper) {
       taperApplied = true; // тейпер есть — наложен пресетом цикла в finalize
     } else {
       const curve = buildArmTaperCurve({ taperWeeks: taperWeeksEff, gripFocus: config.gripFocus as any });
+      // 26.10.2026 было→стало: билдер уже применил микроцикл-множитель
+      // (weekMult 0.45 для peaking / 0.6 для deload), а кривая тейпера считает
+      // проценты ОТ БАЗЫ. Двойной срез давал пик ≈0.45×0.45 = 20% базы.
+      // Возвращаем хвостовые недели к базе (÷weekMult), затем накладываем кривую.
+      const tail = plan.weeks.slice(Math.max(0, plan.weeks.length - curve.length));
+      for (const wk of tail) {
+        const m = Number((wk as any).weekMult);
+        if (!Number.isFinite(m) || m <= 0 || m >= 1) continue;
+        for (const sess of wk.sessions) {
+          for (const ex of sess.exercises) {
+            const before = Number(ex.sets) || 0;
+            const after = Math.max(1, Math.round(before / m));
+            // Нормализация УВЕЛИЧИВАЕТ сеты (×1/m) — workSets нужно добить
+            // клонами последнего сета, иначе sets !== workSets.length и
+            // finishArmPlan напишет validation error (нашёл review 2026-11).
+            if (after > ex.workSets.length) {
+              const last = ex.workSets[ex.workSets.length - 1];
+              while (ex.workSets.length < after) {
+                ex.workSets.push(last ? { ...last } : { reps: ex.repsRange[0], rir: 3, weight: 0 });
+              }
+            } else {
+              ex.workSets = ex.workSets.slice(0, after);
+            }
+            ex.sets = after;
+          }
+        }
+        (wk as any).weekMult = 1;
+      }
       applyArmTaperToWeeks(plan.weeks, curve);
       taperApplied = true;
     }
@@ -219,17 +269,26 @@ export function buildArmBlock(
     const cid = String((config as any).cycleId || '');
     const c = cid ? getArmCycle(cid) : undefined;
     if (c) {
-      const prev = consentPreview({ fit: fitCycleToWeeks(cid, weeks).fit, cycleWeeks: c.weeks, targetWeeks: weeks, cycleName: c.name });
+      const prev = consentPreview({
+        fit: fitCycleToWeeks(cid, weeks).fit,
+        cycleWeeks: c.weeks,
+        targetWeeks: weeks,
+        cycleName: c.name,
+      });
       for (const line of prev.lines) warnings.push(`Цикл: ${line}`);
     }
-  } catch { /* опционально */ }
+  } catch {
+    /* опционально */
+  }
   // PRO-5 P5: годовая лестница — фазовый пресет блока виден в warnings
   // (объём/RIR уже заданы goal-маппингом выше; здесь только честная подпись).
   try {
     const key = block.phase === 'peaking' ? 'peaking' : block.phase === 'transition' ? 'off_season' : 'strength_power';
     const preset = ARM_PHASE_PRESETS[key];
     if (preset) warnings.push(`Фаза года «${block.phase}»: ${preset.note}`);
-  } catch { /* опционально */ }
+  } catch {
+    /* опционально */
+  }
 
   // 26.10.2026 было→стало: configHash считался здесь своим stableHash'ом (массив-replacer
   // в JSON.stringify слепнул к вложенным ключам), но annual-training/block-builders
@@ -272,7 +331,9 @@ export function buildArmYearBlocks(
 ): ArmYearBlock[] {
   const tpl = superSeriesYear(series, totalWeeks);
   return tpl.stages.map((st, i) => {
-    const phase = (st.priority === 'A' ? 'peaking' : st.priority === 'B' ? 'strength' : 'base') as ArmYearBlock['phase'];
+    const phase = (
+      st.priority === 'A' ? 'peaking' : st.priority === 'B' ? 'strength' : 'base'
+    ) as ArmYearBlock['phase'];
     // R6 opt-in: блоки несут рекомендованный именной цикл (потребитель
     // annualBlockCycleSuggestion). По умолчанию выключено — байт-в-байт.
     let cycleFields: Record<string, unknown> = {};
@@ -280,7 +341,9 @@ export function buildArmYearBlocks(
       try {
         const s = annualBlockCycleSuggestion(phase, opts.discipline || 'armwrestling');
         cycleFields = { suggestedCycleId: s.cycleId, suggestedCycleNote: s.note };
-      } catch { cycleFields = {}; }
+      } catch {
+        cycleFields = {};
+      }
     }
     return {
       blockKey: `arm-${tpl.series}-${i + 1}`,
@@ -300,12 +363,18 @@ export function buildArmYearBlocks(
  * годовой план (annualPlanFromMacro) и превью не расходятся по фазам/неделям.
  */
 export function armYearBlocksToMacro(
-  blocks: Array<{ weeks: number; phase: 'base' | 'strength' | 'peaking' | 'transition'; priority: 'A' | 'B' | 'C'; focus: string; blockKey: string }>,
+  blocks: Array<{
+    weeks: number;
+    phase: 'base' | 'strength' | 'peaking' | 'transition';
+    priority: 'A' | 'B' | 'C';
+    focus: string;
+    blockKey: string;
+  }>,
   totalWeeks?: number,
 ): import('./arm-macrocycle.engine').ArmMacrocycle {
   const phaseMap = { base: 'hypertrophy', strength: 'strength', peaking: 'peaking', transition: 'transition' } as const;
   let offset = 0;
-  const macroBlocks = blocks.map(b => {
+  const macroBlocks = blocks.map((b) => {
     const blk = {
       phase: phaseMap[b.phase] as 'hypertrophy' | 'strength' | 'peaking' | 'transition',
       weeks: Math.max(1, Math.round(b.weeks || 1)),

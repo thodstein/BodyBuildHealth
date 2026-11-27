@@ -54,6 +54,8 @@ export function ArmTechniqueCard({ onApplyWeak }: { onApplyWeak?: (weak: string[
             { id:'press', label:'Пресс', desc:'жим плечом' },
           ]} />
         </div>
+        {/* Аудит 2026-11: селект меняет только вход диагностики — план строит ArmAutoConstructor. */}
+        <p className="ad-muted">Техника — только для диагностики (план не меняется).</p>
         <div className="ad-chips">
           {[
             ['cup','Кисть открывается (cup)'],
@@ -62,15 +64,15 @@ export function ArmTechniqueCard({ onApplyWeak }: { onApplyWeak?: (weak: string[
             ['supination','Хук проваливается'],
             ['side','Не дожимает боком'],
             ['back','Тяга на себя слабая'],
-            ['grip','Хват слабеет (pinch)'],
-            ['thumb','Большой палец уходит'],
-            ['ulnar','Ulnar/radial дисбаланс'],
           ].map(([k,label]) => (
             <AdChip key={k} active={!!fails[k]} onClick={() => toggle(k)}>
               {label}
             </AdChip>
           ))}
         </div>
+        {/* Аудит 2026-11: чипы grip/thumb/ulnar убраны — в ArmWeakTest нет полей thumb/ulnar,
+            а pinch-диагноз вводится числом в карточке «Хват» (pinchHoldSec). */}
+        <p className="ad-muted">Хват-pinch, большой палец и ulnar/radial здесь не оцениваются — pinch вводится в карточке «Хват».</p>
         {diag.priorities.length > 0 ? (
           <AdSec title="🎯 Найденные зоны" collapsible summary={`${diag.priorities.length} зон`}>
           <div className="ad-list" data-arm="tech-results">

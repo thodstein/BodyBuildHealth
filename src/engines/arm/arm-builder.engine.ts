@@ -5,21 +5,22 @@
 import type { ArmBuilderInput, ArmPlan, ArmWeek, ArmSession, ArmExercise, ArmSet, ArmWorkingAngle } from './arm-types';
 import { ruCount, ruAdjCount, RU_ADJ_UNILATERAL, RU_SETS } from '../ru-plural';
 import { ARM_MUSCLES } from './arm-types';
-import { TAG_MUSCLES_ARM } from './arm-day-types';
+import { TAG_MUSCLES_ARM, ARM_MUSCLE_SIBLINGS } from './arm-day-types';
 import { ARM_SPLIT_PATTERNS, getArmPattern } from './arm-split-patterns';
-import { getArmLandmarks, isTendonMuscle, TENDON_CAP, MUSCLE_CAP, tendonWeeklyLimit } from './arm-volume-landmarks.engine';
-import { canonicalizeArmMuscle } from './arm-tendon-sets.engine';
-import { computeArmRecoveryMult, computeArmBudget, sessionLimitsForArm, perExerciseCap, computeNutritionMult, tendonBudgetForLevel } from './arm-volume.engine';
+import { getArmLandmarks, isTendonMuscle, TENDON_CAP, tendonWeeklyLimit } from './arm-volume-landmarks.engine';
+import { armWeeklyVolumeFor } from './arm-volume.engine';
+import { computeArmRecoveryMult, sessionLimitsForArm, perExerciseCap, computeNutritionMult } from './arm-volume.engine';
 import { ARM_EXERCISES } from '../../core/exercise-catalog-arm';
-import { localIsoDate } from '../../core/local-date';
+import { localIsoDate, parseLocalIsoDate } from '../../core/local-date';
 import { classifyPed } from '../../data/ped-potency-table';
 import { buildArmSchedule, specializationMrvFactor, specForWeek } from './arm-specialization.engine';
 import { adaptForPEDs } from '../bb/bb-ped-adaptation.engine';
-import { tableWeekKind, tableWeekParams, tableTimeSummary } from './arm-table.engine';
+import { tableWeekKind, tableTimeSummary } from './arm-table.engine';
 import { applyArmPro } from './arm-pro-integration.engine';
 import { ensureRadialFingers } from './arm-load-quant.engine';
 import { profileOpponent, matchupVolumeFor } from './arm-matchup.engine';
 import { buildRfdSession } from './arm-rfd.engine';
+import { speedClosesFor } from './arm-rfd.engine';
 import { planLrSplit } from './arm-lr-split.engine';
 import { applyContestSimToPlan } from './arm-sim-apply.engine';
 import { buildGripRpe } from './arm-grip-rpe.engine';
@@ -32,18 +33,37 @@ import { cyclePhaseMap, fitCycleToWeeks, getArmCycle } from './arm-cycle-library
 import { getMedley, medleyRotationForWeek } from './arm-medley.engine';
 import { estimateArmSessionDuration } from './arm-duration.engine';
 // PRO-5: ядро-гигиена + safety + синглы + UX (всё gated, дефолт no-op)
-import { taperStateFor, isCycleTaperActive, resolveProgressionRates, acwrMultFor, pedHonestyNote, weightHonestyMark, foreignPoolWarnings } from './arm-pro5-core.engine';
+import {
+  taperStateFor,
+  isCycleTaperActive,
+  resolveProgressionRates,
+  acwrMultFor,
+  pedHonestyNote,
+  weightHonestyMark,
+  foreignPoolWarnings,
+} from './arm-pro5-core.engine';
 import { applyPro5Safety, checkHookCap } from './arm-pro5-safety.engine';
 import { checkCocGates } from './arm-pro5-coc-gate.engine';
 import { larrattSinglesFor, strengthLogRir, isSinglesCandidate } from './arm-pro5-singles.engine';
 import { suggestSplitForCycle } from './arm-pro5-ux.engine';
-import { armInjuryRepsCap, armInjuryVolumeFactor, armInjuryWeightFactor, mobilityBlockReason } from './arm-injury-guard.engine';
-import { cycleBlocksFor, deriveArmBlocks, planArmPeaks, progressionForWeek, buildArmAnchorSession, buildArmWarmupSets, blockForWeek } from './arm-periodization.engine';
+import {
+  armInjuryRepsCap,
+  armInjuryVolumeFactor,
+  armInjuryWeightFactor,
+  mobilityBlockReason,
+} from './arm-injury-guard.engine';
+import {
+  cycleBlocksFor,
+  deriveArmBlocks,
+  planArmPeaks,
+  progressionForWeek,
+  buildArmAnchorSession,
+  buildArmWarmupSets,
+  blockForWeek,
+} from './arm-periodization.engine';
 import { legsAnchorBlock, weeksUntilStart, planWeightCut } from './arm-competition-prep.engine';
 import { armFactFeedback, factRateFor, armPerMuscleLoadAlerts } from './arm-plan-feedback.engine';
 import { armCheckinTrend } from './arm-weekly-checkin.engine';
-
-const PHASES: Array<'accumulation' | 'intensification' | 'deload' | 'peaking'> = ['accumulation','intensification','deload','peaking'];
 
 function distributeArmPhases(totalWeeks: number, goal: string, deloadEvery = 4): Record<number, string> {
   const map: Record<number, string> = {};
@@ -67,39 +87,100 @@ function distributeArmPhases(totalWeeks: number, goal: string, deloadEvery = 4):
 }
 
 // ARM_ANGLE_CLASSES — строгие классы углов как в BB ANGLE_CLASSES
-export const ARM_ANGLE_CLASSES: Record<string, { muscles: string[]; elbow: Array<90|110|120>; direction: Array<'to_little'|'to_middle'|'to_thumb'>; forearm: Array<'pronated'|'neutral'|'supinated'> }> = {
-  cup_pronated: { muscles: ['wrist_flexors'], elbow: [90,110], direction: ['to_little','to_middle'], forearm: ['pronated'] },
-  cup_supinated: { muscles: ['wrist_flexors','supinators'], elbow: [90,110], direction: ['to_thumb','to_middle'], forearm: ['supinated'] },
-  rising_iso: { muscles: ['risers','thumb'], elbow: [90,110,120], direction: ['to_little','to_middle'], forearm: ['neutral'] },
-  pron_high: { muscles: ['pronators','brachioradialis'], elbow: [90,110], direction: ['to_little'], forearm: ['pronated'] },
-  pron_low: { muscles: ['pronators'], elbow: [110,120], direction: ['to_little','to_middle'], forearm: ['pronated'] },
-  sup_hook: { muscles: ['supinators','brachialis','biceps_long'], elbow: [90,110], direction: ['to_middle','to_thumb'], forearm: ['supinated'] },
-  sup_neutral: { muscles: ['supinators'], elbow: [90,110,120], direction: ['to_middle'], forearm: ['neutral'] },
-  hammer_neutral: { muscles: ['brachialis','brachioradialis'], elbow: [90,110,120], direction: ['to_middle'], forearm: ['neutral'] },
-  side_press_heavy: { muscles: ['side_pressure'], elbow: [110,120], direction: ['to_thumb'], forearm: ['neutral'] },
-  back_drag_heavy: { muscles: ['back_pressure'], elbow: [90,110], direction: ['to_middle'], forearm: ['pronated','neutral'] },
-  grip_support: { muscles: ['grip_support'], elbow: [90,110], direction: ['to_little','to_middle'], forearm: ['neutral'] },
-  grip_pinch: { muscles: ['grip_pinch','thumb'], elbow: [90,110], direction: ['to_thumb','to_middle'], forearm: ['neutral'] },
-  grip_crush: { muscles: ['grip_crush'], elbow: [90,110], direction: ['to_middle'], forearm: ['neutral'] },
+export const ARM_ANGLE_CLASSES: Record<
+  string,
+  {
+    muscles: string[];
+    elbow: Array<90 | 110 | 120>;
+    direction: Array<'to_little' | 'to_middle' | 'to_thumb'>;
+    forearm: Array<'pronated' | 'neutral' | 'supinated'>;
+  }
+> = {
+  cup_pronated: {
+    muscles: ['wrist_flexors'],
+    elbow: [90, 110],
+    direction: ['to_little', 'to_middle'],
+    forearm: ['pronated'],
+  },
+  cup_supinated: {
+    muscles: ['wrist_flexors', 'supinators'],
+    elbow: [90, 110],
+    direction: ['to_thumb', 'to_middle'],
+    forearm: ['supinated'],
+  },
+  rising_iso: {
+    muscles: ['risers', 'thumb'],
+    elbow: [90, 110, 120],
+    direction: ['to_little', 'to_middle'],
+    forearm: ['neutral'],
+  },
+  pron_high: {
+    muscles: ['pronators', 'brachioradialis'],
+    elbow: [90, 110],
+    direction: ['to_little'],
+    forearm: ['pronated'],
+  },
+  pron_low: { muscles: ['pronators'], elbow: [110, 120], direction: ['to_little', 'to_middle'], forearm: ['pronated'] },
+  sup_hook: {
+    muscles: ['supinators', 'brachialis', 'biceps_long'],
+    elbow: [90, 110],
+    direction: ['to_middle', 'to_thumb'],
+    forearm: ['supinated'],
+  },
+  sup_neutral: { muscles: ['supinators'], elbow: [90, 110, 120], direction: ['to_middle'], forearm: ['neutral'] },
+  hammer_neutral: {
+    muscles: ['brachialis', 'brachioradialis'],
+    elbow: [90, 110, 120],
+    direction: ['to_middle'],
+    forearm: ['neutral'],
+  },
+  side_press_heavy: { muscles: ['side_pressure'], elbow: [110, 120], direction: ['to_thumb'], forearm: ['neutral'] },
+  back_drag_heavy: {
+    muscles: ['back_pressure'],
+    elbow: [90, 110],
+    direction: ['to_middle'],
+    forearm: ['pronated', 'neutral'],
+  },
+  grip_support: {
+    muscles: ['grip_support'],
+    elbow: [90, 110],
+    direction: ['to_little', 'to_middle'],
+    forearm: ['neutral'],
+  },
+  grip_pinch: {
+    muscles: ['grip_pinch', 'thumb'],
+    elbow: [90, 110],
+    direction: ['to_thumb', 'to_middle'],
+    forearm: ['neutral'],
+  },
+  grip_crush: { muscles: ['grip_crush'], elbow: [90, 110], direction: ['to_middle'], forearm: ['neutral'] },
 };
 
 function seededRng(seed: number): () => number {
   let s = seed >>> 0;
   return () => {
     s = (s * 1664525 + 1013904223) >>> 0;
-    return s / 0xFFFFFFFF;
+    return s / 0xffffffff;
   };
 }
 
 function hashString(s: string): number {
   let h = 2166136261;
-  for (let i = 0; i < s.length; i++) { h ^= s.charCodeAt(i); h = Math.imul(h, 16777619); }
+  for (let i = 0; i < s.length; i++) {
+    h ^= s.charCodeAt(i);
+    h = Math.imul(h, 16777619);
+  }
   return h >>> 0;
 }
 
-function equipmentAllows(required: string, available: string[]): boolean {
+/** Единый матчер «снаряд пользователя → упражнение» для билдера и финализатора. */
+export function armEquipmentAllows(required: string, available: string[]): boolean {
   if (available.length === 0) return true;
-  const tokens = available.map((x) => String(x || '').toLowerCase().replace(/[\s-]+/g, '_'));
+  const tokens = available.map((x) =>
+    String(x || '')
+      .toLowerCase()
+      .replace(/[\s-]+/g, '_'),
+  );
   const has = (re: RegExp) => tokens.some((x) => re.test(x));
   const req = String(required || '').toLowerCase();
   if (req === 'bodyweight') return has(/bodyweight|body_weight|own|sv[oе]|без_оборудован/);
@@ -112,11 +193,31 @@ function equipmentAllows(required: string, available: string[]): boolean {
   return true;
 }
 
-function loadModeForExercise(e: { equipment?: string; movementPattern?: string; substitutionGroup?: string }): ArmExercise['loadMode'] {
-  if (e.substitutionGroup === 'cup_iso' || String(e.movementPattern || '').toLowerCase().includes('iso')) return 'isometric';
+function loadModeForExercise(e: {
+  id?: string;
+  equipment?: string;
+  movementPattern?: string;
+  substitutionGroup?: string;
+}): ArmExercise['loadMode'] {
+  // 26.10.2026 было→стало: `cup_iso` отдавал 'isometric' для ВСЕХ сгибаний
+  // кисти (кабельные/штанговые тоже) — печать писала «изометрия» у силового
+  // упражнения. Режим определяет снаряд; изометрия — только явные iso-виды.
   if (e.equipment === 'bodyweight') return 'bodyweight';
   if (e.equipment === 'band') return 'band';
+  const mp = String(e.movementPattern || '').toLowerCase();
+  if (
+    String(e.id || '')
+      .toLowerCase()
+      .includes('iso') ||
+    mp.includes('isometric')
+  )
+    return 'isometric';
   return 'tool';
+}
+
+/** Вес в кг имеет смысл только для внешнего отягощения/инструмента. */
+function hasExternalLoad(mode: ArmExercise['loadMode']): boolean {
+  return mode === 'tool' || mode === 'external' || mode == null;
 }
 
 /** P2: снаряд платформы → приоритетные упражнения (gripImplement теперь влияет на план). */
@@ -132,16 +233,26 @@ const IMPLEMENT_BIAS_IDS: Record<string, string[]> = {
 };
 
 const ARM_DIFF_RANK: Record<string, number> = { beginner: 0, intermediate: 1, advanced: 2 };
-function armLevelRank(level: string): number {
-  const l = String(level || 'intermediate').toLowerCase();
-  return l === 'beginner' ? 0 : l === 'intermediate' ? 1 : l === 'advanced' ? 2 : 3;
-}
 
-function pickExerciseForMuscle(muscle: string, role: 'primary'|'accessory', equipment: string[], favorite: string[], excluded: string[], usedIds: Set<string>, technique?: string, mobilityRestrictions: string[] = [], injuries?: Array<{ muscle: string; volumePct?: number; exclude?: boolean }>, level: string = 'intermediate', week: number = 1, rotationOn: boolean = false, implementBias?: Set<string>): typeof ARM_EXERCISES[number] | null {
+function pickExerciseForMuscle(
+  muscle: string,
+  role: 'primary' | 'accessory',
+  equipment: string[],
+  favorite: string[],
+  excluded: string[],
+  usedIds: Set<string>,
+  technique?: string,
+  mobilityRestrictions: string[] = [],
+  injuries?: Array<{ muscle: string; volumePct?: number; exclude?: boolean }>,
+  level: string = 'intermediate',
+  week: number = 1,
+  rotationOn: boolean = false,
+  implementBias?: Set<string>,
+): (typeof ARM_EXERCISES)[number] | null {
   const mLow = muscle.toLowerCase();
   if (armInjuryVolumeFactor(injuries, mLow) <= 0) return null;
   // Техника-специфичные приоритеты
-  const techniqueBoost = (e: typeof ARM_EXERCISES[number]): number => {
+  const techniqueBoost = (e: (typeof ARM_EXERCISES)[number]): number => {
     const sg = (e.substitutionGroup || '').toLowerCase();
     const mp = String(e.movementPattern || '').toLowerCase();
     if (!technique) return 0;
@@ -153,36 +264,36 @@ function pickExerciseForMuscle(muscle: string, role: 'primary'|'accessory', equi
     if (t === 'toproll' && mLow === 'risers' && sg === 'rising') return 1;
     return 0;
   };
-  const pool = ARM_EXERCISES.filter(e => {
+  const pool = ARM_EXERCISES.filter((e) => {
     const effMuscle = (e.targetMuscle || '').toLowerCase();
     const sg = (e.substitutionGroup || '').toLowerCase();
-    const mp = (e.movementPattern as any || '').toString().toLowerCase();
+    const mp = ((e.movementPattern as any) || '').toString().toLowerCase();
     // Строгий матчинг: сначала точные маппинги, затем фолбэк
     const exactMap: Record<string, string[]> = {
-      'wrist_flexors': ['cup_iso'],
-      'wrist_extensors': ['wrist_ext'],
-      'pronators': ['pronation'],
-      'supinators': ['supination'],
-      'brachialis': ['hammer'],
-      'grip_support': ['grip_support'],
-      'grip_pinch': ['grip_pinch'],
-      'grip_crush': ['grip_crush'],
-      'risers': ['rising'],
-      'side_pressure': ['side_press'],
-      'back_pressure': ['back_drag'],
-      'thumb': ['grip_pinch','thumb_iso'],
-      'shoulder_stab': ['shoulder_int','shoulder_ext'],
-      'core_anchor': ['core_anti'],
-      'ulnar_deviators': ['ulnar_iso'],
-      'radial_deviators': ['radial_iso'],
-      'biceps_long': ['bicep_curl','hammer'],
-      'biceps_short': ['bicep_curl','hammer'],
-      'brachioradialis': ['hammer','reverse_curl'],
+      wrist_flexors: ['cup_iso'],
+      wrist_extensors: ['wrist_ext'],
+      pronators: ['pronation'],
+      supinators: ['supination'],
+      brachialis: ['hammer'],
+      grip_support: ['grip_support'],
+      grip_pinch: ['grip_pinch'],
+      grip_crush: ['grip_crush'],
+      risers: ['rising'],
+      side_pressure: ['side_press'],
+      back_pressure: ['back_drag'],
+      thumb: ['grip_pinch', 'thumb_iso'],
+      shoulder_stab: ['shoulder_int', 'shoulder_ext'],
+      core_anchor: ['core_anti'],
+      ulnar_deviators: ['ulnar_iso'],
+      radial_deviators: ['radial_iso'],
+      biceps_long: ['bicep_curl', 'hammer'],
+      biceps_short: ['bicep_curl', 'hammer'],
+      brachioradialis: ['hammer', 'reverse_curl'],
     };
     const allowedSg = exactMap[mLow];
     let matches = false;
     if (allowedSg) {
-      matches = allowedSg.some(s => sg === s || sg.includes(s));
+      matches = allowedSg.some((s) => sg === s || sg.includes(s));
       // также проверяем movementPattern для гранулярности
       if (!matches) {
         if (mLow === 'wrist_flexors' && mp.includes('cupping')) matches = true;
@@ -193,18 +304,21 @@ function pickExerciseForMuscle(muscle: string, role: 'primary'|'accessory', equi
       }
     } else {
       // фолбэк по подстроке для неизвестных
-      matches = effMuscle.includes(mLow.replace('_',' ')) || sg.includes(mLow.split('_')[0]) || mp.includes(mLow.split('_')[0]);
+      matches =
+        effMuscle.includes(mLow.replace('_', ' ')) ||
+        sg.includes(mLow.split('_')[0]) ||
+        mp.includes(mLow.split('_')[0]);
     }
     if (!matches) return false;
     if (excluded.includes(e.id)) return false;
     if (usedIds.has(e.id)) return false;
     if (mobilityBlockReason(e, mobilityRestrictions)) return false;
-    if (!equipmentAllows(String(e.equipment || ''), equipment)) return false;
+    if (!armEquipmentAllows(String(e.equipment || ''), equipment)) return false;
     return true;
   });
   if (pool.length === 0) return null;
   for (const fav of favorite) {
-    const f = pool.find(p => p.id === fav || p.name === fav);
+    const f = pool.find((p) => p.id === fav || p.name === fav);
     if (f) return f;
   }
   // PRO-PLAN: уровень-гейт сложности — новичок не получает advanced-упражнения
@@ -214,15 +328,32 @@ function pickExerciseForMuscle(muscle: string, role: 'primary'|'accessory', equi
   const maxDiff = String(level || '').toLowerCase() === 'beginner' ? 0 : 3;
   const withinLevel = pool.filter((e) => (ARM_DIFF_RANK[String(e.difficulty || 'intermediate')] ?? 1) <= maxDiff);
   const usable = withinLevel.length ? withinLevel : pool;
-  usable.sort((a,b) => {
+  // 26.10.2026: ротаторы плеча. У армрестлеров наружная ротация слабее
+  // внутренней (ER/IR ≈ 0.57 при нормативе 0.64–0.66 — Gonzaga/Pascoa,
+  // Acta Ortop Bras 2026, PMID 41696553), а пул shoulder_stab содержал обе
+  // ротации с равным fatigueCost — стабильная сортировка ставила ПЕРВОЙ
+  // внутреннюю, поэтому наружная не попадала в план вообще (8 недель подряд
+  // только «внутренняя ротация на резине»). Наружная ротация — приоритет
+  // пула: она защищает плечо, внутреннюю и так грузят жимы/боковое.
+  const erBoost = (e: (typeof ARM_EXERCISES)[number]): number =>
+    mLow === 'shoulder_stab' &&
+    String(e.substitutionGroup || '')
+      .toLowerCase()
+      .includes('shoulder_ext')
+      ? 3
+      : 0;
+  usable.sort((a, b) => {
     const boostA = techniqueBoost(a);
     const boostB = techniqueBoost(b);
     if (boostB !== boostA) return boostB - boostA;
+    const erA = erBoost(a);
+    const erB = erBoost(b);
+    if (erB !== erA) return erB - erA;
     // P2: приоритет выбранного снаряда платформы (gripImplement).
     const biasA = implementBias?.has(a.id) ? 1 : 0;
     const biasB = implementBias?.has(b.id) ? 1 : 0;
     if (biasB !== biasA) return biasB - biasA;
-    return (role === 'primary' ? b.fatigueCost - a.fatigueCost : a.fatigueCost - b.fatigueCost);
+    return role === 'primary' ? b.fatigueCost - a.fatigueCost : a.fatigueCost - b.fatigueCost;
   });
   // P1-5: ротация по неделям внутри группы замены (3 варианта, детерминированно).
   if (rotationOn && usable.length > 1) {
@@ -232,33 +363,42 @@ function pickExerciseForMuscle(muscle: string, role: 'primary'|'accessory', equi
   return usable[0];
 }
 
-function workingAngleFor(muscle: string, week: number, sessionIdx: number, technique?: string, history?: Record<string, ArmWorkingAngle[]>): ArmWorkingAngle {
+function workingAngleFor(
+  muscle: string,
+  week: number,
+  sessionIdx: number,
+  technique?: string,
+  history?: Record<string, ArmWorkingAngle[]>,
+): ArmWorkingAngle {
   // Техника-специфичные РУ (Kuznetsov I+II, TAWF Hook/Toproll/Press)
-  if (technique === 'hook' && ['supinators','brachialis','biceps_long','biceps_short','wrist_flexors'].includes(muscle)) {
-    const dirs: Array<'to_little'|'to_middle'|'to_thumb'> = ['to_middle','to_thumb','to_middle'];
-    const elbows: Array<90|110|120> = [90,90,110];
-    const forearms: Array<'pronated'|'neutral'|'supinated'> = ['supinated','supinated','neutral'];
+  if (
+    technique === 'hook' &&
+    ['supinators', 'brachialis', 'biceps_long', 'biceps_short', 'wrist_flexors'].includes(muscle)
+  ) {
+    const dirs: Array<'to_little' | 'to_middle' | 'to_thumb'> = ['to_middle', 'to_thumb', 'to_middle'];
+    const elbows: Array<90 | 110 | 120> = [90, 90, 110];
+    const forearms: Array<'pronated' | 'neutral' | 'supinated'> = ['supinated', 'supinated', 'neutral'];
     const idx = (week + sessionIdx) % 3;
     return { elbowDeg: elbows[idx], wrist: 'flexed' as const, forearm: forearms[idx], direction: dirs[idx] };
   }
-  if (technique === 'toproll' && ['pronators','risers','brachioradialis','wrist_flexors'].includes(muscle)) {
-    const dirs: Array<'to_little'|'to_middle'|'to_thumb'> = ['to_little','to_little','to_middle'];
-    const elbows: Array<90|110|120> = [110,110,120];
-    const forearms: Array<'pronated'|'neutral'|'supinated'> = ['pronated','pronated','neutral'];
+  if (technique === 'toproll' && ['pronators', 'risers', 'brachioradialis', 'wrist_flexors'].includes(muscle)) {
+    const dirs: Array<'to_little' | 'to_middle' | 'to_thumb'> = ['to_little', 'to_little', 'to_middle'];
+    const elbows: Array<90 | 110 | 120> = [110, 110, 120];
+    const forearms: Array<'pronated' | 'neutral' | 'supinated'> = ['pronated', 'pronated', 'neutral'];
     const idx = (week + sessionIdx) % 3;
     return { elbowDeg: elbows[idx], wrist: 'flexed' as const, forearm: forearms[idx], direction: dirs[idx] };
   }
-  if (technique === 'press' && ['side_pressure','shoulder_stab','core_anchor'].includes(muscle)) {
-    const dirs: Array<'to_little'|'to_middle'|'to_thumb'> = ['to_thumb','to_thumb','to_middle'];
-    const elbows: Array<90|110|120> = [120,110,120];
-    const forearms: Array<'pronated'|'neutral'|'supinated'> = ['neutral','neutral','neutral'];
+  if (technique === 'press' && ['side_pressure', 'shoulder_stab', 'core_anchor'].includes(muscle)) {
+    const dirs: Array<'to_little' | 'to_middle' | 'to_thumb'> = ['to_thumb', 'to_thumb', 'to_middle'];
+    const elbows: Array<90 | 110 | 120> = [120, 110, 120];
+    const forearms: Array<'pronated' | 'neutral' | 'supinated'> = ['neutral', 'neutral', 'neutral'];
     const idx = (week + sessionIdx) % 3;
     return { elbowDeg: elbows[idx], wrist: 'neutral' as const, forearm: forearms[idx], direction: dirs[idx] };
   }
-  const dirs: Array<'to_little'|'to_middle'|'to_thumb'> = ['to_little','to_middle','to_thumb'];
-  const wrists: Array<'flexed'|'neutral'|'extended'> = ['flexed','neutral','extended'];
-  const forearms: Array<'pronated'|'supinated'|'neutral'> = ['pronated','neutral','supinated'];
-  const elbows: Array<90|110|120> = [90,110,120];
+  const dirs: Array<'to_little' | 'to_middle' | 'to_thumb'> = ['to_little', 'to_middle', 'to_thumb'];
+  const wrists: Array<'flexed' | 'neutral' | 'extended'> = ['flexed', 'neutral', 'extended'];
+  const forearms: Array<'pronated' | 'supinated' | 'neutral'> = ['pronated', 'neutral', 'supinated'];
+  const elbows: Array<90 | 110 | 120> = [90, 110, 120];
   // Ротация с учётом истории чтобы не повторять 2 дня подряд
   let idx = (week + sessionIdx) % 3;
   if (history && history[muscle] && history[muscle].length > 0) {
@@ -276,27 +416,31 @@ function workingAngleFor(muscle: string, week: number, sessionIdx: number, techn
 function setsFor(muscle: string, character: string, week: number, targetSets: number, freq: number): number {
   const perSession = Math.max(1, Math.round(targetSets / Math.max(1, freq)));
   if (character === 'тяж') return Math.min(perExerciseCap(muscle), Math.max(2, perSession));
-  if (character === 'техника') return Math.max(2, Math.min(3, perSession));
+  // 28.11.2026: 'техника' имела пол 2 сета на упражнение — пиковая неделя
+  // (weekMult 0.45) не могла опуститься ниже ~50 сетов, и тейпер был фиктивным.
+  if (character === 'техника') return Math.max(1, Math.min(3, perSession));
   if (character === 'памп') return Math.max(2, Math.min(4, perSession + 1));
-  if (character === 'лёг') return Math.max(1, Math.min(2, Math.round(perSession * 0.6)));
+  // Делод: недельный множитель (0.6) уже применён к target — дополнительный
+  // ×0.6 внутри setsFor делал делод 36% базы вместо 60% (двойной срез).
+  if (character === 'лёг') return Math.max(1, Math.min(3, perSession));
   return perSession;
 }
 
 function repsFor(muscle: string, character: string, phase: string): [number, number] {
-  if (muscle === 'side_pressure') return character === 'тяж' ? [3,6] : [8,12];
-  if (['grip_support','grip_pinch','grip_crush'].includes(muscle)) {
-    if (character === 'тяж') return [3,6];
-    return [8,12];
+  if (muscle === 'side_pressure') return character === 'тяж' ? [3, 6] : [8, 12];
+  if (['grip_support', 'grip_pinch', 'grip_crush'].includes(muscle)) {
+    if (character === 'тяж') return [3, 6];
+    return [8, 12];
   }
-  if (['wrist_flexors','pronators','supinators','risers'].includes(muscle)) {
-    if (phase === 'deload') return [12,20];
-    if (character === 'техника') return [10,15];
-    if (character === 'памп') return [12,20];
-    return [6,10];
+  if (['wrist_flexors', 'pronators', 'supinators', 'risers'].includes(muscle)) {
+    if (phase === 'deload') return [12, 20];
+    if (character === 'техника') return [10, 15];
+    if (character === 'памп') return [12, 20];
+    return [6, 10];
   }
-  if (character === 'тяж') return [5,8];
-  if (character === 'техника') return [8,12];
-  return [10,15];
+  if (character === 'тяж') return [5, 8];
+  if (character === 'техника') return [8, 12];
+  return [10, 15];
 }
 
 function rirFor(character: string, phase: string, week: number, technique?: string): number {
@@ -313,6 +457,17 @@ function rirFor(character: string, phase: string, week: number, technique?: stri
   return 3;
 }
 
+/**
+ * Вес сета = workMax мышцы × % дня. Вес НЕ выдумывается: без явного workMax
+ * своей мышцы (или алиаса wrist/grip/pron/sup) возвращается 0 — «вес по RIR»,
+ * а не чужое число.
+ *
+ * 26.10.2026 было→стало: фолбэк `workMax['default']` подставлял массу тела
+ * (UI писал `default = bodyWeightKg`) как максимум КАЖДОЙ мышцы — атлет 80 кг
+ * получал пронацию-пульсы 15×65.5 кг и «внутреннюю ротацию на резине» 54.5 кг.
+ * Теперь default игнорируется: неизвестный максимум честно помечается
+ * «вес ориентир», а не превращается в опасное число.
+ */
 function weightForMuscle(muscle: string, workMax: Record<string, number>, pct: number): number {
   const low = muscle.toLowerCase();
   let max = workMax[low];
@@ -321,9 +476,11 @@ function weightForMuscle(muscle: string, workMax: Record<string, number>, pct: n
     else if (workMax['grip'] != null && low.includes('grip')) max = workMax['grip'];
     else if (workMax['pron'] != null && low.includes('pron')) max = workMax['pron'];
     else if (workMax['sup'] != null && low.includes('sup')) max = workMax['sup'];
-    else max = Number(workMax['default']) > 0 ? Number(workMax['default']) : 0;
+    else max = 0;
   }
-  return Math.round(max * pct * 2) / 2;
+  const value = Number(max);
+  if (!Number.isFinite(value) || value <= 0) return 0;
+  return Math.round(value * pct * 2) / 2;
 }
 
 export function buildArmPlan(input: ArmBuilderInput): ArmPlan {
@@ -345,25 +502,45 @@ export function buildArmPlan(input: ArmBuilderInput): ArmPlan {
     selectionWarningKeys.add(key);
     selectionWarnings.push(text);
   };
-  const weakPoints = (input.weakPoints || []).map(s => s.toLowerCase());
+  const weakPoints = (input.weakPoints || []).map((s) => s.toLowerCase());
   const focusGroup = input.focusGroup ? input.focusGroup.toLowerCase() : undefined;
   // P2: выбранный снаряд платформы (gripImplement) — приоритет в пулах хвата (иначе undefined).
   const implementBias = (() => {
     try {
       const gi = String((input as any).gripImplement || '');
       return gi && IMPLEMENT_BIAS_IDS[gi] ? new Set(IMPLEMENT_BIAS_IDS[gi]) : undefined;
-    } catch { return undefined; }
+    } catch {
+      return undefined;
+    }
   })();
 
   // PRO A–J: оркестратор (аддитивно, try/catch внутри — ядро не падает)
   // PRO-5 G1: честная деградация — каждая опциональная ветка пишет причину, а не молчит.
   const degraded: string[] = [];
-  const markDegraded = (reason: string) => { degraded.push(reason); };
-  let pro: { rationale: string[]; warnings: string[]; volumeMult: number; rirShift: number; replaceSideWithIso: boolean; replaceHeavyPronWithPulses: boolean; workMaxPatch: Record<string, number> };
+  const markDegraded = (reason: string) => {
+    degraded.push(reason);
+  };
+  let pro: {
+    rationale: string[];
+    warnings: string[];
+    volumeMult: number;
+    rirShift: number;
+    replaceSideWithIso: boolean;
+    replaceHeavyPronWithPulses: boolean;
+    workMaxPatch: Record<string, number>;
+  };
   try {
     pro = applyArmPro(input);
   } catch {
-    pro = { rationale: [], warnings: [], volumeMult: 1, rirShift: 0, replaceSideWithIso: false, replaceHeavyPronWithPulses: false, workMaxPatch: {} };
+    pro = {
+      rationale: [],
+      warnings: [],
+      volumeMult: 1,
+      rirShift: 0,
+      replaceSideWithIso: false,
+      replaceHeavyPronWithPulses: false,
+      workMaxPatch: {},
+    };
     markDegraded('PRO-оркестратор недоступен — план generic');
   }
   // PRO-5 P1: safety-гейты (без входов — no-op, старые планы целы).
@@ -372,20 +549,32 @@ export function buildArmPlan(input: ArmBuilderInput): ArmPlan {
     const toStart = ((): number | null => {
       const iso = String((input as any).competitionDateIso || (input as any).calStartIso || '');
       if (!iso) return null;
-      const t = Date.parse(iso);
-      if (!Number.isFinite(t)) return null;
-      return Math.max(0, Math.round((t - Date.now()) / (7 * 86400000)));
+      // 28.11.2026: date-only парсился как UTC, а якорь — «сейчас», хотя авто-пик
+      // считает от planStartWeek. Теперь оба идут от канона local-date.
+      const DATE_ONLY = /^\d{4}-\d{2}-\d{2}$/;
+      const parseDay = (s: string): Date | null => (DATE_ONLY.test(s) ? parseLocalIsoDate(s) : new Date(s));
+      const target = parseDay(iso);
+      if (!target || Number.isNaN(target.getTime())) return null;
+      const isoStart = String((input as any).planStartWeek || '');
+      const anchor = (isoStart && parseDay(isoStart)) || new Date();
+      return Math.max(0, Math.round((target.getTime() - anchor.getTime()) / (7 * 86400000)));
     })();
     pro5safety = applyPro5Safety({
       axisCheck: (input as any).axisCheck,
       warmupDone: (input as any).warmupDone,
-      elbowPain: (input as any).elbowPain ?? (Array.isArray((input as any).diary) ? Math.max(0, ...((input as any).diary as any[]).map((d: any) => Number(d.elbowPain ?? 0))) : 0),
+      elbowPain:
+        (input as any).elbowPain ??
+        (Array.isArray((input as any).diary)
+          ? Math.max(0, ...((input as any).diary as any[]).map((d: any) => Number(d.elbowPain ?? 0)))
+          : 0),
       hookCapSets: (input as any).hookCapSets,
       technique,
       level,
       weeksToStart: toStart,
     });
-  } catch { markDegraded('PRO-5 safety недоступен — гейты пропущены'); }
+  } catch {
+    markDegraded('PRO-5 safety недоступен — гейты пропущены');
+  }
   // Бенчи → workMax: явный workMax пользователя приоритетнее
   const mergedWorkMax: Record<string, number> = { ...(pro.workMaxPatch || {}), ...(input.workMax || {}) };
 
@@ -401,7 +590,10 @@ export function buildArmPlan(input: ArmBuilderInput): ArmPlan {
         strapExpected: input.strapExpected,
       });
     }
-  } catch { matchupPlan = null; markDegraded('матчап недоступен — объём без поправки на оппонента'); }
+  } catch {
+    matchupPlan = null;
+    markDegraded('матчап недоступен — объём без поправки на оппонента');
+  }
   let rfdNote: string | null = null;
   try {
     if (input.rfd === true || input.explosivePct != null || input.fastPct != null || input.slowIndex != null) {
@@ -414,7 +606,10 @@ export function buildArmPlan(input: ArmBuilderInput): ArmPlan {
       });
       rfdNote = rfd.allowed ? rfd.note : null;
     }
-  } catch { rfdNote = null; markDegraded('RFD-блок недоступен — speed-протокол пропущен'); }
+  } catch {
+    rfdNote = null;
+    markDegraded('RFD-блок недоступен — speed-протокол пропущен');
+  }
   const rfdOn = rfdNote != null;
   let lrNote: string | null = null;
   let lrWeak: string | null = null;
@@ -428,13 +623,21 @@ export function buildArmPlan(input: ArmBuilderInput): ArmPlan {
         lrPct = lr.asymmetryPct;
       }
     }
-  } catch { lrNote = null; lrWeak = null; lrPct = null; markDegraded('L/R-сплит недоступен — добивка пропущена'); }
+  } catch {
+    lrNote = null;
+    lrWeak = null;
+    lrPct = null;
+    markDegraded('L/R-сплит недоступен — добивка пропущена');
+  }
   // TOP wave-5: Table-IQ рычаги в объём (только при журнале схваток)
   let iqPlan: ReturnType<typeof analyzeTableIq> | null = null;
   try {
     const bouts = (input as any).bouts;
     if (Array.isArray(bouts) && bouts.length) iqPlan = analyzeTableIq({ bouts });
-  } catch { iqPlan = null; markDegraded('Table-IQ недоступен — рычаги фолов/срывов не применены'); }
+  } catch {
+    iqPlan = null;
+    markDegraded('Table-IQ недоступен — рычаги фолов/срывов не применены');
+  }
 
   // MRV multipliers — через adaptForPEDs с tendonCap 1.5×
   let pedMult = 1;
@@ -443,12 +646,17 @@ export function buildArmPlan(input: ArmBuilderInput): ArmPlan {
     const canonicalDoses: Record<string, number> = {};
     for (const [rawId, rawDose] of Object.entries(input.pedDoses)) {
       const cls = classifyPed(rawId);
-      const type = cls.startsWith('aas_') ? 'AAS'
-        : cls === 'insulin' ? 'insulin'
-        : cls === 'mgf' ? 'MGF'
-        : cls === 'igf' ? 'IGF1'
-        : cls === 'gh' ? 'GH'
-        : null;
+      const type = cls.startsWith('aas_')
+        ? 'AAS'
+        : cls === 'insulin'
+          ? 'insulin'
+          : cls === 'mgf'
+            ? 'MGF'
+            : cls === 'igf'
+              ? 'IGF1'
+              : cls === 'gh'
+                ? 'GH'
+                : null;
       const dose = Number(rawDose);
       if (type && Number.isFinite(dose)) canonicalDoses[type] = (canonicalDoses[type] || 0) + dose;
     }
@@ -466,23 +674,42 @@ export function buildArmPlan(input: ArmBuilderInput): ArmPlan {
     pedAdapt = { combinedMrvMultiplier: pedMult };
   }
   let pedNote: string | null = null;
-  try { pedNote = pedHonestyNote(input.pedDoses as any); } catch { markDegraded('PED-пометка недоступна'); }
+  try {
+    pedNote = pedHonestyNote(input.pedDoses as any);
+  } catch {
+    markDegraded('PED-пометка недоступна');
+  }
   if (pedNote) {
     pedMult = 1;
     pedAdapt = null;
     markDegraded('неизвестный PED: MRV boost отключён');
   }
-  const recoveryMult = computeArmRecoveryMult({ bodyFat: input.bodyFat, leanMass: input.leanMass, hrvMs: input.hrvMs, sleepHours: input.sleepHours, stressLevel: input.stressLevel });
+  const recoveryMult = computeArmRecoveryMult({
+    bodyFat: input.bodyFat,
+    leanMass: input.leanMass,
+    hrvMs: input.hrvMs,
+    sleepHours: input.sleepHours,
+    stressLevel: input.stressLevel,
+  });
   const labMult = input.labMrvMultiplier ? Math.max(0.6, Math.min(1.4, input.labMrvMultiplier)) : 1;
-  const nutritionMult = computeNutritionMult({ calorieSurplus: input.calorieSurplus, proteinPerKg: input.proteinPerKg });
+  const nutritionMult = computeNutritionMult({
+    calorieSurplus: input.calorieSurplus,
+    proteinPerKg: input.proteinPerKg,
+  });
   // Tendon: beginner 0.7 первые 4 недели, intermediate 0.85, иначе 1 — как GripStrength F1
   const tendonMultGlobal = level === 'beginner' ? 0.7 : level === 'intermediate' ? 0.85 : 1;
   // Seeded RNG для детерминизма (как BB planner-carb-periodization he_planner_gen_salt)
-  const seedBase = hashString(`${discipline}|${technique}|${level}|${goal}|${pattern.id}|${weeks}|${(input.weakPoints||[]).join(',')}|${focusGroup||''}`);
+  const seedBase = hashString(
+    `${discipline}|${technique}|${level}|${goal}|${pattern.id}|${weeks}|${(input.weakPoints || []).join(',')}|${focusGroup || ''}`,
+  );
   const rng = seededRng(seedBase);
   // PRO-5 G3: распил correctionPct (legacy — фолбэк обоих новых полей).
   let progRates = { cyclePctPerWeek: 0, mesoRate: 1.025, migrated: false };
-  try { progRates = resolveProgressionRates(input as any); } catch { markDegraded('прогрессия: ставки по умолчанию'); }
+  try {
+    progRates = resolveProgressionRates(input as any);
+  } catch {
+    markDegraded('прогрессия: ставки по умолчанию');
+  }
   // PRO-5 G6: живой ACWR по sRPE-дневнику (без diary — ровно 1, старые планы целы).
   let acwrMult = 1;
   let acwrNote: string | null = null;
@@ -492,7 +719,11 @@ export function buildArmPlan(input: ArmBuilderInput): ArmPlan {
     acwrMult = acwr.mult;
     acwrNote = acwr.note;
     acwrZone = acwr.zone;
-  } catch { acwrMult = 1; acwrZone = 'none'; markDegraded('ACWR недоступен — объём без поправки дневника'); }
+  } catch {
+    acwrMult = 1;
+    acwrZone = 'none';
+    markDegraded('ACWR недоступен — объём без поправки дневника');
+  }
   // PRO-PLAN: стиль прогрессии (дефолт auto = историческое поведение).
   const progressionStyle = ((input as any).progressionStyle || 'auto') as 'auto' | 'linear' | 'double' | 'wave';
   // labWarnings уже учтены в labMult, но tendonWarnings отдельно
@@ -507,7 +738,9 @@ export function buildArmPlan(input: ArmBuilderInput): ArmPlan {
     if (Array.isArray(fs) && fs.length > 0 && input.previousPlan) {
       factFeedback = armFactFeedback(input.previousPlan as any, fs, { windowDays: 28 });
     }
-  } catch { markDegraded('обратная связь по дневнику недоступна — кросс-мезо по плановой ставке'); }
+  } catch {
+    markDegraded('обратная связь по дневнику недоступна — кросс-мезо по плановой ставке');
+  }
 
   // Cross-mesocycle continuity: если есть previousPlan — используем его финальные веса как базу для прогрессии (факт-ставка или +2.5%/мезоцикл)
   let crossMesoWorkMax: Record<string, number> | null = null;
@@ -517,42 +750,81 @@ export function buildArmPlan(input: ArmBuilderInput): ArmPlan {
       const lastWeek = prev.weeks[prev.weeks.length - 1];
       if (lastWeek && lastWeek.sessions) {
         crossMesoWorkMax = {};
+        // 26.10.2026 было→стало: в базу клался РАБОЧИЙ вес прошлой недели
+        // (~0.82 × максимум), и на него снова умножался pct — следующий мезоцикл
+        // проседал на ~18%, а при заданном workMax условие baseFromPrev > curMax
+        // не срабатывало вовсе (прогрессии не было). Теперь берём максимум
+        // прошлого плана (inputSnapshot.workMax), иначе восстанавливаем из
+        // рабочего веса по % дня.
+        const prevMaxes: Record<string, number> = (prev.inputSnapshot && prev.inputSnapshot.workMax) || {};
         for (const sess of lastWeek.sessions) {
-          for (const ex of (sess.exercises||[])) {
-            const mus = (ex.muscle||'').toString().toLowerCase();
+          for (const ex of sess.exercises || []) {
+            const mus = (ex.muscle || '').toString().toLowerCase();
             const w = ex.workSets && ex.workSets[0] ? Number(ex.workSets[0].weight) : 0;
-            if (mus && Number.isFinite(w) && w>0) {
-              // Per-muscle ставка: факт дневника > общая кросс-мезо ставка.
-              const rate = factRateFor(mus, factFeedback.muscles, progRates.mesoRate);
-              const progressed = Math.round(w * rate * 2)/2;
-              if (!crossMesoWorkMax[mus] || progressed > crossMesoWorkMax[mus]) crossMesoWorkMax[mus] = progressed;
+            if (!mus || !Number.isFinite(w) || w <= 0) continue;
+            let impliedMax = Number(prevMaxes[mus]);
+            if (!Number.isFinite(impliedMax) || impliedMax <= 0) impliedMax = 0;
+            // 28.11.2026 (review): явный workMax прошлого плана — это максимум на
+            // СТАРТЕ цикла; внутри цикла он вырос (correctionPct). Поэтому база =
+            // max(входной максимум, рабочий вес последней недели ÷ % дня), иначе
+            // следующий мезоцикл откатывался на ~18%.
+            {
+              const ch = String(ex.character || '');
+              const pct = ch === 'тяж' ? 0.82 : ch === 'техника' ? 0.6 : ch === 'памп' ? 0.68 : 0.65;
+              const impliedFromWeight = w / pct;
+              if (impliedFromWeight > impliedMax) impliedMax = impliedFromWeight;
             }
+            // Per-muscle ставка: факт дневника > общая кросс-мезо ставка.
+            const rate = factRateFor(mus, factFeedback.muscles, progRates.mesoRate);
+            const progressed = Math.round(impliedMax * rate * 2) / 2;
+            if (!crossMesoWorkMax[mus] || progressed > crossMesoWorkMax[mus]) crossMesoWorkMax[mus] = progressed;
           }
         }
       }
-    } catch { markDegraded('предыдущий план недоступен — кросс-мезо прогрессия пропущена'); }
+    } catch {
+      markDegraded('предыдущий план недоступен — кросс-мезо прогрессия пропущена');
+    }
   }
 
   // Build specialization schedule
-  const specSchedule = buildArmSchedule({ focusGroup, weakPoints, specialization: !!input.specialization, totalWeeks: weeks, explicitBlocks: input.specializationSchedule });
+  const specSchedule = buildArmSchedule({
+    focusGroup,
+    weakPoints,
+    specialization: !!input.specialization,
+    totalWeeks: weeks,
+    explicitBlocks: input.specializationSchedule,
+  });
 
   // MRV per muscle — с tendonCap раздельно + техника-спец + humerus
   const mrvByMuscle: Record<string, number> = {};
   for (const m of ARM_MUSCLES) {
     const base = getArmLandmarks(level, m).mrv;
-    const specFactor = specializationMrvFactor(m, specSchedule.blocks.flatMap(b => b.targets), weakPoints, focusGroup);
+    const specFactor = specializationMrvFactor(
+      m,
+      specSchedule.blocks.flatMap((b) => b.targets),
+      weakPoints,
+      focusGroup,
+    );
     // Техника-спец ×1.3 (hook/toproll/press) — доминирующие мышцы получают +30%
     let techFactor = 1;
     const tLow = technique.toLowerCase();
-    if (tLow === 'hook' && ['supinators','brachialis','wrist_flexors','back_pressure','biceps_long'].includes(m)) techFactor = 1.3;
-    else if (tLow === 'toproll' && ['pronators','risers','brachioradialis','wrist_flexors','back_pressure'].includes(m)) techFactor = 1.3;
-    else if (tLow === 'press' && ['side_pressure','shoulder_stab','core_anchor'].includes(m)) techFactor = 1.3;
+    if (tLow === 'hook' && ['supinators', 'brachialis', 'wrist_flexors', 'back_pressure', 'biceps_long'].includes(m))
+      techFactor = 1.3;
+    else if (
+      tLow === 'toproll' &&
+      ['pronators', 'risers', 'brachioradialis', 'wrist_flexors', 'back_pressure'].includes(m)
+    )
+      techFactor = 1.3;
+    else if (tLow === 'press' && ['side_pressure', 'shoulder_stab', 'core_anchor'].includes(m)) techFactor = 1.3;
     // Tendon-мульт: для сухожильных — отдельный tendonMultGlobal, для остальных 1
     const tendonFactor = isTendonMuscle(m) ? tendonMultGlobal : 1;
-    let mrv = base * pedMult * recoveryMult * labMult * nutritionMult * tendonFactor * specFactor * techFactor * acwrMult;
+    let mrv =
+      base * pedMult * recoveryMult * labMult * nutritionMult * tendonFactor * specFactor * techFactor * acwrMult;
     // TendonCap 1.2× жёстко ограничивает pedMult для сухожилий
     if (isTendonMuscle(m)) {
-      const tendonCapMrv = Math.round(base * TENDON_CAP * recoveryMult * labMult * nutritionMult * tendonFactor * specFactor * techFactor);
+      const tendonCapMrv = Math.round(
+        base * TENDON_CAP * recoveryMult * labMult * nutritionMult * tendonFactor * specFactor * techFactor,
+      );
       mrv = Math.min(mrv, tendonCapMrv);
     }
     if (m === 'side_pressure' && input.enableHumerusGuard !== false) {
@@ -578,7 +850,7 @@ export function buildArmPlan(input: ArmBuilderInput): ArmPlan {
   const muscleFreq: Record<string, number> = {};
   for (const [tag, cnt] of Object.entries(tagCounts)) {
     const ms = TAG_MUSCLES_ARM[tag] || [tag];
-    for (const m of ms) muscleFreq[m] = (muscleFreq[m] || 0) + cnt * 7 / pattern.rotationDays;
+    for (const m of ms) muscleFreq[m] = (muscleFreq[m] || 0) + (cnt * 7) / pattern.rotationDays;
   }
 
   // Volume targets
@@ -587,8 +859,21 @@ export function buildArmPlan(input: ArmBuilderInput): ArmPlan {
     const lm = getArmLandmarks(level, m);
     const freq = muscleFreq[m] || 1;
     const mrv = mrvByMuscle[m] || lm.mrv;
-    const target = Math.min(mrv, Math.max(lm.mev, Math.round(lm.mav * (goal === 'hypertrophy' ? 1 : goal === 'strength' ? 0.9 : 0.85))));
-    volumeTargets[m] = { muscle: m, frequency: freq, mev: lm.mev, mav: lm.mav, mrv, targetSets: target, minSetsPerSession: 2, maxSetsPerSession: perExerciseCap(m, level), rationale: `target ${target}` };
+    const target = Math.min(
+      mrv,
+      Math.max(lm.mev, Math.round(lm.mav * (goal === 'hypertrophy' ? 1 : goal === 'strength' ? 0.9 : 0.85))),
+    );
+    volumeTargets[m] = {
+      muscle: m,
+      frequency: freq,
+      mev: lm.mev,
+      mav: lm.mav,
+      mrv,
+      targetSets: target,
+      minSetsPerSession: 2,
+      maxSetsPerSession: perExerciseCap(m, level),
+      rationale: `target ${target}`,
+    };
   }
   // 26.10.2026 (§8 п.1): ER:IR risk (Pascoa 2026 — у армрестлеров ER/IR ≈0.57 против
   // норматива 0.64–0.66) → стабилизаторы плеча получают +15% объёма (кап MRV).
@@ -597,7 +882,9 @@ export function buildArmPlan(input: ArmBuilderInput): ArmPlan {
     const vt = volumeTargets['shoulder_stab'];
     const bumped = Math.min(vt.mrv, Math.round(vt.targetSets * 1.15));
     if (bumped > vt.targetSets) {
-      selectionWarnings.push(`🩺 Баланс ротаторов плеча (ER:IR risk — диагностика): shoulder_stab ${vt.targetSets}→${ruCount(bumped, RU_SETS)}/нед (кап MRV ${vt.mrv}).`);
+      selectionWarnings.push(
+        `🩺 Баланс ротаторов плеча (ER:IR risk — диагностика): shoulder_stab ${vt.targetSets}→${ruCount(bumped, RU_SETS)}/нед (кап MRV ${vt.mrv}).`,
+      );
       vt.targetSets = bumped;
     }
   }
@@ -610,7 +897,10 @@ export function buildArmPlan(input: ArmBuilderInput): ArmPlan {
   try {
     const track = longevityTrackFor(Number((input as any).ageYears ?? 30));
     mastersDeload = track === 'grandmaster' || track === 'supergrand';
-  } catch { mastersDeload = false; markDegraded('masters-профиль недоступен — делод-каденс по умолчанию'); }
+  } catch {
+    mastersDeload = false;
+    markDegraded('masters-профиль недоступен — делод-каденс по умолчанию');
+  }
   // Именной цикл (P0): фазовая карта библиотеки поверх generic — только при
   // cycleId + (exact либо согласие на extend/shrink). Без cycleId — байт-в-байт.
   let phaseMap = distributeArmPhases(weeks, goal, mastersDeload ? 3 : 4);
@@ -645,7 +935,24 @@ export function buildArmPlan(input: ArmBuilderInput): ArmPlan {
         cycleNote = `Цикл ${c.name}: ${fit.note} — без согласия построен generic (фазы по умолчанию).`;
       }
     }
-  } catch { markDegraded('цикл недоступен — фазы generic'); }
+  } catch {
+    markDegraded('цикл недоступен — фазы generic');
+  }
+  // PRO-PLAN: авто-ставка по умолчанию. 26.10.2026 было→стало: без cycleId и без
+  // явной ставки план НЕ прогрессировал вовсе (множитель 1.0 все недели), хотя
+  // ArmBuilderInput.correctionPct объявляет «СРЦ-дефолт 0.5». Теперь auto даёт
+  // +0.5%/нед от базы (консервативно; пользователь может задать свою ставку).
+  let autoRateDefault = false;
+  // Явный 0 (%/нед) — это «без прогрессии», а не «поле не задано»: авто-дефолт
+  // включаем только когда ставка вообще не передана (review 2026-11).
+  const explicitRate =
+    (input as any).correctionPct != null ||
+    (input as any).cyclePctPerWeek != null ||
+    (input as any).mesoRatePct != null;
+  if (progressionStyle === 'auto' && !explicitRate && !(effectiveCyclePct > 0)) {
+    effectiveCyclePct = 0.5;
+    autoRateDefault = true;
+  }
   // PRO-PLAN P0-4: авто-пик из даты старта (когда старты не заданы вручную):
   // дата внутри окна плана → пик на соответствующей неделе с приоритетом календаря.
   let peaksInput = (input as any).peaks;
@@ -664,9 +971,10 @@ export function buildArmPlan(input: ArmBuilderInput): ArmPlan {
       // тейпер на первую неделю, а ветка «вне окна плана» была недостижима для прошлого.
       const anchorMs = Date.parse(`${startOk ? isoStart : localIsoDate()}T00:00:00Z`);
       const startMs = Date.parse(`${iso}T00:00:00Z`);
-      const rawWeeks = Number.isFinite(anchorMs) && Number.isFinite(startMs) && startMs >= anchorMs
-        ? Math.ceil((startMs - anchorMs) / (7 * 86400000))
-        : 0;
+      const rawWeeks =
+        Number.isFinite(anchorMs) && Number.isFinite(startMs) && startMs >= anchorMs
+          ? Math.ceil((startMs - anchorMs) / (7 * 86400000))
+          : 0;
       if (rawWeeks >= 1 && rawWeeks <= weeks) {
         const peakWeek = Math.max(1, Math.min(weeks, Math.round(rawWeeks)));
         const raw = String((input as any).calPriority || 'A').toUpperCase();
@@ -674,21 +982,35 @@ export function buildArmPlan(input: ArmBuilderInput): ArmPlan {
         peaksInput = [{ week: peakWeek, priority: prio, name: 'Старт из даты' }];
         autoPeakNote = `🏁 Старт из даты ${iso}: авто-пик Н${peakWeek} (${prio}, ${rawWeeks} нед от ${startOk ? 'начала плана' : 'сегодня'}) — тейпер-окно и восстановление построены.`;
       } else if (Number.isFinite(wOut)) {
-        autoPeakNote = rawWeeks === 0
-          ? `🏁 Дата старта ${iso} уже прошла — авто-пик не строится, только гейты готовности.`
-          : `🏁 Дата старта ${iso} вне окна плана (${rawWeeks} нед) — авто-пик не строился, только гейты готовности.`;
+        autoPeakNote =
+          rawWeeks === 0
+            ? `🏁 Дата старта ${iso} уже прошла — авто-пик не строится, только гейты готовности.`
+            : `🏁 Дата старта ${iso} вне окна плана (${rawWeeks} нед) — авто-пик не строился, только гейты готовности.`;
       }
     }
-  } catch { autoPeakNote = null; }
+  } catch {
+    autoPeakNote = null;
+  }
   // PRO-PLAN: мульти-старты внутри плана — тейпер-окна + восстановительные недели.
-  let peaksRuntime: ReturnType<typeof planArmPeaks> = { windows: [], phaseOverrides: {}, volumeOverrides: {}, rirOverrides: {}, taperWeeks: [], recoveryWeeks: [], markers: {}, notes: [] };
+  let peaksRuntime: ReturnType<typeof planArmPeaks> = {
+    windows: [],
+    phaseOverrides: {},
+    volumeOverrides: {},
+    rirOverrides: {},
+    taperWeeks: [],
+    recoveryWeeks: [],
+    markers: {},
+    notes: [],
+  };
   try {
     peaksRuntime = planArmPeaks(peaksInput, weeks, phaseMap as Record<number, string>);
     for (const [wStr, ph] of Object.entries(peaksRuntime.phaseOverrides)) {
       const w = Number(wStr);
       if (w >= 1 && w <= weeks) (phaseMap as Record<number, string>)[w] = ph;
     }
-  } catch { markDegraded('мульти-старты недоступны — единый хвост тейпера'); }
+  } catch {
+    markDegraded('мульти-старты недоступны — единый хвост тейпера');
+  }
   // PRO-PLAN: дневниковая разгрузка первой недели (ACWR danger) — план реагирует
   // на реальную усталость, а не только множит MRV всего мезоцикла.
   let diaryDeload = false;
@@ -711,7 +1033,9 @@ export function buildArmPlan(input: ArmBuilderInput): ArmPlan {
     if (Array.isArray(ci) && ci.length) {
       checkinTrend = armCheckinTrend(ci, { targetWeightKg: Number((input as any).targetWeightKg) || undefined });
     }
-  } catch { markDegraded('чек-ин недели недоступен'); }
+  } catch {
+    markDegraded('чек-ин недели недоступен');
+  }
   if (checkinTrend?.painWarn && weeks >= 3) {
     readinessDeload = true;
     if (String(phaseMap[1] || '') !== 'deload') (phaseMap as Record<number, string>)[1] = 'deload';
@@ -722,14 +1046,20 @@ export function buildArmPlan(input: ArmBuilderInput): ArmPlan {
   try {
     const fs3 = (input as any).diarySessions;
     if (Array.isArray(fs3) && fs3.length) muscleLoadAlerts = armPerMuscleLoadAlerts(fs3);
-  } catch { markDegraded('per-muscle нагрузка недоступна'); }
+  } catch {
+    markDegraded('per-muscle нагрузка недоступна');
+  }
   const overloadedMuscles = new Set(muscleLoadAlerts.map((a) => a.muscle));
   // PRO-PLAN: мезо-блоки (явные цикловые или выведенные из фаз).
   let planBlocks: ReturnType<typeof deriveArmBlocks> = [];
   try {
     const cidB = String((input as any).cycleId || '');
-    planBlocks = cidB ? cycleBlocksFor(cidB, phaseMap as Record<number, string>, weeks) : deriveArmBlocks(phaseMap as Record<number, string>, weeks);
-  } catch { planBlocks = deriveArmBlocks(phaseMap as Record<number, string>, weeks); }
+    planBlocks = cidB
+      ? cycleBlocksFor(cidB, phaseMap as Record<number, string>, weeks)
+      : deriveArmBlocks(phaseMap as Record<number, string>, weeks);
+  } catch {
+    planBlocks = deriveArmBlocks(phaseMap as Record<number, string>, weeks);
+  }
   // Недельные индексы внутри фазы (для double/wave прогрессии).
   const weekPhaseInfo: Record<number, { inPhase: number; instance: number }> = {};
   {
@@ -743,11 +1073,20 @@ export function buildArmPlan(input: ArmBuilderInput): ArmPlan {
         inPhase = 1;
         if (ph === 'accumulation' || ph === 'intensification') instance++;
       } else inPhase++;
-      weekPhaseInfo[w] = { inPhase, instance: (ph === 'accumulation' || ph === 'intensification') ? instance : 0 };
+      weekPhaseInfo[w] = { inPhase, instance: ph === 'accumulation' || ph === 'intensification' ? instance : 0 };
     }
   }
   // PRO-PLAN: база-якорь (LegsCore: присед/тяга/фермер) — реальная сессия, не строка.
-  const anchorProto = (input as any).legsAnchor === true ? (() => { try { return legsAnchorBlock(level); } catch { return null; } })() : null;
+  const anchorProto =
+    (input as any).legsAnchor === true
+      ? (() => {
+          try {
+            return legsAnchorBlock(level);
+          } catch {
+            return null;
+          }
+        })()
+      : null;
   // P2-14b: сгонка — недельные весовые цели в заметках недель (контроль; объём не меняется).
   const cutPlan = (() => {
     try {
@@ -755,9 +1094,16 @@ export function buildArmPlan(input: ArmBuilderInput): ArmPlan {
       const bw = Number((input as any).bodyWeightKg);
       const tw = Number((input as any).targetWeightKg);
       if (isoC && Number.isFinite(bw) && Number.isFinite(tw) && bw > 0 && tw > 0 && bw > tw) {
-        return planWeightCut({ startKg: bw, targetKg: tw, weeksOut: weeksUntilStart(undefined, isoC), sex: (input as any).sex });
+        return planWeightCut({
+          startKg: bw,
+          targetKg: tw,
+          weeksOut: weeksUntilStart(undefined, isoC),
+          sex: (input as any).sex,
+        });
       }
-    } catch { /* тихо */ }
+    } catch {
+      /* тихо */
+    }
     return null;
   })();
   // Хвостовое окно тейпера: непрерывный run делоад/пик-недель с конца плана
@@ -765,7 +1111,11 @@ export function buildArmPlan(input: ArmBuilderInput): ArmPlan {
   // Только оно идёт под кривую финализатора; срединные делоады (каждая 4-я)
   // режутся обычным weekMult 0.6 как раньше.
   let taperState = { tailStart: weeks + 1, hasTail: false, tailPhases: [] as string[] };
-  try { taperState = taperStateFor(phaseMap as Record<number, string>, weeks); } catch { markDegraded('тейпер-стейт по умолчанию'); }
+  try {
+    taperState = taperStateFor(phaseMap as Record<number, string>, weeks);
+  } catch {
+    markDegraded('тейпер-стейт по умолчанию');
+  }
   const tableRatio = input.tableTimeRatio ?? (discipline === 'armlifting' ? 0.2 : 0.55);
 
   const planWeeks: ArmWeek[] = [];
@@ -783,7 +1133,6 @@ export function buildArmPlan(input: ArmBuilderInput): ArmPlan {
     // PRO-5 S4: losing-gate — защита + близкий старт: стресс→heavy в хвосте.
     let kind = tableWeekKind(w, weeks);
     if (pro5safety.forbidStressSingles && kind === 'stress' && w > weeks - 2) kind = 'heavy';
-    const tableParams = tableWeekParams(kind);
     // weekMult: moderate 1.0, heavy 0.85, stress 0.55 + deload 0.6 + peaking 0.45.
     // Исключение: non-classic тейпер-пресет цикла — ХВОСТОВОЕ окно идёт полным,
     // режет только кривая финализатора (иначе двойной срез 0.45×0.6).
@@ -814,7 +1163,10 @@ export function buildArmPlan(input: ArmBuilderInput): ArmPlan {
       });
       weekLoadMult = prog.weightMult;
       repsShift = prog.repsShift;
-    } catch { weekLoadMult = 1; repsShift = 0; }
+    } catch {
+      weekLoadMult = 1;
+      repsShift = 0;
+    }
     // PRO-PLAN: тейпер-окна и RIR стартов внутри плана (не поверх кривой пресета).
     const peakVol = peaksRuntime.volumeOverrides[w];
     if (peakVol != null && !cycleTaperActive) weekMult = Math.min(weekMult, peakVol);
@@ -829,9 +1181,17 @@ export function buildArmPlan(input: ArmBuilderInput): ArmPlan {
         const gp = buildGripRpe({ week: (input.gripWeek ?? w) as number, phase: input.gripPhase });
         gripPhaseName = gp.phase;
         if (gp.phase === 'deload') gripPhaseMult = 0.6;
-        else if (gp.phase === 'peak') { gripPhaseMult = 0.7; gripRirAdd = 1; }
+        else if (gp.phase === 'peak') {
+          gripPhaseMult = 0.7;
+          gripRirAdd = 1;
+        }
       }
-    } catch { gripPhaseMult = 1; gripRirAdd = 0; gripPhaseName = null; markDegraded('Grip-RPE протокол недоступен — базовая нагрузка'); }
+    } catch {
+      gripPhaseMult = 1;
+      gripRirAdd = 0;
+      gripPhaseName = null;
+      markDegraded('Grip-RPE протокол недоступен — базовая нагрузка');
+    }
     // TOP wave-9: один showcase-протокол хвата в неделю (peak → overcrush, intensification → negatives)
     let gripExecDone = gripPhaseName == null || (gripPhaseName !== 'peak' && gripPhaseName !== 'intensification');
     // PRO-5 P4: один Larratt-блок синглов на intensification-неделю (advanced+).
@@ -852,9 +1212,11 @@ export function buildArmPlan(input: ArmBuilderInput): ArmPlan {
       const usedInSession = new Set<string>();
 
       // Filter muscles — for armlifting, skip armwrestling-specific
-      const baseFiltered = muscles.filter(m => {
-        if (discipline === 'armlifting' && ['pronators','supinators','side_pressure','back_pressure'].includes(m)) return false;
-        if (discipline === 'armwrestling' && ['grip_crush'].includes(m) && !weakPoints.includes('grip_crush')) return false;
+      const baseFiltered = muscles.filter((m) => {
+        if (discipline === 'armlifting' && ['pronators', 'supinators', 'side_pressure', 'back_pressure'].includes(m))
+          return false;
+        if (discipline === 'armwrestling' && ['grip_crush'].includes(m) && !weakPoints.includes('grip_crush'))
+          return false;
         return ARM_MUSCLES.includes(m as any);
       });
       // PRO F: FullArm всегда содержит radial/fingers (Praxis топ-3 + containment)
@@ -865,16 +1227,27 @@ export function buildArmPlan(input: ArmBuilderInput): ArmPlan {
       for (const mus of filteredMuscles) {
         const injuryFactor = armInjuryVolumeFactor(injuries, mus);
         if (injuryFactor <= 0) {
-          addSelectionWarning(`exclude:${mus}`, `Н${w} ${mus}: упражнение исключено травмой; безопасная замена не найдена.`);
+          addSelectionWarning(
+            `exclude:${mus}`,
+            `Н${w} ${mus}: упражнение исключено травмой; безопасная замена не найдена.`,
+          );
           continue;
         }
         // PRO G: боль ≥4 — side/pron тяжёлая работа переводится в технику (безопасность сухожилий)
-        const effCh = (pro.replaceSideWithIso && mus === 'side_pressure' && ch === 'тяж')
-          ? 'техника'
-          : (pro.replaceHeavyPronWithPulses && mus === 'pronators' && ch === 'тяж') ? 'техника' : ch;
+        const effCh =
+          pro.replaceSideWithIso && mus === 'side_pressure' && ch === 'тяж'
+            ? 'техника'
+            : pro.replaceHeavyPronWithPulses && mus === 'pronators' && ch === 'тяж'
+              ? 'техника'
+              : ch;
         // spec filter: if specialization active and muscle not in targets + not core — accessory
-        let role: 'primary'|'accessory' = 'primary';
-        if (specSchedule.active && weekSpecs.length > 0 && !weekSpecs.includes(mus) && !['shoulder_stab','core_anchor'].includes(mus)) {
+        let role: 'primary' | 'accessory' = 'primary';
+        if (
+          specSchedule.active &&
+          weekSpecs.length > 0 &&
+          !weekSpecs.includes(mus) &&
+          !['shoulder_stab', 'core_anchor'].includes(mus)
+        ) {
           role = 'accessory';
         }
         const matchupMult = matchupPlan ? matchupVolumeFor(mus, matchupPlan) : 1;
@@ -882,7 +1255,17 @@ export function buildArmPlan(input: ArmBuilderInput): ArmPlan {
         const gripMult = mus.startsWith('grip_') ? gripPhaseMult : 1;
         const iqSide = iqPlan && (iqPlan.foulRate ?? 0) >= 1 && mus === 'side_pressure' ? 0.8 : 1;
         const iqRise = iqPlan && (iqPlan.slipRate ?? 0) >= 40 && (mus === 'risers' || mus === 'thumb') ? 1.15 : 1;
-        const targetRaw = volumeTargets[mus] ? Math.round(volumeTargets[mus].targetSets * weekMult * (pro.volumeMult || 1) * matchupMult * gripMult * iqSide * iqRise * injuryFactor) : 6;
+        const targetRaw = volumeTargets[mus]
+          ? Math.round(
+              volumeTargets[mus].targetSets *
+                weekMult *
+                (pro.volumeMult || 1) *
+                matchupMult *
+                gripMult *
+                iqSide *
+                iqRise,
+            )
+          : 6;
         const target = volumeTargets[mus] ? Math.min(volumeTargets[mus].mrv, targetRaw) : 6;
         const freq = muscleFreq[mus] || 1;
         // P1-7: локальная перегрузка мышцы (дневник) — первые 2 недели сеты ×0.8
@@ -892,51 +1275,138 @@ export function buildArmPlan(input: ArmBuilderInput): ArmPlan {
         const repsBase = repsFor(mus, effCh, phase);
         const injuryRepsCap = armInjuryRepsCap(injuries, mus);
         // TOP wave-5: RFD — настоящий speed-протокол 5×3 RPE8 вместо метки (первое speed-упражнение тяжёлой intensification)
-        const rfdSpeed = rfdOn && phase === 'intensification' && effCh === 'тяж' && !rfdDone &&
-          ['pronators','supinators','wrist_flexors','risers','grip_support','grip_pinch','brachioradialis'].includes(mus);
+        const rfdSpeed =
+          rfdOn &&
+          phase === 'intensification' &&
+          effCh === 'тяж' &&
+          !rfdDone &&
+          [
+            'pronators',
+            'supinators',
+            'wrist_flexors',
+            'risers',
+            'grip_support',
+            'grip_pinch',
+            'brachioradialis',
+          ].includes(mus);
         if (rfdSpeed) rfdDone = true;
         // PRO-5 P4: Larratt-синглы — первое тяжёлое pron/cup-движение intensification (advanced+).
-        const wantSingles = (input as any).heavySingles === true && (level === 'advanced' || level === 'enhanced') && phase === 'intensification' && effCh === 'тяж' && !singlesDone && !rfdSpeed && isSinglesCandidate(mus);
-        if (wantSingles) { singlesDone = true; larrattWeeks++; }
+        const wantSingles =
+          (input as any).heavySingles === true &&
+          (level === 'advanced' || level === 'enhanced') &&
+          phase === 'intensification' &&
+          effCh === 'тяж' &&
+          !singlesDone &&
+          !rfdSpeed &&
+          isSinglesCandidate(mus);
+        if (wantSingles) {
+          singlesDone = true;
+          larrattWeeks++;
+        }
         const larratt = wantSingles ? larrattSinglesFor(Number((input as any).larrattStepKg) || 0.57) : null;
-        const protocolSets = wantSingles && larratt ? larratt.sets : rfdSpeed ? Math.min(5, perExerciseCap(mus, level)) : setsBase;
-        const sets = Math.max(1, Math.min(perExerciseCap(mus, level), Math.max(1, Math.round(protocolSets * injuryFactor))));
+        // Число сетов RFD — по уровню (speedClosesFor: beginner 3 / intermediate 4 / advanced+ 5).
+        const rfdSets = rfdSpeed
+          ? Math.max(1, Math.min(speedClosesFor(level).sets, perExerciseCap(mus, level)))
+          : setsBase;
+        const protocolSets = wantSingles && larratt ? larratt.sets : rfdSets;
+        // Травма применяется ОДИН раз — здесь, в дозе сета (и в весе ниже).
+        // Финализатор добивает только свои добавленные упражнения (provenance
+        // 'finalizer'), иначе получалось 0.5³ → 1/8 объёма.
+        const sets = Math.max(
+          1,
+          Math.min(perExerciseCap(mus, level), Math.max(1, Math.round(protocolSets * injuryFactor))),
+        );
         const protocolReps: [number, number] = wantSingles ? [1, 1] : rfdSpeed ? [3, 3] : repsBase;
-        const reps: [number, number] = injuryRepsCap == null
-          ? protocolReps
-          : [Math.min(protocolReps[0], injuryRepsCap), Math.min(protocolReps[1], injuryRepsCap)];
+        const reps: [number, number] =
+          injuryRepsCap == null
+            ? protocolReps
+            : [Math.min(protocolReps[0], injuryRepsCap), Math.min(protocolReps[1], injuryRepsCap)];
         // PRO-PLAN double progression: повторы растут внутри блока (не в синглах/RFD).
-        const repsFinal: [number, number] = repsShift > 0 && !wantSingles && !rfdSpeed
-          ? [Math.min(15, reps[0] + repsShift), Math.min(15, reps[1] + repsShift)]
-          : reps;
+        const repsFinal: [number, number] =
+          repsShift > 0 && !wantSingles && !rfdSpeed
+            ? [Math.min(15, reps[0] + repsShift), Math.min(15, reps[1] + repsShift)]
+            : reps;
         const iqRir = (mus === 'side_pressure' && iqSide < 1 ? 1 : 0) + (mus.startsWith('grip_') ? gripRirAdd : 0);
-        const hookShift = (mus === 'supinators' || mus === 'wrist_flexors') ? (pro5safety.hookRirShift || 0) : 0;
+        const hookShift = mus === 'supinators' || mus === 'wrist_flexors' ? pro5safety.hookRirShift || 0 : 0;
         // PRO-5 P4: RIR по карте StrengthLog (только явный rpeParity, делоад/пик — как было).
-        const rirBase = ((input as any).rpeParity === true && !isDeload && phase !== 'peaking')
-          ? strengthLogRir(Math.min(8, Math.max(1, w)), effCh)
-          : rirFor(effCh, phase, w, technique);
-        const rir = wantSingles && larratt ? larratt.rir : Math.max(0, Math.min(5, rirBase + (pro.rirShift || 0) + iqRir + hookShift + peakRir));
-        const exTpl = pickExerciseForMuscle(mus, role, equipment, favorite, excluded, usedInSession, technique, mobilityRestrictions, injuries, level, w, (input as any).rotationMode === true, implementBias);
+        const rirBase =
+          (input as any).rpeParity === true && !isDeload && phase !== 'peaking'
+            ? strengthLogRir(Math.min(8, Math.max(1, w)), effCh)
+            : rirFor(effCh, phase, w, technique);
+        const rir =
+          wantSingles && larratt
+            ? larratt.rir
+            : Math.max(0, Math.min(5, rirBase + (pro.rirShift || 0) + iqRir + hookShift + peakRir));
+        const exTpl = pickExerciseForMuscle(
+          mus,
+          role,
+          equipment,
+          favorite,
+          excluded,
+          usedInSession,
+          technique,
+          mobilityRestrictions,
+          injuries,
+          level,
+          w,
+          (input as any).rotationMode === true,
+          implementBias,
+        );
         if (!exTpl) {
-          addSelectionWarning(`missing:${mus}:${mobilityRestrictions.join('|')}`, `Н${w} ${mus}: нет безопасного упражнения для equipment/ограничений; произвольная замена не используется.`);
+          // Соседняя мышца того же семейства (biceps_long/short) в этой сессии уже
+          // закрыта одним упражнением — это не «нет безопасного упражнения», а
+          // покрытие семейства. Не пугаем ложной тревогой.
+          const siblings = ARM_MUSCLE_SIBLINGS[mus] || [];
+          const coveredBySibling = siblings.some((sib) => exercises.some((e) => e.muscle === sib));
+          if (!coveredBySibling) {
+            addSelectionWarning(
+              `missing:${mus}:${mobilityRestrictions.join('|')}`,
+              `Н${w} ${mus}: нет безопасного упражнения для equipment/ограничений; произвольная замена не используется.`,
+            );
+          }
           continue;
         }
         usedInSession.add(exTpl.id);
         usedIdsGlobal.add(exTpl.id);
+        const loadMode = loadModeForExercise(exTpl);
 
         const sgTpl = (exTpl.substitutionGroup || '').toString();
-        const isTable = exTpl.equipment === 'band' || sgTpl.includes('pronation') || sgTpl.includes('supination') || sgTpl === 'cup_iso' || exTpl.id.includes('hook') || exTpl.id.includes('lat_drag') || sgTpl === 'rising' || exTpl.id.includes('table');
+        const isTable =
+          exTpl.equipment === 'band' ||
+          sgTpl.includes('pronation') ||
+          sgTpl.includes('supination') ||
+          sgTpl === 'cup_iso' ||
+          exTpl.id.includes('hook') ||
+          exTpl.id.includes('lat_drag') ||
+          sgTpl === 'rising' ||
+          exTpl.id.includes('table');
         const angle = workingAngleFor(mus, w, sessionIdx, technique, angleHistory);
         if (!angleHistory[mus]) angleHistory[mus] = [];
         angleHistory[mus].push(angle);
 
         // Вес: теперь через workMax (PRO), а не 0; tempo зависит от kind
-        const tempoForKind = mus === 'side_pressure' ? '3-1-1-0' : kind === 'stress' ? '2-0-1-0' : kind === 'heavy' ? '2-1-1-0' : '3-1-1-0';
+        const tempoForKind =
+          mus === 'side_pressure'
+            ? '3-1-1-0'
+            : kind === 'stress'
+              ? '2-0-1-0'
+              : kind === 'heavy'
+                ? '2-1-1-0'
+                : '3-1-1-0';
         const workSets: ArmSet[] = [];
         for (let s = 0; s < sets; s++) {
           const repVal = repsFinal[0] + Math.floor(rng() * (repsFinal[1] - repsFinal[0] + 1));
           // Вес по workMax + cross-meso прогрессия: тяж 82%, техника 60%, памп 68%
-          const pct = wantSingles && larratt ? larratt.pctOfMax : effCh === 'тяж' ? 0.82 : effCh === 'техника' ? 0.6 : effCh === 'памп' ? 0.68 : 0.65;
+          const pct =
+            wantSingles && larratt
+              ? larratt.pctOfMax
+              : effCh === 'тяж'
+                ? 0.82
+                : effCh === 'техника'
+                  ? 0.6
+                  : effCh === 'памп'
+                    ? 0.68
+                    : 0.65;
           // cross-meso: если есть предыдущий план — его финальный вес +2.5% как база
           let effectiveWorkMax: Record<string, number> = { ...mergedWorkMax };
           if (crossMesoWorkMax && crossMesoWorkMax[mus] != null) {
@@ -948,16 +1418,45 @@ export function buildArmPlan(input: ArmBuilderInput): ArmPlan {
             }
           }
           const injuryWeightFactor = armInjuryWeightFactor(injuries, mus);
-          const wgtBase = weightForMuscle(mus, effectiveWorkMax, pct) * injuryWeightFactor;
-          const wgt = weekLoadMult === 1 ? wgtBase : Math.round(wgtBase * weekLoadMult * 2) / 2;
+          // 26.10.2026: вес только для внешнего отягощения. Резина/свой вес/
+          // изометрия не измеряются килограммами на грифе — иначе «внутренняя
+          // ротация на резине» печаталась как 54.5 кг (BW×0.68).
+          const wgtBase = hasExternalLoad(loadMode)
+            ? weightForMuscle(mus, effectiveWorkMax, pct) * injuryWeightFactor
+            : 0;
+          const wgt = weekLoadMult === 1 || wgtBase === 0 ? wgtBase : Math.round(wgtBase * weekLoadMult * 2) / 2;
           workSets.push({
             reps: repVal,
             rir,
             weight: wgt,
-            restSeconds: rfdSpeed ? 90 : mus === 'side_pressure' ? 180 : mus.includes('grip') ? (kind === 'stress' ? 180 : 120) : effCh === 'тяж' ? 120 : 90,
+            restSeconds: rfdSpeed
+              ? 90
+              : mus === 'side_pressure'
+                ? 180
+                : mus.includes('grip')
+                  ? kind === 'stress'
+                    ? 180
+                    : 120
+                  : effCh === 'тяж'
+                    ? 120
+                    : 90,
             tempo: tempoForKind,
-            technique: mus === 'side_pressure' && effCh === 'тяж' ? 'none' : effCh === 'техника' ? 'isometric' : (kind === 'stress' ? 'stress_single' : 'none'),
-            holdSeconds: exTpl.substitutionGroup === 'grip_support' || exTpl.substitutionGroup === 'grip_pinch' || exTpl.substitutionGroup === 'grip_crush' ? (effCh === 'техника' ? 15 : 10) : undefined,
+            technique:
+              mus === 'side_pressure' && effCh === 'тяж'
+                ? 'none'
+                : effCh === 'техника'
+                  ? 'isometric'
+                  : kind === 'stress'
+                    ? 'stress_single'
+                    : 'none',
+            holdSeconds:
+              exTpl.substitutionGroup === 'grip_support' ||
+              exTpl.substitutionGroup === 'grip_pinch' ||
+              exTpl.substitutionGroup === 'grip_crush'
+                ? effCh === 'техника'
+                  ? 15
+                  : 10
+                : undefined,
           });
         }
 
@@ -966,7 +1465,9 @@ export function buildArmPlan(input: ArmBuilderInput): ArmPlan {
         try {
           const topSetW = workSets.length ? Math.max(...workSets.map((x) => Number(x.weight) || 0)) : 0;
           if (effCh === 'тяж' && !wantSingles && topSetW > 0) warmupSets = buildArmWarmupSets(topSetW);
-        } catch { warmupSets = undefined; }
+        } catch {
+          warmupSets = undefined;
+        }
 
         // TOP wave-9: showcase-протокол хвата — один в неделю (peak → overcrush, intensification → negatives)
         let gripShow: '' | 'over' | 'neg' = '';
@@ -986,25 +1487,49 @@ export function buildArmPlan(input: ArmBuilderInput): ArmPlan {
         let finalSets = sets;
         try {
           if (
-            (input as any).intensityTechniques === true && goal === 'hypertrophy' && effCh === 'памп' &&
-            String(exTpl.type) === 'isolation' && !isDeload && sets >= 2 && sets < perExerciseCap(mus, level)
+            (input as any).intensityTechniques === true &&
+            goal === 'hypertrophy' &&
+            effCh === 'памп' &&
+            String(exTpl.type) === 'isolation' &&
+            !isDeload &&
+            sets >= 2 &&
+            sets < perExerciseCap(mus, level)
           ) {
             const last = workSets[workSets.length - 1];
             const w0 = Number(last?.weight) || 0;
             if (w0 > 0) {
-              workSets.push({ ...last, weight: Math.max(0.5, Math.round(w0 * 0.7 * 2) / 2), reps: Math.min(30, (Number(last.reps) || 10) + 2), rir: 0, restSeconds: 0 });
+              workSets.push({
+                ...last,
+                weight: Math.max(0.5, Math.round(w0 * 0.7 * 2) / 2),
+                reps: Math.min(30, (Number(last.reps) || 10) + 2),
+                rir: 0,
+                restSeconds: 0,
+              });
               finalSets = workSets.length;
               dropSet = true;
               dropSetsApplied++;
             }
           }
-        } catch { dropSet = false; finalSets = sets; }
+        } catch {
+          dropSet = false;
+          finalSets = sets;
+        }
 
         // PRO-5 G7: честная пометка веса-ориентира (workMax пуст — прогрессия не ведётся).
         let wEstimated = false;
         try {
           wEstimated = weightHonestyMark(mus, mergedWorkMax) && !(crossMesoWorkMax && crossMesoWorkMax[mus] != null);
-        } catch { wEstimated = true; markDegraded('проверка workMax недоступна — вес отмечен как ориентир'); }
+        } catch {
+          wEstimated = true;
+          markDegraded('проверка workMax недоступна — вес отмечен как ориентир');
+        }
+        // Нет килограммов у внешней нагрузки (workMax не задан) — пометка «вес ориентир».
+        // Для резины/своего веса/изометрии кг не предусмотрены: отдельная честная
+        // строка «по RIR», иначе «задайте workMax» врёт про такой снаряд.
+        const noKg = !hasExternalLoad(loadMode);
+        if (!noKg && workSets.every((x) => !(Number(x.weight) > 0))) {
+          wEstimated = !(crossMesoWorkMax && crossMesoWorkMax[mus] != null);
+        }
         exercises.push({
           muscle: mus as any,
           name: exTpl.name,
@@ -1023,18 +1548,27 @@ export function buildArmPlan(input: ArmBuilderInput): ArmPlan {
           substitutionGroup: exTpl.substitutionGroup,
           exerciseId: exTpl.id,
           equipment: exTpl.equipment,
-          loadMode: loadModeForExercise(exTpl),
+          loadMode: loadMode,
           provenance: 'catalog',
           provenanceSource: `exercise-catalog-arm:${exTpl.id}`,
-          holdSeconds: gripShow === 'over' ? 12 : (mus === 'grip_support' || mus === 'grip_pinch' || mus === 'grip_crush' ? (effCh === 'техника' ? 15 : 10) : undefined),
+          holdSeconds:
+            gripShow === 'over'
+              ? 12
+              : mus === 'grip_support' || mus === 'grip_pinch' || mus === 'grip_crush'
+                ? effCh === 'техника'
+                  ? 15
+                  : 10
+                : undefined,
           ...(warmupSets && warmupSets.length ? { warmupSets } : {}),
-          comment: ((rfdSpeed
-            ? `RFD speed 5×3 @RPE8: ускорение через весь диапазон, отдых 90с · ${exTpl.technique || ''}`
-            : (exTpl.technique || ''))
-            + (gripShow === 'over' ? ' · overcrush hold 8–12с (дожим)' : gripShow === 'neg' ? ' · negatives 5с' : '')
-            + (dropSet ? ' · 💧 drop-set: −30% вес, без отдыха' : '')
-            + (wantSingles && larratt ? ` · ${larratt.comment}` : '')
-            + (wEstimated ? ' · вес ориентир — задайте workMax' : '') || undefined),
+          comment:
+            (rfdSpeed
+              ? `RFD speed ${rfdSets}×3 @RPE8: ускорение через весь диапазон, отдых 90с · ${exTpl.technique || ''}`
+              : exTpl.technique || '') +
+              (gripShow === 'over' ? ' · overcrush hold 8–12с (дожим)' : gripShow === 'neg' ? ' · negatives 5с' : '') +
+              (dropSet ? ' · 💧 drop-set: −30% вес, без отдыха' : '') +
+              (wantSingles && larratt ? ` · ${larratt.comment}` : '') +
+              (noKg ? ' · нагрузка по RIR (кг для этого снаряда не задаются)' : '') +
+              (wEstimated ? ' · вес ориентир — задайте workMax' : '') || undefined,
         });
       }
 
@@ -1042,12 +1576,15 @@ export function buildArmPlan(input: ArmBuilderInput): ArmPlan {
       const limits = sessionLimitsForArm({ level, onCourse: !!pedAdapt, discipline, sessionTag: tag });
       if (exercises.length > limits.maxExercises) {
         // Удаляем accessory последними, primary не трогаем
-        const priCount = exercises.filter(e => e.role === 'primary').length;
+        const priCount = exercises.filter((e) => e.role === 'primary').length;
         const toRemove = exercises.length - limits.maxExercises;
         // сортируем по приоритету удаления: accessory с конца
         let removed = 0;
         for (let i = exercises.length - 1; i >= 0 && removed < toRemove; i--) {
-          if (exercises[i].role === 'accessory' || priCount + (exercises.length - removed - priCount) > limits.maxExercises) {
+          if (
+            exercises[i].role === 'accessory' ||
+            priCount + (exercises.length - removed - priCount) > limits.maxExercises
+          ) {
             // не удаляем единственный primary мышцы если есть
             const mus = exercises[i].muscle;
             const othersSameMus = exercises.filter((e, idx) => e.muscle === mus && idx !== i).length;
@@ -1060,7 +1597,7 @@ export function buildArmPlan(input: ArmBuilderInput): ArmPlan {
         if (exercises.length > limits.maxExercises) exercises.splice(limits.maxExercises);
       }
 
-      const isTableSession = tag.toLowerCase().includes('table') || exercises.some(e => e.isTable);
+      const isTableSession = tag.toLowerCase().includes('table') || exercises.some((e) => e.isTable);
       const session: ArmSession = {
         day: d + 1,
         weekOffset: w - 1,
@@ -1073,7 +1610,9 @@ export function buildArmPlan(input: ArmBuilderInput): ArmPlan {
         if (!Number.isFinite(Number((session as any).durationMin)) || !(session as any).durationMin) {
           session.durationMin = estimateArmSessionDuration(session).durationMin;
         }
-      } catch { /* оценка длительности опциональна */ }
+      } catch {
+        /* оценка длительности опциональна */
+      }
       sessions.push(session);
       sessionIdx++;
     }
@@ -1087,7 +1626,10 @@ export function buildArmPlan(input: ArmBuilderInput): ArmPlan {
         const impl = medleyRotationForWeek(mid, w);
         if (impl) weekNote = `🎯 Медли-фокус: ${impl}`;
       }
-    } catch { weekNote = undefined; markDegraded('медли-фокус недоступен — ротация не добавлена'); }
+    } catch {
+      weekNote = undefined;
+      markDegraded('медли-фокус недоступен — ротация не добавлена');
+    }
     if (cutPlan && cutPlan.lossKg > 0 && w <= cutPlan.weeksOut) {
       const targetKg = Math.max(cutPlan.targetKg, Math.round((cutPlan.startKg - cutPlan.weeklyLossKg * w) * 10) / 10);
       weekNote = `${weekNote ? `${weekNote} ` : ''}⚖️ вес ≤ ${targetKg} кг`;
@@ -1098,7 +1640,8 @@ export function buildArmPlan(input: ArmBuilderInput): ArmPlan {
         const anchor = buildArmAnchorSession(anchorProto as any, mergedWorkMax);
         if (anchor) {
           const weekTotals: Record<string, number> = {};
-          for (const s of sessions) for (const e of s.exercises) weekTotals[e.muscle] = (weekTotals[e.muscle] || 0) + (e.sets || 0);
+          for (const s of sessions)
+            for (const e of s.exercises) weekTotals[e.muscle] = (weekTotals[e.muscle] || 0) + (e.sets || 0);
           const fits: any[] = [];
           for (const ex of anchor.exercises) {
             const mrv = mrvByMuscle[ex.muscle] ?? 99;
@@ -1109,7 +1652,10 @@ export function buildArmPlan(input: ArmBuilderInput): ArmPlan {
           }
           if (fits.length) {
             const anchorSession: ArmSession = {
-              day: pattern.schedule.length + 1,
+              // 26.10.2026 было→стало: `schedule.length + 1` давал день 8 при
+              // неделе 1..7 — ICS ставил сессию на понедельник следующей недели,
+              // годовой макрос давал коллизию (8-1)%7=0. Ставим последний день.
+              day: Math.min(7, pattern.schedule.length),
               weekOffset: w - 1,
               character: 'тяж',
               sessionTag: 'LegsCore',
@@ -1117,11 +1663,17 @@ export function buildArmPlan(input: ArmBuilderInput): ArmPlan {
               exercises: fits,
               note: anchor.note + (fits.length < anchor.exercises.length ? ' (часть снята MRV-капом)' : ''),
             };
-            try { anchorSession.durationMin = estimateArmSessionDuration(anchorSession).durationMin; } catch { /* опционально */ }
+            try {
+              anchorSession.durationMin = estimateArmSessionDuration(anchorSession).durationMin;
+            } catch {
+              /* опционально */
+            }
             sessions.push(anchorSession);
           }
         }
-      } catch { markDegraded('база-якорь недоступна — сессия LegsCore пропущена'); }
+      } catch {
+        markDegraded('база-якорь недоступна — сессия LegsCore пропущена');
+      }
     }
     const weekBlock = blockForWeek(planBlocks, w);
     planWeeks.push({
@@ -1131,8 +1683,10 @@ export function buildArmPlan(input: ArmBuilderInput): ArmPlan {
       taper,
       // Аудит 2026-10: множитель микро-цикла едет в план — гварды нормализуют им объём
       weekMult: Math.round(weekMult * 1000) / 1000,
-      tableRatio: sessions.filter(s => s.tableTime).length / Math.max(1, sessions.length),
+      tableRatio: sessions.filter((s) => s.tableTime).length / Math.max(1, sessions.length),
       sessions,
+      // Фактический вид недели после safety-замены stress→heavy (для rationale/печати).
+      tableKind: kind,
       ...(weekNote ? { note: weekNote } : {}),
       ...(weekBlock ? { block: `${weekBlock.name} (${weekBlock.weekStart}–${weekBlock.weekEnd})` } : {}),
       ...(peaksRuntime.markers[w] ? { peak: peaksRuntime.markers[w] } : {}),
@@ -1159,7 +1713,9 @@ export function buildArmPlan(input: ArmBuilderInput): ArmPlan {
       } else if (applied.warning) {
         simRationale = [applied.warning];
       }
-    } catch { markDegraded('contest-sim недоступен — финальная неделя без симуляции'); }
+    } catch {
+      markDegraded('contest-sim недоступен — финальная неделя без симуляции');
+    }
   }
 
   // TOP wave-7: Table-IQ инъекция containment при срывах ≥40% (до подсчёта объёма)
@@ -1175,7 +1731,9 @@ export function buildArmPlan(input: ArmBuilderInput): ArmPlan {
       for (let i = 0; i < planWeeks.length; i++) planWeeks[i] = inj.plan.weeks[i];
       tableInjectNotes = inj.notes;
     }
-  } catch { markDegraded('Table-IQ инъекция недоступна — коррекции стола не добавлены'); }
+  } catch {
+    markDegraded('Table-IQ инъекция недоступна — коррекции стола не добавлены');
+  }
 
   // TOP wave-8: унилатеральные бонусные сеты слабой руки — пост-проход по готовым неделям.
   // Только здесь виден полный недельный объём (мид-билд гард слеп к будущим сессиям + sim/inject уже применены).
@@ -1184,89 +1742,157 @@ export function buildArmPlan(input: ArmBuilderInput): ArmPlan {
   if (lrWeak != null && (lrPct ?? 0) >= 7) {
     try {
       const want = (lrPct ?? 0) >= 12 ? 2 : 1;
-      const UNI = new Set(['wrist_flexors', 'wrist_extensors', 'pronators', 'supinators', 'risers', 'thumb', 'brachialis', 'biceps_long', 'biceps_short', 'brachioradialis']);
+      const UNI = new Set([
+        'wrist_flexors',
+        'wrist_extensors',
+        'pronators',
+        'supinators',
+        'risers',
+        'thumb',
+        'brachialis',
+        'biceps_long',
+        'biceps_short',
+        'brachioradialis',
+      ]);
       for (const wk of planWeeks) {
         if ((wk as any).deload || (wk as any).taper || wk.phase === 'peaking') continue;
         const totals: Record<string, number> = {};
-        for (const s of (wk.sessions || [])) for (const e of (s.exercises || [])) totals[e.muscle] = (totals[e.muscle] || 0) + (e.sets || 0);
-        for (const s of (wk.sessions || [])) {
-          const ex = (s.exercises || []).find((e: any) => UNI.has(e.muscle) && !/унилатерально/.test(String(e.comment || '')));
+        for (const s of wk.sessions || [])
+          for (const e of s.exercises || []) totals[e.muscle] = (totals[e.muscle] || 0) + (e.sets || 0);
+        for (const s of wk.sessions || []) {
+          const ex = (s.exercises || []).find(
+            (e: any) => UNI.has(e.muscle) && !/унилатерально/.test(String(e.comment || '')),
+          );
           if (!ex) continue;
           const mrv = mrvByMuscle[ex.muscle] ?? 99;
           if ((totals[ex.muscle] || 0) + want > mrv || ex.sets + want > perExerciseCap(ex.muscle, level)) {
-            ex.comment = `${ex.comment || ''} + слабой (${lrWeak}): без запаса до MRV — 2 подх. из этих унилатерально`.trim();
+            ex.comment =
+              `${ex.comment || ''} + слабой (${lrWeak}): без запаса до MRV — 2 подх. из этих унилатерально`.trim();
             continue;
           }
-          const template: ArmSet = ex.workSets[ex.workSets.length - 1] || { reps: 10, rir: 2, weight: 0, restSeconds: 90 };
+          const template: ArmSet = ex.workSets[ex.workSets.length - 1] || {
+            reps: 10,
+            rir: 2,
+            weight: 0,
+            restSeconds: 90,
+          };
           for (let i = 0; i < want; i++) ex.workSets.push({ ...template });
           ex.sets += want;
           totals[ex.muscle] += want;
           uniBonusSets += want;
-          ex.comment = `${ex.comment || ''} + унилатерально слабой (${lrWeak}): +${ruCount(want, RU_SETS)} сверху`.trim();
+          ex.comment =
+            `${ex.comment || ''} + унилатерально слабой (${lrWeak}): +${ruCount(want, RU_SETS)} сверху`.trim();
         }
       }
-    } catch { markDegraded('L/R добивка недоступна — унилатеральные сеты не добавлены'); }
+    } catch {
+      markDegraded('L/R добивка недоступна — унилатеральные сеты не добавлены');
+    }
   }
 
   // Rationale — расширено table 3/2/1 и tendon
   const rationale: string[] = [];
   rationale.push(`Дисциплина: ${discipline}, техника: ${technique}, цель: ${goal}, уровень: ${level}`);
   rationale.push(`Сплит: ${pattern.name} (${pattern.sessionsPerRotation}x/${pattern.rotationDays}дн)`);
-  rationale.push(`Периодизация: ${Object.entries(phaseMap).map(([wk, ph]) => `Н${wk}:${ph}`).join(', ')}`);
+  rationale.push(
+    `Периодизация: ${Object.entries(phaseMap)
+      .map(([wk, ph]) => `Н${wk}:${ph}`)
+      .join(', ')}`,
+  );
   if (cycleNote) rationale.push(cycleNote);
   // PRO-PLAN: мезо-блоки / стиль прогрессии / старты / дневниковая разгрузка / якорь.
-  if (planBlocks.length) rationale.push(`Мезо-блоки: ${planBlocks.map((b) => `${b.name} (Н${b.weekStart}–${b.weekEnd})`).join(' → ')}.`);
-  if (progressionStyle === 'double') rationale.push('Прогрессия double: повторы +1/нед в блоке (до +3), вес +2.5% между блоками; RIR держит цель.');
-  else if (progressionStyle === 'wave') rationale.push('Прогрессия wave: тяжёлая/средняя/лёгкая недели внутри блока (+1.5% базы за блок).');
+  if (planBlocks.length)
+    rationale.push(`Мезо-блоки: ${planBlocks.map((b) => `${b.name} (Н${b.weekStart}–${b.weekEnd})`).join(' → ')}.`);
+  if (progressionStyle === 'double')
+    rationale.push('Прогрессия double: повторы +1/нед в блоке (до +3), вес +2.5% между блоками; RIR держит цель.');
+  else if (progressionStyle === 'wave')
+    rationale.push('Прогрессия wave: тяжёлая/средняя/лёгкая недели внутри блока (+1.5% базы за блок).');
   for (const line of peaksRuntime.notes) rationale.push(line);
   if (autoPeakNote) rationale.push(autoPeakNote);
-  if (implementBias) rationale.push(`🖐️ Снаряд платформы: приоритет «${String((input as any).gripImplement)}» в пулах хвата (шкала помоста — PLATFORM_WR).`);
+  if (implementBias)
+    rationale.push(
+      `🖐️ Снаряд платформы: приоритет «${String((input as any).gripImplement)}» в пулах хвата (шкала помоста — PLATFORM_WR).`,
+    );
   // P0-1: сводка «план ↔ факт» + честные последствия по плато/опережению.
   if (factFeedback.muscles.length && crossMesoWorkMax) {
     rationale.push(factFeedback.summary);
     const beats = factFeedback.muscles.filter((f) => f.status === 'beat');
     const stalled = factFeedback.muscles.filter((f) => f.status === 'stalled');
-    if (beats.length) rationale.push(`Факт превысил план: ${beats.slice(0, 4).map((f) => f.muscle).join(', ')} — ставка ${progRates.mesoRate.toFixed(3)} на эти мышцы.`);
+    if (beats.length)
+      rationale.push(
+        `Факт превысил план: ${beats
+          .slice(0, 4)
+          .map((f) => f.muscle)
+          .join(', ')} — ставка ${progRates.mesoRate.toFixed(3)} на эти мышцы.`,
+      );
     if (stalled.length) {
-      rationale.push(`⛔ Плато по факту: ${stalled.slice(0, 4).map((f) => f.muscle).join(', ')} — вес −2%, проверьте сон/питание.`);
+      rationale.push(
+        `⛔ Плато по факту: ${stalled
+          .slice(0, 4)
+          .map((f) => f.muscle)
+          .join(', ')} — вес −2%, проверьте сон/питание.`,
+      );
       feedbackWarnings.push(`Плато факта (дневник): ${stalled.map((f) => f.muscle).join(', ')} — ставка мезо снижена.`);
     }
   }
   // P1-8 / P1-7 / P1-9 / P2-14: честные строки профессионального контура.
-  if (readinessDeload) rationale.push('🩺 Готовность красная: первая неделя — разгрузка (60%, RIR+2) до восстановления.');
+  if (readinessDeload)
+    rationale.push('🩺 Готовность красная: первая неделя — разгрузка (60%, RIR+2) до восстановления.');
   if (checkinTrend && checkinTrend.weeks > 0) {
     rationale.push(`🗓 Чек-ин недели: ${checkinTrend.notes.join(' ')}`);
-    if (checkinTrend.painWarn) feedbackWarnings.push(`Чек-ин: боль локтя ${checkinTrend.painAvgLast2}/10 две недели — первая неделя разгрузочная.`);
+    if (checkinTrend.painWarn)
+      feedbackWarnings.push(
+        `Чек-ин: боль локтя ${checkinTrend.painAvgLast2}/10 две недели — первая неделя разгрузочная.`,
+      );
   }
   if (muscleLoadAlerts.length) {
-    const txt = muscleLoadAlerts.slice(0, 4).map((a) => `${a.muscle} (7д ${a.sets7} vs ср.${a.weeklyAvg}, ×${a.ratio})`).join('; ');
+    const txt = muscleLoadAlerts
+      .slice(0, 4)
+      .map((a) => `${a.muscle} (7д ${a.sets7} vs ср.${a.weeklyAvg}, ×${a.ratio})`)
+      .join('; ');
     rationale.push(`⚖️ Локальная перегрузка дневника: ${txt} — первые 2 недели объём ×0.8, контроль восстановления.`);
     feedbackWarnings.push(`Локальная перегрузка дневника: ${txt}.`);
   }
-  if (dropSetsApplied > 0) rationale.push(`💧 Drop-set: +${dropSetsApplied} мини-сетов на памп-изоляции (гипертрофия, без отдыха).`);
+  if (dropSetsApplied > 0)
+    rationale.push(`💧 Drop-set: +${dropSetsApplied} мини-сетов на памп-изоляции (гипертрофия, без отдыха).`);
   if (cutPlan) rationale.push(`⚖️ Сгонка к старту: ${cutPlan.note}`);
-  if (diaryDeload) rationale.push(`🔄 Дневник: ACWR danger — первая неделя построена как разгрузка (60%, RIR+2) до восстановления.`);
-  if (anchorProto) rationale.push('🏋️ База-якорь: LegsCore-сессия 1×/нед (присед/тяга/фермер) — side-цепь и общий тонус.');
+  if (diaryDeload)
+    rationale.push(`🔄 Дневник: ACWR danger — первая неделя построена как разгрузка (60%, RIR+2) до восстановления.`);
+  if (anchorProto)
+    rationale.push('🏋️ База-якорь: LegsCore-сессия 1×/нед (присед/тяга/фермер) — side-цепь и общий тонус.');
   if (Number((input as any).daysPerWeek || 0) > 0) {
     const splitPerWeek = (pattern.sessionsPerRotation * 7) / Math.max(1, pattern.rotationDays);
     if (Math.abs(splitPerWeek - Number((input as any).daysPerWeek)) >= 1.5) {
-      rationale.push(`PRO-PLAN: дней/нед ${(input as any).daysPerWeek} vs сплит ~${splitPerWeek.toFixed(1)} — выберите сплит под свою частоту.`);
+      rationale.push(
+        `PRO-PLAN: дней/нед ${(input as any).daysPerWeek} vs сплит ~${splitPerWeek.toFixed(1)} — выберите сплит под свою частоту.`,
+      );
     }
   }
   try {
     if (effectiveCyclePct > 0 && progressionStyle !== 'double' && progressionStyle !== 'wave') {
-      rationale.push(`Прогрессия весов +${effectiveCyclePct}%/нед${cycleProgFromLib ? ' (дефолт цикла)' : ''} + кросс-мезо ×${progRates.mesoRate.toFixed(3)}${progRates.migrated ? ' (раздельные поля PRO-5)' : ' (legacy correctionPct)'}.`);
+      rationale.push(
+        `Прогрессия весов +${effectiveCyclePct}%/нед${cycleProgFromLib ? ' (дефолт цикла)' : autoRateDefault ? ' (авто-дефолт)' : ''} + кросс-мезо ×${progRates.mesoRate.toFixed(3)}${progRates.migrated ? ' (раздельные поля PRO-5)' : ' (legacy correctionPct)'}.`,
+      );
     }
-  } catch { markDegraded('пояснение прогрессии недоступно'); }
+  } catch {
+    markDegraded('пояснение прогрессии недоступно');
+  }
   if (mastersDeload) rationale.push('Masters 50+: делоад каждая 3-я неделя (longevity Devon-трек).');
   if (specSchedule.active) rationale.push(`Специализация: ${specSchedule.rationale}`);
-  const tableKinds = planWeeks.map(wk => `${tableWeekKind(wk.week, weeks)}`).join('/');
-  rationale.push(`Table 3/2/1: ${tableKinds} (moderate 50-75% 1-3мин / heavy 75-100% 10с-1мин / stress 100-125% 5-10с)`);
+  const tableKinds = planWeeks.map((wk) => `${(wk as any).tableKind || tableWeekKind(wk.week, weeks)}`).join('/');
+  rationale.push(
+    `Table 3/2/1: ${tableKinds} (moderate 50-75% 1-3мин / heavy 75-100% 10с-1мин / stress 100-125% 5-10с)`,
+  );
   const tableSummary = tableTimeSummary(planWeeks, tableRatio);
-  rationale.push(`Table sessions: target ${(tableRatio * 100).toFixed(0)}%, fact ${(tableSummary.tableSessionShare * 100).toFixed(0)}%; minutes ${tableSummary.tableMinutesShare == null ? 'нет данных' : `${(tableSummary.tableMinutesShare * 100).toFixed(0)}%`}; target applies to session share.`);
-  rationale.push(`Бюджет: recovery×${recoveryMult.toFixed(2)} lab×${labMult.toFixed(2)} nutrition×${nutritionMult.toFixed(2)} ped×${pedMult.toFixed(2)} tendon×${tendonMultGlobal.toFixed(2)} (tendonCap 1.2×)`);
-  if (isTendonMuscle('wrist_flexors')) rationale.push(`Tendon лимит ${ruCount(tendonWeeklyLimit(level), RU_SETS)}/нед для wrist/pron/sup`);
-  if (crossMesoWorkMax) rationale.push(`Cross-meso: веса +2.5% от предыдущего мезоцикла (${Object.keys(crossMesoWorkMax).length} групп)`);
+  rationale.push(
+    `Table sessions: target ${(tableRatio * 100).toFixed(0)}%, fact ${(tableSummary.tableSessionShare * 100).toFixed(0)}%; minutes ${tableSummary.tableMinutesShare == null ? 'нет данных' : `${(tableSummary.tableMinutesShare * 100).toFixed(0)}%`}; target applies to session share.`,
+  );
+  rationale.push(
+    `Бюджет: recovery×${recoveryMult.toFixed(2)} lab×${labMult.toFixed(2)} nutrition×${nutritionMult.toFixed(2)} ped×${pedMult.toFixed(2)} tendon×${tendonMultGlobal.toFixed(2)} (tendonCap 1.2×)`,
+  );
+  if (isTendonMuscle('wrist_flexors'))
+    rationale.push(`Tendon лимит ${ruCount(tendonWeeklyLimit(level), RU_SETS)}/нед для wrist/pron/sup`);
+  if (crossMesoWorkMax)
+    rationale.push(`Cross-meso: веса +2.5% от предыдущего мезоцикла (${Object.keys(crossMesoWorkMax).length} групп)`);
   // TOP wave-6: кросс-мезо лестницы — прогресс имплемента между мезоциклами
   try {
     const prevSnap = (input.previousPlan as any)?.inputSnapshot;
@@ -1276,10 +1902,14 @@ export function buildArmPlan(input: ArmBuilderInput): ArmPlan {
       if (Number.isFinite(prev) && prev > 0 && Number.isFinite(cur) && cur > 0) {
         const d = Math.round(((cur - prev) / prev) * 1000) / 10;
         const nx = nextImplement(input.ladderFrom, cur, (input.sex as string) || 'male');
-        rationale.push(`Лестница ${input.ladderFrom}: ${d >= 0 ? '+' : ''}${d}% за мезоцикл — ${nx.ready && nx.next ? `готов к ${nx.next}` : 'держать базу'}.`);
+        rationale.push(
+          `Лестница ${input.ladderFrom}: ${d >= 0 ? '+' : ''}${d}% за мезоцикл — ${nx.ready && nx.next ? `готов к ${nx.next}` : 'держать базу'}.`,
+        );
       }
     }
-  } catch { markDegraded('медли/лестница прогрессии недоступна — переход пропущен'); }
+  } catch {
+    markDegraded('медли/лестница прогрессии недоступна — переход пропущен');
+  }
   // PRO A–J: строки оркестратора (аддитивно)
   for (const line of pro.rationale) rationale.push(line);
   for (const line of selectionWarnings) rationale.push(line);
@@ -1289,13 +1919,20 @@ export function buildArmPlan(input: ArmBuilderInput): ArmPlan {
   if (lrNote) rationale.push(lrNote);
   for (const line of simRationale) rationale.push(line);
   for (const line of tableInjectNotes) rationale.push(line);
-  if (uniBonusSets > 0) rationale.push(`L/R добивка: +${ruAdjCount(uniBonusSets, RU_ADJ_UNILATERAL, RU_SETS)} слабой (${lrWeak}) в клампе MRV.`);
+  if (uniBonusSets > 0)
+    rationale.push(
+      `L/R добивка: +${ruAdjCount(uniBonusSets, RU_ADJ_UNILATERAL, RU_SETS)} слабой (${lrWeak}) в клампе MRV.`,
+    );
   // PRO-5: честные строки (деградация/PED/ACWR/safety/синглы/RPE/сплит-подсказка).
   if (pedNote) rationale.push(pedNote);
   if (acwrNote) rationale.push(`PRO-5: ${acwrNote}`);
   for (const line of pro5safety.notes) rationale.push(line);
-  if ((input as any).rpeParity === true) rationale.push('PRO-5: RIR по карте StrengthLog (W1–4 RPE7–8 → RIR2–3; W5–8 RPE8–9 → RIR1–2).');
-  if (larrattWeeks > 0) rationale.push(`PRO-5: Larratt-синглы 5×1 @92% в ${larrattWeeks} нед. (полная лесенка 17–18 — практика, микрошаг ${Number((input as any).larrattStepKg) || 0.57} кг).`);
+  if ((input as any).rpeParity === true)
+    rationale.push('PRO-5: RIR по карте StrengthLog (W1–4 RPE7–8 → RIR2–3; W5–8 RPE8–9 → RIR1–2).');
+  if (larrattWeeks > 0)
+    rationale.push(
+      `PRO-5: Larratt-синглы 5×1 @92% в ${larrattWeeks} нед. (полная лесенка 17–18 — практика, микрошаг ${Number((input as any).larrattStepKg) || 0.57} кг).`,
+    );
   if (degraded.length > 0) rationale.push(`Честная деградация: ${degraded.join('; ')}.`);
   try {
     const cid = String((input as any).cycleId || '');
@@ -1303,11 +1940,25 @@ export function buildArmPlan(input: ArmBuilderInput): ArmPlan {
     if (c) {
       const splitPerWeek = (pattern.sessionsPerRotation * 7) / Math.max(1, pattern.rotationDays);
       if (Math.abs(splitPerWeek - c.daysPerWeek) >= 2) {
-        const sug = suggestSplitForCycle({ id: c.id, name: c.name, daysPerWeek: c.daysPerWeek, tablePerWeek: c.tablePerWeek, discipline: c.discipline }, ARM_SPLIT_PATTERNS as any);
-        if (sug) rationale.push(`PRO-5: под цикл ${c.name} подходит сплит «${sug.name}» — переключите в 1 клик (сейчас ~${splitPerWeek.toFixed(1)}×/нед vs ${c.daysPerWeek}×/нед).`);
+        const sug = suggestSplitForCycle(
+          {
+            id: c.id,
+            name: c.name,
+            daysPerWeek: c.daysPerWeek,
+            tablePerWeek: c.tablePerWeek,
+            discipline: c.discipline,
+          },
+          ARM_SPLIT_PATTERNS as any,
+        );
+        if (sug)
+          rationale.push(
+            `PRO-5: под цикл ${c.name} подходит сплит «${sug.name}» — переключите в 1 клик (сейчас ~${splitPerWeek.toFixed(1)}×/нед vs ${c.daysPerWeek}×/нед).`,
+          );
       }
     }
-  } catch { markDegraded('подбор сплита под цикл недоступен'); }
+  } catch {
+    markDegraded('подбор сплита под цикл недоступен');
+  }
   // TOP wave-13: отдельный peak-протокол хвата (только явная фаза, не авто)
   try {
     const gp = String(input.gripPhase || '').toLowerCase();
@@ -1323,16 +1974,20 @@ export function buildArmPlan(input: ArmBuilderInput): ArmPlan {
         equipment: input.equipment,
       });
       for (let i = 0; i < planWeeks.length; i++) planWeeks[i] = inj.plan.weeks[i];
-      for (const line of (inj.plan.rationale || [])) rationale.push(line);
+      for (const line of inj.plan.rationale || []) rationale.push(line);
     }
-  } catch { markDegraded('peak-протокол хвата недоступен — базовая методика'); }
+  } catch {
+    markDegraded('peak-протокол хвата недоступен — базовая методика');
+  }
   const proWarnings = [...pro.warnings, ...selectionWarnings, ...feedbackWarnings];
   for (const line of pro5safety.warnings) proWarnings.push(line);
   for (const line of pro5safety.blocked) proWarnings.push(`⛔ ${line}`);
   // PRO-5: пост-проход честных гейтов (только warnings/строки, объёмы не трогаем).
   try {
     for (const line of foreignPoolWarnings(planWeeks as any)) proWarnings.push(line);
-  } catch { markDegraded('пул-чек недоступен'); }
+  } catch {
+    markDegraded('пул-чек недоступен');
+  }
   // PRO-5 S2: hook-кап — только hook-техника или явный hookCapSets
   // (у balanced/toproll супинация — норма, не hook-перегруз).
   try {
@@ -1340,10 +1995,14 @@ export function buildArmPlan(input: ArmBuilderInput): ArmPlan {
       const cap = Number((input as any).hookCapSets) || 12;
       for (const line of checkHookCap(planWeeks as any, cap)) proWarnings.push(line);
     }
-  } catch { markDegraded('hook-кап недоступен'); }
+  } catch {
+    markDegraded('hook-кап недоступен');
+  }
   try {
     for (const wk of planWeeks) for (const line of checkCocGates(wk as any, wk.week)) proWarnings.push(line);
-  } catch { markDegraded('CoC-гейты недоступны'); }
+  } catch {
+    markDegraded('CoC-гейты недоступны');
+  }
   if (pro5safety.warmupRequired && planWeeks.length > 0) {
     const w1 = planWeeks[0];
     w1.note = `${w1.note || ''} 🧤 Warmup-блок 10–15 мин обязателен (холод/без разминки).`.trim();
@@ -1355,35 +2014,31 @@ export function buildArmPlan(input: ArmBuilderInput): ArmPlan {
     }
   }
 
-  // Weekly volume
+  // Weekly volume (единый источник: прямой + косвенный объём — arm-volume)
   const weeklyVolume: Record<number, Record<string, any>> = {};
-  for (const wk of planWeeks) {
-    const vol: Record<string, any> = {};
-    for (const sess of wk.sessions) {
-      for (const ex of sess.exercises) {
-        const muscle = canonicalizeArmMuscle(ex.muscle) || ex.muscle;
-        if (!vol[muscle]) vol[muscle] = { directSets: 0, effectiveSets: 0, tendonSets: 0, fatigueWeightedSets: 0 };
-        vol[muscle].directSets += ex.sets;
-        vol[muscle].effectiveSets += ex.sets;
-        vol[muscle].fatigueWeightedSets += ex.sets * 1;
-        if (isTendonMuscle(muscle)) vol[muscle].tendonSets += ex.sets;
-      }
-    }
-    weeklyVolume[wk.week] = vol;
-  }
+  for (const wk of planWeeks) weeklyVolume[wk.week] = armWeeklyVolumeFor([wk as any]);
 
   return {
     pattern,
     weeks: planWeeks,
-    rotationMuscleVolume: Object.fromEntries(ARM_MUSCLES.map(m => [m, volumeTargets[m]?.targetSets || 0])),
+    rotationMuscleVolume: Object.fromEntries(ARM_MUSCLES.map((m) => [m, volumeTargets[m]?.targetSets || 0])),
     rationale,
     level,
     discipline: discipline as any,
     technique: technique as any,
     goal: goal as any,
-    volumeLandmarks: ARM_MUSCLES.map(m => {
+    volumeLandmarks: ARM_MUSCLES.map((m) => {
       const lm = getArmLandmarks(level, m);
-      return { group: m, label: m, muscle: m, sets: lm.mav, mev: lm.mev, mav: lm.mav, mrv: lm.mrv, status: 'optimal' as any };
+      return {
+        group: m,
+        label: m,
+        muscle: m,
+        sets: lm.mav,
+        mev: lm.mev,
+        mav: lm.mav,
+        mrv: lm.mrv,
+        status: 'optimal' as any,
+      };
     }),
     muscleFrequency: muscleFreq,
     volumeTargets,

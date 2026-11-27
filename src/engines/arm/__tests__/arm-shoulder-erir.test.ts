@@ -4,7 +4,11 @@
  */
 import { describe, it, expect } from 'vitest';
 import {
-  erIrRatio, erIrVerdict, ERIR_RATIO_MIN, ERIR_ATHELETE_MIN, ERIR_RATIO_HIGH,
+  erIrRatio,
+  erIrVerdict,
+  ERIR_RATIO_MIN,
+  ERIR_ATHELETE_MIN,
+  ERIR_RATIO_HIGH,
 } from '../arm-shoulder-erir.engine';
 import { buildArmDiagnosticsReport } from '../arm-diagnostics-hub.engine';
 import { SourceFileReader } from './helpers/source-reader';
@@ -55,10 +59,10 @@ describe('ER:IR — расчёт и зоны', () => {
   });
 
   it('границы: <0.64 risk / 0.64–0.75 watch / ≥0.75 ok — без «мёртвых» зон', () => {
-    expect(erIrVerdict({ erKg: 31.5, irKg: 50 }).zone).toBe('risk');      // 0.63 — строго ниже нормы атлетов
-    expect(erIrVerdict({ erKg: 32, irKg: 50 }).zone).toBe('watch');      // 0.64 — ровно на границе норматива
-    expect(erIrVerdict({ erKg: 32.5, irKg: 50 }).zone).toBe('watch');    // 0.65
-    expect(erIrVerdict({ erKg: 37.5, irKg: 50 }).zone).toBe('ok');       // 0.75 — граница нормы здоровых
+    expect(erIrVerdict({ erKg: 31.5, irKg: 50 }).zone).toBe('risk'); // 0.63 — строго ниже нормы атлетов
+    expect(erIrVerdict({ erKg: 32, irKg: 50 }).zone).toBe('watch'); // 0.64 — ровно на границе норматива
+    expect(erIrVerdict({ erKg: 32.5, irKg: 50 }).zone).toBe('watch'); // 0.65
+    expect(erIrVerdict({ erKg: 37.5, irKg: 50 }).zone).toBe('ok'); // 0.75 — граница нормы здоровых
     expect(ERIR_ATHELETE_MIN).toBe(0.64);
     expect(ERIR_RATIO_MIN).toBe(0.75);
     expect(ERIR_RATIO_HIGH).toBe(1.15);
@@ -66,7 +70,15 @@ describe('ER:IR — расчёт и зоны', () => {
 });
 
 describe('ER:IR — проводка в диагностику плеча', () => {
-  const BASE: any = { weakTest: {}, grip: {}, level: 'intermediate', technique: 'balanced', tableSessions: 2, totalSessions: 4, tendonSets: 8 };
+  const BASE: any = {
+    weakTest: {},
+    grip: {},
+    level: 'intermediate',
+    technique: 'balanced',
+    tableSessions: 2,
+    totalSessions: 4,
+    tendonSets: 8,
+  };
 
   it('risk-замер → critical finding с exercise external_rotation_band', () => {
     const r = buildArmDiagnosticsReport({ ...BASE, erIr: { erKg: 28.5, irKg: 50 } });
@@ -109,6 +121,9 @@ describe('UI-проводка ER:IR (source-guard)', () => {
     expect(engine.text).toContain('erIr?: ErIrInput');
     expect(engine.text).toContain('erIrVerdict(input.erIr');
     const hub = new SourceFileReader('src/ui/screens/TrainingScreen_parts/ArmDiagnosticsHub.tsx');
-    expect(hub.text).toMatch(/erIr: \(parseFloat\(state\.erKg \|\| ''\)/);
+    // Форматирование (Prettier) может разнести `erIr:` и вызов по строкам —
+    // проверяем поле и оба parseFloat, а не конкретную однострочную форму.
+    expect(hub.text).toMatch(/erIr:\s*[\s\S]{0,120}?parseFloat\(state\.erKg \|\| ''\)/);
+    expect(hub.text).toMatch(/irKg: parseFloat\(state\.irKg \|\| '0'\)/);
   });
 });

@@ -27,17 +27,13 @@ export const FORCE_HEAVY_GROUPS_ARM: ReadonlySet<string> = new Set([
 ]);
 
 /** Группы техники — всегда 'техника' или 'лёг', не тяж. */
-export const FORCE_TECHNIQUE_GROUPS: ReadonlySet<string> = new Set([
-  'risers',
-  'thumb',
-  'shoulder_stab',
-]);
+export const FORCE_TECHNIQUE_GROUPS: ReadonlySet<string> = new Set(['risers', 'thumb', 'shoulder_stab']);
 
 /** Единый источник sessionTag → мышцы для движка + селектора. */
 export const TAG_MUSCLES_ARM: Record<string, string[]> = {
   TableHeavy: ['wrist_flexors', 'pronators', 'brachialis', 'back_pressure'],
   TableTech: ['risers', 'pronators', 'supinators', 'shoulder_stab', 'wrist_flexors', 'radial_deviators', 'thumb'],
-  TableCup: ['wrist_flexors', 'risers', 'thumb', 'brachialis'],
+  TableCup: ['wrist_flexors', 'risers', 'thumb', 'brachialis', 'ulnar_deviators'],
   TablePronation: ['pronators', 'brachioradialis', 'wrist_flexors', 'back_pressure'],
   TableSupination: ['supinators', 'brachialis', 'biceps_long', 'shoulder_stab'],
   GripHeavy: ['grip_support', 'grip_pinch', 'wrist_flexors', 'thumb', 'brachioradialis'],
@@ -55,6 +51,35 @@ export const TAG_MUSCLES_ARM: Record<string, string[]> = {
   HybridArm: ['wrist_flexors', 'pronators', 'grip_support', 'brachialis', 'back_pressure', 'side_pressure'],
   Recovery: ['shoulder_stab', 'wrist_extensors', 'core_anchor'],
   LegsCore: ['core_anchor', 'shoulder_stab'],
+};
+
+/** Группы замены, которые покрывают мышцу (паритет с exactMap билдера). */
+export const ARM_MUSCLE_SG: Record<string, string[]> = {
+  wrist_flexors: ['cup_iso', 'cupping'],
+  wrist_extensors: ['wrist_ext'],
+  pronators: ['pronation'],
+  supinators: ['supination'],
+  brachialis: ['hammer'],
+  grip_support: ['grip_support'],
+  grip_pinch: ['grip_pinch', 'thumb_iso'],
+  grip_crush: ['grip_crush'],
+  risers: ['rising'],
+  side_pressure: ['side_press'],
+  back_pressure: ['back_drag'],
+  thumb: ['grip_pinch', 'thumb_iso'],
+  shoulder_stab: ['shoulder_int', 'shoulder_ext'],
+  core_anchor: ['core_anti'],
+  ulnar_deviators: ['ulnar_iso'],
+  radial_deviators: ['radial_iso'],
+  biceps_long: ['bicep_curl', 'hammer'],
+  biceps_short: ['bicep_curl', 'hammer'],
+  brachioradialis: ['hammer', 'reverse_curl'],
+};
+
+/** Мышцы, которые физически покрываются одним упражнением семейства. */
+export const ARM_MUSCLE_SIBLINGS: Record<string, string[]> = {
+  biceps_long: ['biceps_short'],
+  biceps_short: ['biceps_long'],
 };
 
 export const ARM_SESSION_TAG_LABEL: Record<string, string> = {

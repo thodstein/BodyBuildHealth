@@ -13,7 +13,9 @@ beforeEach(() => {
 
 function openPlanSec() {
   fireEvent.click(screen.getByRole('button', { name: '4 Сплит и цикл' }));
-  const head = screen.getAllByRole('button', { name: /Периодизация и старты/ }).find((b) => b.getAttribute('aria-expanded') != null);
+  const head = screen
+    .getAllByRole('button', { name: /Периодизация и старты/ })
+    .find((b) => b.getAttribute('aria-expanded') != null);
   expect(head, 'секция периодизации').toBeTruthy();
   if (head && head.getAttribute('aria-expanded') === 'false') fireEvent.click(head);
 }
@@ -92,10 +94,11 @@ describe('Arm PRO-PLAN UI', () => {
 
   it('P0-1/P0-2: после сборки — разминка в плане и карточка «План vs факт»', () => {
     const { container } = render(<ArmAutoConstructor />);
-    // вес базы → тяжёлые упражнения получают вес и разминку
+    // 28.11.2026: «База (кг)» больше не подставляется как максимум КАЖДОЙ мышцы
+    // (это давало пронацию 65 кг у атлета 80 кг). Задаём максимум конкретной мышцы.
     fireEvent.click(screen.getByRole('button', { name: '2 Атлет' }));
     openSec(/Рабочие максимумы/);
-    fireEvent.change(screen.getByLabelText(/База \(кг\)/), { target: { value: '50' } });
+    fireEvent.change(screen.getByLabelText(/Кисть \(кг\)/), { target: { value: '50' } });
     fireEvent.click(screen.getByRole('button', { name: '4 Сплит и цикл' }));
     fireEvent.click(screen.getByText('⚡ Собрать план'));
     expect(container.querySelector('[data-arm="ex-warmup"]'), 'строка разминки').not.toBeNull();

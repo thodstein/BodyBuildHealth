@@ -92,10 +92,25 @@ export type ArmMuscle =
   | 'core_anchor';
 
 export const ARM_MUSCLES: readonly ArmMuscle[] = [
-  'wrist_flexors','wrist_extensors','pronators','supinators','risers',
-  'ulnar_deviators','radial_deviators','brachialis','biceps_long','biceps_short',
-  'brachioradialis','back_pressure','side_pressure','grip_support','grip_pinch',
-  'grip_crush','thumb','shoulder_stab','core_anchor',
+  'wrist_flexors',
+  'wrist_extensors',
+  'pronators',
+  'supinators',
+  'risers',
+  'ulnar_deviators',
+  'radial_deviators',
+  'brachialis',
+  'biceps_long',
+  'biceps_short',
+  'brachioradialis',
+  'back_pressure',
+  'side_pressure',
+  'grip_support',
+  'grip_pinch',
+  'grip_crush',
+  'thumb',
+  'shoulder_stab',
+  'core_anchor',
 ] as const;
 
 export function isArmMuscle(v: string): v is ArmMuscle {
@@ -160,9 +175,22 @@ export interface ArmBuilderInput {
   supermatch?: boolean; // режим best-of-5/6 (эпик C)
   sparring?: { intensityPct?: 70 | 90 | 100; partnerDeltaKg?: number; sessionsThisWeek?: number };
   strapExpected?: boolean; // ожидается судейский ремень
-  diary?: Array<{ dateIso: string; srpe?: number; elbowPain?: number; wristPain?: number; velocityLossPct?: number | null }>;
+  diary?: Array<{
+    dateIso: string;
+    srpe?: number;
+    elbowPain?: number;
+    wristPain?: number;
+    velocityLossPct?: number | null;
+  }>;
   trackCsv?: string; // Kinovea-трекинг кисти (эпик I)
-  bench?: { wristCurlLb?: number; pronHoldSec?: number; cupHoldSec?: number; cocLevel?: number; rtKg?: number; sideKg?: number };
+  bench?: {
+    wristCurlLb?: number;
+    pronHoldSec?: number;
+    cupHoldSec?: number;
+    cocLevel?: number;
+    rtKg?: number;
+    sideKg?: number;
+  };
   // ── TOP T1–T8 (все опциональны, движок обратно совместим) ──
   oppStyle?: string; // стиль оппонента: hook/toproll/press/balanced/unknown
   oppHand?: string; // рука оппонента: high/low/neutral/unknown
@@ -184,7 +212,14 @@ export interface ArmBuilderInput {
   heavyGripThisWeek?: number;
   plannedHeavy?: boolean;
   hoursSinceHeavyPull?: number;
-  bouts?: Array<{ fouls?: number; slip?: boolean; strap?: boolean; centerHoldSec?: number; win?: boolean; finishSec?: number }>; // Table-IQ журнал
+  bouts?: Array<{
+    fouls?: number;
+    slip?: boolean;
+    strap?: boolean;
+    centerHoldSec?: number;
+    win?: boolean;
+    finishSec?: number;
+  }>; // Table-IQ журнал
   calStartIso?: string; // календарь: дата старта (дубль competitionDateIso для явности)
   calPriority?: string; // A/B/C
   calSeries?: string; // waf_worlds/east_vs_west/super_series/local
@@ -206,7 +241,14 @@ export interface ArmBuilderInput {
   medleyAttempts?: Array<{ eventIdx: number; weightKg: number; success: boolean }>; // факт попыток → сводка simulateMedley
   forMode?: boolean; // FOR-7 overreach (гейт advanced/enhanced)
   forSpecialization?: 'crush' | 'support' | 'pinch' | 'open' | 'wrist';
-  axisCheck?: { trunkRotatedTowardAttack?: boolean; wristBehindShoulder?: boolean; wristExtendedDorsally?: boolean; coldNoWarmup?: boolean; fightingFromDefense?: boolean; sideMaxAttempt?: boolean }; // humerus-axis 2026
+  axisCheck?: {
+    trunkRotatedTowardAttack?: boolean;
+    wristBehindShoulder?: boolean;
+    wristExtendedDorsally?: boolean;
+    coldNoWarmup?: boolean;
+    fightingFromDefense?: boolean;
+    sideMaxAttempt?: boolean;
+  }; // humerus-axis 2026
   // ── PRO-5 (все опциональны, движок обратно совместим) ──
   cyclePctPerWeek?: number; // PRO-5: внутрицикловой %/нед (распил correctionPct)
   mesoRatePct?: number; // PRO-5: кросс-мезо ставка %/мезоцикл (распил correctionPct)
@@ -334,6 +376,8 @@ export interface ArmWeek {
   block?: string;
   /** Старт в этой неделе (мульти-пиковость). */
   peak?: { priority: 'A' | 'B' | 'C'; name: string };
+  /** Фактический вид недели Table 3/2/1 после safety-замен (moderate/heavy/stress). */
+  tableKind?: string;
 }
 
 export interface ArmPlan {
@@ -348,7 +392,10 @@ export interface ArmPlan {
   volumeLandmarks?: VolumeLandmarkRow[];
   muscleFrequency?: Record<string, number>;
   volumeTargets?: Record<string, any>;
-  weeklyVolume?: Record<number, Record<string, { directSets: number; effectiveSets: number; tendonSets: number; fatigueWeightedSets: number }>>;
+  weeklyVolume?: Record<
+    number,
+    Record<string, { directSets: number; effectiveSets: number; tendonSets: number; fatigueWeightedSets: number }>
+  >;
   validation?: ArmValidationResult;
   report?: ArmReport;
   metrics?: ArmMetrics;
@@ -361,7 +408,14 @@ export interface ArmPlan {
   blocks?: Array<{ id: string; name: string; objective: string; weekStart: number; weekEnd: number }>;
   progressionStyle?: ArmProgressionStyle;
   /** Тейпер-окна стартов внутри плана (для UI/печати). */
-  peakWindows?: Array<{ week: number; priority: 'A' | 'B' | 'C'; name: string; leadWeeks: number[]; recoveryWeek: number | null; skippedReason?: string }>;
+  peakWindows?: Array<{
+    week: number;
+    priority: 'A' | 'B' | 'C';
+    name: string;
+    leadWeeks: number[];
+    recoveryWeek: number | null;
+    skippedReason?: string;
+  }>;
 }
 
 export interface ArmValidationResult {

@@ -24,6 +24,14 @@ describe('arm-diary-autoreg (эпик G)', () => {
     expect(r.volumeMult).toBe(0.5);
     expect(r.extraRestDays).toBe(2);
   });
+  it('extraRestDays не обещается в note (отдых никто не применяет)', () => {
+    // 28.11.2026 было→стало: строка «+N дней отдыха» убрана из notes —
+    // arm-pro-integration переносит только volumeMult/rirShift/replace*.
+    // Поле extraRestDays остаётся в типе для UI.
+    const r = autoregArmFromDiary([{ dateIso: '2026-01-01', wristPain: 8 }]);
+    expect(r.extraRestDays).toBeGreaterThan(0);
+    expect(r.note).not.toContain('отдыха');
+  });
   it('ACWR-зоны', () => {
     expect(armAcwrZone(20, 10)).toBe('danger');
     expect(armAcwrZone(14, 10)).toBe('caution');

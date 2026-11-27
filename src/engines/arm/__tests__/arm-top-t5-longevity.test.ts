@@ -36,4 +36,13 @@ describe('arm TOP T5 longevity + rehab', () => {
   it('red-flags всегда есть', () => {
     expect(buildRehabPlan({}).redFlags.join(' ')).toMatch(/врач|рентген/i);
   });
+  it('red-flags локтя показываются для elbow_tendon/ucl/biceps', () => {
+    // 28.11.2026 было→стало: ключ 'elbow' не совпадал ни с одним значением normInjury
+    // ('elbow_tendon'|'ucl'|'biceps') — флаги локтя не показывались никогда.
+    for (const injury of ['elbow_tendon', 'ucl', 'biceps']) {
+      const flags = buildRehabPlan({ injury, weeksSince: 8 }).redFlags.join(' ');
+      expect(flags).toMatch(/UCL\/медиальный эпикондил/);
+      expect(flags).not.toMatch(/Spiral humerus/);
+    }
+  });
 });

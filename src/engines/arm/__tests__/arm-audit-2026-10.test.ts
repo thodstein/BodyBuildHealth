@@ -13,6 +13,7 @@ import { buildArmPlan } from '../arm-builder.engine';
 import { finalizeArmPlan } from '../arm-finalize.engine';
 import { validateArmPlan } from '../arm-validator.engine';
 import { acwrMultFor } from '../arm-pro5-core.engine';
+import { ARM_TENDON_MUSCLES } from '../arm-tendon-sets.engine';
 import { perExerciseCap, sessionLimitsForArm } from '../arm-volume.engine';
 import { buildArmReport } from '../arm-report.engine';
 import { planLrSplit } from '../arm-lr-split.engine';
@@ -35,7 +36,14 @@ import { buildArmBridgeData } from '../arm-bridge-payload.engine';
 import { ARM_MUSCLES, ARM_MUSCLE_RU } from '../arm-types';
 import { SourceFileReader } from './helpers/source-reader';
 
-const BASE: any = { discipline: 'armwrestling', patternId: 'arm_3_full', level: 'intermediate', goal: 'strength', technique: 'toproll', weeks: 8 };
+const BASE: any = {
+  discipline: 'armwrestling',
+  patternId: 'arm_3_full',
+  level: 'intermediate',
+  goal: 'strength',
+  technique: 'toproll',
+  weeks: 8,
+};
 
 // ─────────────────────────────────────────────────────────────────────────────
 describe('P0-1: role в плане реальный (accessory политика обрезки)', () => {
@@ -48,40 +56,104 @@ describe('P0-1: role в плане реальный (accessory политика 
   it('финализатор режет accessory раньше primary (cap сессии по канону)', () => {
     let p: any = buildArmPlan({ ...BASE, weeks: 2, patternId: 'arm_5_specialized' });
     p = finalizeArmPlan(p, { level: 'intermediate' });
-    for (const wk of p.weeks) for (const sess of wk.sessions) {
-      const cap = sessionLimitsForArm({ level: 'intermediate', discipline: 'armwrestling', sessionTag: sess.sessionTag }).maxExercises;
-      expect(sess.exercises.length).toBeLessThanOrEqual(cap);
-    }
+    for (const wk of p.weeks)
+      for (const sess of wk.sessions) {
+        const cap = sessionLimitsForArm({
+          level: 'intermediate',
+          discipline: 'armwrestling',
+          sessionTag: sess.sessionTag,
+        }).maxExercises;
+        expect(sess.exercises.length).toBeLessThanOrEqual(cap);
+      }
   });
 });
 
 describe('P0-2: ACWR по ДАТАМ, не по порядку записей', () => {
-  const diary = (entries: Array<[number, number, number]>) => entries.map(([day, rpe, mins]) => {
-    const d = new Date(Date.UTC(2026, 0, day));
-    return { dateIso: d.toISOString().slice(0, 10), srpe: rpe, durationMin: mins };
-  });
+  const diary = (entries: Array<[number, number, number]>) =>
+    entries.map(([day, rpe, mins]) => {
+      const d = new Date(Date.UTC(2026, 0, day));
+      return { dateIso: d.toISOString().slice(0, 10), srpe: rpe, durationMin: mins };
+    });
   it('danger/caution режут (последовательный дневник)', () => {
-    const danger = acwrMultFor({ diary: diary([[1, 5, 60], [2, 5, 60], [3, 5, 60], [4, 5, 60], [5, 5, 60], [6, 5, 60], [7, 5, 60], [8, 5, 60], [9, 5, 60], [10, 5, 60], [11, 13.4, 60], [12, 13.4, 60], [13, 13.4, 60], [14, 13.4, 60], [15, 13.4, 60], [16, 13.4, 60], [17, 13.4, 60]]) });
+    const danger = acwrMultFor({
+      diary: diary([
+        [1, 5, 60],
+        [2, 5, 60],
+        [3, 5, 60],
+        [4, 5, 60],
+        [5, 5, 60],
+        [6, 5, 60],
+        [7, 5, 60],
+        [8, 5, 60],
+        [9, 5, 60],
+        [10, 5, 60],
+        [11, 13.4, 60],
+        [12, 13.4, 60],
+        [13, 13.4, 60],
+        [14, 13.4, 60],
+        [15, 13.4, 60],
+        [16, 13.4, 60],
+        [17, 13.4, 60],
+      ]),
+    });
     expect(danger.zone).toBe('danger');
     expect(danger.mult).toBe(0.65);
-    const caution = acwrMultFor({ diary: diary([[1, 5, 60], [2, 5, 60], [3, 5, 60], [4, 5, 60], [5, 5, 60], [6, 5, 60], [7, 5, 60], [8, 5, 60], [9, 5, 60], [10, 5, 60], [11, 10, 60], [12, 10, 60], [13, 10, 60], [14, 10, 60], [15, 10, 60], [16, 10, 60], [17, 10, 60]]) });
+    // 28.11.2026 было→стало: календарные окна (Σ7/7 и Σ28/28). Прежний caution-фикстур
+    // (10 дней ×5 + 7 дней ×10) теперь даёт danger 2.33 — 7 сессий/нед после 10 дней базы
+    // это реальный скачок недельного объёма. Caution держим ровным фоном 21д ×5 → 7д ×7.5.
+    const caution = acwrMultFor({
+      diary: diary([
+        ...Array.from({ length: 21 }, (_, i) => [i + 1, 5, 60] as [number, number, number]),
+        ...Array.from({ length: 7 }, (_, i) => [i + 22, 7.5, 60] as [number, number, number]),
+      ]),
+    });
     expect(caution.zone).toBe('caution');
     expect(caution.mult).toBe(0.85);
   });
+  it('рост частоты 3→7 сессий/нед даёт danger (не прячется за числом дней)', () => {
+    // 28.11.2026 было→стало: деление на distinctDays давало ratio≈1 при том же
+    // недельном объёме на сессию — реальный рост частоты вдвое оставался «ok».
+    const steady = acwrMultFor({
+      diary: diary([1, 3, 5, 8, 10, 12, 15, 17, 19, 22, 24, 26].map((d) => [d, 6, 60] as [number, number, number])),
+    });
+    expect(steady.zone).toBe('ok');
+    expect(steady.ratio!).toBeCloseTo(1, 2);
+    const spike = acwrMultFor({
+      diary: diary(
+        [1, 3, 5, 8, 10, 12, 15, 17, 19, 20, 21, 22, 23, 24, 25, 26].map((d) => [d, 6, 60] as [number, number, number]),
+      ),
+    });
+    expect(spike.zone).toBe('danger');
+    expect(spike.ratio!).toBeGreaterThan(1.5);
+  });
   it('правка задним числом НЕ создаёт ложный danger', () => {
-    const r = acwrMultFor({ diary: [...diary(Array.from({ length: 20 }, (_, i) => [i + 1, 6, 60] as [number, number, number])), [3, 18, 60]] });
+    // 28.11.2026: фикстур добавлял в diary «сырой» массив [3, 18, 60] вместо объекта
+    // записи — acwrMultFor его отбрасывал, и тест проверял не задним числом, а
+    // отсутствие записи (на календарных окнах это давало caution 1.4). Теперь
+    // запись настоящая: Jan 3 sRPE 18 при базе Jan 1–20 по 6 → ratio 1.22 ok.
+    const r = acwrMultFor({
+      diary: [
+        ...diary(Array.from({ length: 20 }, (_, i) => [i + 1, 6, 60] as [number, number, number])),
+        { dateIso: '2026-01-03', srpe: 18, durationMin: 60 },
+      ],
+    });
     expect(r.zone).toBe('ok');
   });
   it('legacy без дат — прежнее поведение (порядок массива)', () => {
-    const legacy = acwrMultFor({ diary: Array.from({ length: 10 }, () => ({ srpe: 5, durationMin: 60 })).concat(Array.from({ length: 7 }, () => ({ srpe: 13.4, durationMin: 60 }))) });
+    const legacy = acwrMultFor({
+      diary: Array.from({ length: 10 }, () => ({ srpe: 5, durationMin: 60 })).concat(
+        Array.from({ length: 7 }, () => ({ srpe: 13.4, durationMin: 60 })),
+      ),
+    });
     expect(legacy.zone).toBe('danger');
   });
   it('билдер: ACWR danger режет MRV', () => {
     const base: any = buildArmPlan({ ...BASE });
-    const mk = (rpe: number, n: number, startDay: number) => Array.from({ length: n }, (_, i) => {
-      const d = new Date(Date.UTC(2026, 1, startDay + i));
-      return { dateIso: d.toISOString().slice(0, 10), srpe: rpe, durationMin: 60 };
-    });
+    const mk = (rpe: number, n: number, startDay: number) =>
+      Array.from({ length: n }, (_, i) => {
+        const d = new Date(Date.UTC(2026, 1, startDay + i));
+        return { dateIso: d.toISOString().slice(0, 10), srpe: rpe, durationMin: 60 };
+      });
     const danger: any = buildArmPlan({ ...BASE, diary: [...mk(5, 10, 1), ...mk(13.4, 7, 11)] });
     expect(danger.mrvByMuscle.brachialis).toBeLessThan(base.mrvByMuscle.brachialis);
     expect(danger.rationale.some((r: string) => r.includes('ACWR'))).toBe(true);
@@ -92,10 +164,22 @@ describe('P1: недельные пороги отчёта (не суммой п
   it('12-нед план с нормой tendon 8/нед НЕ даёт ложной тревоги', () => {
     const p: any = buildArmPlan({ ...BASE, weeks: 12 });
     const rep = buildArmReport(p);
-    const maxTendon = Math.max(...p.weeks.map((wk: any) =>
-      wk.sessions.reduce((a: number, s: any) => a + s.exercises.filter((e: any) => ['wrist_flexors', 'wrist_extensors', 'pronators', 'supinators', 'risers', 'thumb'].includes(e.muscle)).reduce((x: number, e: any) => x + (e.sets || 0), 0), 0)));
+    const maxTendon = Math.max(
+      ...p.weeks.map((wk: any) =>
+        wk.sessions.reduce(
+          (a: number, s: any) =>
+            a +
+            s.exercises
+              .filter((e: any) => ARM_TENDON_MUSCLES.includes(e.muscle))
+              .reduce((x: number, e: any) => x + (e.sets || 0), 0),
+          0,
+        ),
+      ),
+    );
     const rep2 = buildArmReport(p);
-    const falseAlarm = rep2.warnings.some((w) => /Tendon load [0-9]+ сетов/.test(w) && !rep.warnings.some((x) => x === w));
+    const falseAlarm = rep2.warnings.some(
+      (w) => /Tendon load [0-9]+ сетов/.test(w) && !rep.warnings.some((x) => x === w),
+    );
     expect(falseAlarm).toBe(false);
     // warning появляется только при пиковой неделе > 22
     if (maxTendon <= 22) expect(rep.warnings.some((w) => w.startsWith('Tendon load'))).toBe(false);
@@ -106,15 +190,22 @@ describe('P1: сессионный кап — единый источник би
   it('TableTech armwrestling non-enhanced = 7 (PRO F) выживает в финализации', () => {
     let p: any = buildArmPlan({ ...BASE, weeks: 2, patternId: 'arm_2_table_support' });
     p = finalizeArmPlan(p, { level: 'intermediate' });
-    for (const wk of p.weeks) for (const sess of wk.sessions) {
-      const cap = sessionLimitsForArm({ level: 'intermediate', discipline: 'armwrestling', sessionTag: sess.sessionTag }).maxExercises;
-      expect(sess.exercises.length).toBeLessThanOrEqual(cap);
-    }
+    for (const wk of p.weeks)
+      for (const sess of wk.sessions) {
+        const cap = sessionLimitsForArm({
+          level: 'intermediate',
+          discipline: 'armwrestling',
+          sessionTag: sess.sessionTag,
+        }).maxExercises;
+        expect(sess.exercises.length).toBeLessThanOrEqual(cap);
+      }
   });
   it('armlifting natural = 5 упражнений в сессии', () => {
     const caps = ARM_SPLIT_PATTERNS.filter((p) => p.id.startsWith('grip_')).map((p) => p.id);
     expect(caps.length).toBeGreaterThan(0);
-    expect(sessionLimitsForArm({ level: 'intermediate', discipline: 'armlifting', sessionTag: 'SupportGrip' }).maxExercises).toBe(5);
+    expect(
+      sessionLimitsForArm({ level: 'intermediate', discipline: 'armlifting', sessionTag: 'SupportGrip' }).maxExercises,
+    ).toBe(5);
   });
 });
 
@@ -163,12 +254,16 @@ describe('P2: armlift пул/причины — RU-канон и полнота'
   it('PINCH: причина mobility теперь >= 2 записей', () => {
     const src = new SourceFileReader('src/engines/arm/armlift-correction.engine.ts');
     const pinch = src.blockBetween('const PINCH: PoolEntry[] = [', 'const CRUSH: PoolEntry[] = [');
-    const mobility = pinch.split('\n').filter((l) => l.includes('exId:') && l.includes("causes:") && /causes: \[[^\]]*'mobility'/.test(l));
+    const mobility = pinch
+      .split('\n')
+      .filter((l) => l.includes('exId:') && l.includes('causes:') && /causes: \[[^\]]*'mobility'/.test(l));
     expect(mobility.length).toBeGreaterThanOrEqual(2);
   });
   it('все fixes — валидные id точек срыва', () => {
     const src = new SourceFileReader('src/engines/arm/armlift-correction.engine.ts');
-    const fixes = [...src.text.matchAll(/fixes: \[([^\]]*)\]/g)].flatMap((m) => m[1].split(',').map((x) => x.trim().replace(/'/g, '')));
+    const fixes = [...src.text.matchAll(/fixes: \[([^\]]*)\]/g)].flatMap((m) =>
+      m[1].split(',').map((x) => x.trim().replace(/'/g, '')),
+    );
     const valid = new Set(['off_floor', 'mid', 'lockout', 'hold_short', 'hold_long', 'close_fail']);
     for (const f of fixes) expect(valid.has(f)).toBe(true);
   });
@@ -190,8 +285,18 @@ describe('P2: armlift пул/причины — RU-канон и полнота'
 
 describe('P2: отчёт и честность данных', () => {
   it('completeness: CoC 0 (Trainer) НЕ закрывает тест', () => {
-    const zero = diagnosticCompleteness({ implement: 'coc_gripper', failurePoint: 'close_fail', hasMobilityData: true, cocLevel: 0 });
-    const two = diagnosticCompleteness({ implement: 'coc_gripper', failurePoint: 'close_fail', hasMobilityData: true, cocLevel: 2 });
+    const zero = diagnosticCompleteness({
+      implement: 'coc_gripper',
+      failurePoint: 'close_fail',
+      hasMobilityData: true,
+      cocLevel: 0,
+    });
+    const two = diagnosticCompleteness({
+      implement: 'coc_gripper',
+      failurePoint: 'close_fail',
+      hasMobilityData: true,
+      cocLevel: 2,
+    });
     expect(two.pct).toBeGreaterThan(zero.pct);
     expect(zero.missing.some((m) => m.includes('CoC'))).toBe(true);
   });
@@ -212,7 +317,7 @@ describe('P2: отчёт и честность данных', () => {
   });
   it('CSV армлифтинга защищён от формульной инъекции', () => {
     const src = new SourceFileReader('src/engines/arm/armlifting-diagnostics.engine.ts');
-    expect(src.text).toContain("^[=+");
+    expect(src.text).toContain('^[=+');
     expect(src.text).toContain('const safe =');
   });
 });
@@ -297,7 +402,13 @@ describe('P2: perf + цикл-данные (остаток §7 отчёта)', (
     const plan44 = src.text.slice(i, i + 500);
     expect(plan44).toContain("w % 4 === 0 ? 'deload'");
     // сборка цикла совместима: 44 недели, ошибок нет
-    const p: any = buildArmPlan({ ...BASE, weeks: 44, cycleId: 'dobrorezov_44', cycleConsent: true, patternId: 'arm_3_full' });
+    const p: any = buildArmPlan({
+      ...BASE,
+      weeks: 44,
+      cycleId: 'dobrorezov_44',
+      cycleConsent: true,
+      patternId: 'arm_3_full',
+    });
     expect(p.weeks.length).toBe(44);
     expect(p.rationale.some((r: string) => r.includes('dobrorezov') || r.includes('Доброрез'))).toBe(true);
   });
@@ -330,29 +441,83 @@ describe('§8 п.1/п.3: ER:IR risk доезжает до плана и выбо
     expect(b.volumeTargets['shoulder_stab'].targetSets).toBe(a.volumeTargets['shoulder_stab'].targetSets);
   });
   it('селектор: shoulderRisk дает бонус сплиту с shoulder_stab', () => {
-    const ranked = rankArmSplits({ level: 'intermediate', goal: 'strength', technique: 'balanced', discipline: 'armwrestling', daysPerWeek: 3, shoulderRisk: true } as any);
+    const ranked = rankArmSplits({
+      level: 'intermediate',
+      goal: 'strength',
+      technique: 'balanced',
+      discipline: 'armwrestling',
+      daysPerWeek: 3,
+      shoulderRisk: true,
+    } as any);
     const withShoulder = ranked.find((r) => r.rationale.some((x) => x.includes('shoulder_stab')));
     expect(withShoulder).toBeTruthy();
-    const plain = rankArmSplits({ level: 'intermediate', goal: 'strength', technique: 'balanced', discipline: 'armwrestling', daysPerWeek: 3 } as any);
+    const plain = rankArmSplits({
+      level: 'intermediate',
+      goal: 'strength',
+      technique: 'balanced',
+      discipline: 'armwrestling',
+      daysPerWeek: 3,
+    } as any);
     const scoreWith = withShoulder!.score;
     const same = plain.find((r) => r.pattern.id === withShoulder!.pattern.id)!;
     expect(scoreWith).toBeGreaterThan(same.score);
   });
   it('мост: armShoulderRisk уезжает только при risk (пустой ключ без флага)', () => {
     const base: any = buildArmBridgeData({
-      groups: ['cup'], technique: 'balanced', weakPoints: ['cup'],
-      biomechCards: [], corrections: [], scoring: null, diag: {}, angles: {}, force: null,
-      vbt: null, dynamic: null, bench: null, tendon: 8, findings: [], humerus: [], balance: [],
-      asymmetry: null, info: [], weakCauses: {}, topByPoint: {}, spec: null,
-      mobilityFails: [], acwrDanger: [], bilateral: null, attempts: [],
+      groups: ['cup'],
+      technique: 'balanced',
+      weakPoints: ['cup'],
+      biomechCards: [],
+      corrections: [],
+      scoring: null,
+      diag: {},
+      angles: {},
+      force: null,
+      vbt: null,
+      dynamic: null,
+      bench: null,
+      tendon: 8,
+      findings: [],
+      humerus: [],
+      balance: [],
+      asymmetry: null,
+      info: [],
+      weakCauses: {},
+      topByPoint: {},
+      spec: null,
+      mobilityFails: [],
+      acwrDanger: [],
+      bilateral: null,
+      attempts: [],
     });
     expect(base.armShoulderRisk).toBeUndefined();
     const risk: any = buildArmBridgeData({
-      groups: ['cup'], technique: 'balanced', weakPoints: ['cup'],
-      biomechCards: [], corrections: [], scoring: null, diag: {}, angles: {}, force: null,
-      vbt: null, dynamic: null, bench: null, tendon: 8, findings: [], humerus: [], balance: [],
-      asymmetry: null, info: [], weakCauses: {}, topByPoint: {}, spec: null,
-      mobilityFails: [], acwrDanger: [], bilateral: null, attempts: [], shoulderRisk: true,
+      groups: ['cup'],
+      technique: 'balanced',
+      weakPoints: ['cup'],
+      biomechCards: [],
+      corrections: [],
+      scoring: null,
+      diag: {},
+      angles: {},
+      force: null,
+      vbt: null,
+      dynamic: null,
+      bench: null,
+      tendon: 8,
+      findings: [],
+      humerus: [],
+      balance: [],
+      asymmetry: null,
+      info: [],
+      weakCauses: {},
+      topByPoint: {},
+      spec: null,
+      mobilityFails: [],
+      acwrDanger: [],
+      bilateral: null,
+      attempts: [],
+      shoulderRisk: true,
     });
     expect(risk.armShoulderRisk).toBe(true);
   });
@@ -383,20 +548,35 @@ describe('§8 п.2: ёмкость дня сплита по уровню', () =>
   });
   it('ранжирование: перебор дня при уровне = предупреждение и штраф', () => {
     const table = ARM_SPLIT_PATTERNS.find((p) => p.schedule.some((d) => d.sessionTag === 'TableTech'))!;
-    const row = rankArmSplits({ level: 'beginner', goal: 'strength', technique: 'balanced', discipline: 'armwrestling', daysPerWeek: 3 } as any)
-      .find((r) => r.pattern.id === table.id)!;
+    const row = rankArmSplits({
+      level: 'beginner',
+      goal: 'strength',
+      technique: 'balanced',
+      discipline: 'armwrestling',
+      daysPerWeek: 3,
+    } as any).find((r) => r.pattern.id === table.id)!;
     expect(row.maxSessionMuscles).toBe(7);
     expect(row.levelCapacity).toBe(5);
     expect(row.warnings.some((w) => /мышц/.test(w) && /ёмкост/.test(w))).toBe(true);
     // на enhanced ёмкость 9 — предупреждения ёмкости у того же сплита нет
-    const enh = rankArmSplits({ level: 'enhanced', goal: 'strength', technique: 'balanced', discipline: 'armwrestling', daysPerWeek: 3 } as any)
-      .find((r) => r.pattern.id === table.id)!;
+    const enh = rankArmSplits({
+      level: 'enhanced',
+      goal: 'strength',
+      technique: 'balanced',
+      discipline: 'armwrestling',
+      daysPerWeek: 3,
+    } as any).find((r) => r.pattern.id === table.id)!;
     expect(enh.warnings.some((w) => /ёмкост/.test(w))).toBe(false);
   });
   it('ранжирование: бонус сплиту с запасом ёмкости', () => {
     const sparse = ARM_SPLIT_PATTERNS.find((p) => p.schedule.some((d) => d.sessionTag === 'SupportGrip'))!;
-    const row = rankArmSplits({ level: 'intermediate', goal: 'strength', technique: 'balanced', discipline: 'armwrestling', daysPerWeek: 3 } as any)
-      .find((r) => r.pattern.id === sparse.id)!;
+    const row = rankArmSplits({
+      level: 'intermediate',
+      goal: 'strength',
+      technique: 'balanced',
+      discipline: 'armwrestling',
+      daysPerWeek: 3,
+    } as any).find((r) => r.pattern.id === sparse.id)!;
     expect(row.rationale.some((x) => /запасом/.test(x))).toBe(true);
   });
 });
@@ -423,7 +603,9 @@ describe('UI-конструктор (source-guard)', () => {
   });
   it('стартовый вес плоской пирамиды — отдельное поле (не результат лестницы)', () => {
     expect(ui.text).toContain('cycFlatW');
-    expect(ui.text).not.toContain('parseFloat(topLadderVal) > 0 ? parseFloat(topLadderVal) : undefined,\n        bloodflow');
+    expect(ui.text).not.toContain(
+      'parseFloat(topLadderVal) > 0 ? parseFloat(topLadderVal) : undefined,\n        bloodflow',
+    );
   });
   it('план↔факт считается по правленому плану (viewPlan)', () => {
     expect(ui.text).toMatch(/armFactFeedback\(viewPlan/);
@@ -498,15 +680,21 @@ describe('движки: UTC-даты убраны (канон core/local-date)',
   }
 });
 
-
 describe('раунд «менее изученных»: годовой макро, тейпер, импорт результатов, отчёт сплита', () => {
   it('buildArmMacrocycle: сумма недель блоков === totalWeeks (12 нед + приоритет A)', () => {
     for (const total of [4, 5, 8, 12, 16, 24, 52]) {
-      const m = buildArmMacrocycle({ totalWeeks: total, goal: 'strength', competitions: [{ week: 2, id: 'waf', priority: 'A' }] });
+      const m = buildArmMacrocycle({
+        totalWeeks: total,
+        goal: 'strength',
+        competitions: [{ week: 2, id: 'waf', priority: 'A' }],
+      });
       const sum = m.blocks.reduce((a, b) => a + b.weeks, 0);
       expect(sum, `totalWeeks=${total}`).toBe(m.totalWeeks);
       let off = 0;
-      for (const b of m.blocks) { expect(b.weekOffset).toBe(off); off += b.weeks; }
+      for (const b of m.blocks) {
+        expect(b.weekOffset).toBe(off);
+        off += b.weeks;
+      }
     }
   });
   it('buildArmMacrocycle: цель hypertrophy тоже даёт бюджет без раздувания', () => {
@@ -526,13 +714,33 @@ describe('раунд «менее изученных»: годовой макр�
     expect(c[2].volumePct).toBe(0.7);
   });
   it('applyArmTaperToWeeks: side-давление однократно от базы (подпись кривой не врёт)', () => {
-    const weeks: any[] = [{ week: 1, sessions: [{ exercises: [{ muscle: 'side_pressure', sets: 4, rir: 2, workSets: [{ rir: 2 }, { rir: 2 }, { rir: 2 }, { rir: 2 }] }] }] }];
+    const weeks: any[] = [
+      {
+        week: 1,
+        sessions: [
+          {
+            exercises: [
+              { muscle: 'side_pressure', sets: 4, rir: 2, workSets: [{ rir: 2 }, { rir: 2 }, { rir: 2 }, { rir: 2 }] },
+            ],
+          },
+        ],
+      },
+    ];
     applyArmTaperToWeeks(weeks, buildArmTaperCurve({ taperWeeks: 1 }));
     expect(weeks[0].sessions[0].exercises[0].sets).toBe(1);
   });
   it('applyArmTaperToWeeks: «Тейпер-1: 65% объёма, RIR+1, side −50%» — side ровно −50%', () => {
     const weeks: any[] = [
-      { week: 1, sessions: [{ exercises: [{ muscle: 'side_pressure', sets: 4, rir: 2, workSets: [{ rir: 2 }, { rir: 2 }, { rir: 2 }, { rir: 2 }] }] }] },
+      {
+        week: 1,
+        sessions: [
+          {
+            exercises: [
+              { muscle: 'side_pressure', sets: 4, rir: 2, workSets: [{ rir: 2 }, { rir: 2 }, { rir: 2 }, { rir: 2 }] },
+            ],
+          },
+        ],
+      },
       { week: 2, sessions: [{ exercises: [] }] },
     ];
     applyArmTaperToWeeks(weeks, buildArmTaperCurve({ taperWeeks: 2 }));
@@ -550,10 +758,32 @@ describe('раунд «менее изученных»: годовой макр�
   it('armSplitReport: частота и ёмкость отдельными строками (не только скоринг)', () => {
     const ranked = rankArmSplits({ level: 'intermediate', goal: 'strength', daysPerWeek: 4 });
     const rep = armSplitReport(ranked[0], 'intermediate');
-    expect(rep.lines.some(l => l.startsWith('Частота:'))).toBe(true);
-    expect(rep.lines.some(l => l.startsWith('Ёмкость дня:'))).toBe(true);
+    expect(rep.lines.some((l) => l.startsWith('Частота:'))).toBe(true);
+    expect(rep.lines.some((l) => l.startsWith('Ёмкость дня:'))).toBe(true);
     expect(rep.capacity.levelCapacity).toBe(levelSessionCapacity('intermediate'));
     expect(rep.capacity.maxSessionMuscles).toBe(splitMaxSessionMuscles(ranked[0].pattern));
+  });
+  it('armSplitReport: частота по каноническим мышцам (не мёртвые rising/pronation/cup)', () => {
+    // 28.11.2026 было→стало: REPORT_MUSCLES держал ключи вне TAG_MUSCLES_ARM, и строка
+    // частоты оставляла только side_pressure/wrist_flexors. Теперь канон ARM_MUSCLES.
+    const heavy: any = {
+      id: 'test_table_heavy',
+      name: 'Тест: стол тяж',
+      rotationDays: 7,
+      sessionsPerRotation: 1,
+      schedule: [{ kind: 'тренировка', character: 'тяж', sessionTag: 'TableHeavy' }],
+      level: ['intermediate'],
+      description: '',
+      direction: 'both',
+    };
+    const rep = armSplitReport({ pattern: heavy, score: 0, rationale: [], warnings: [] }, 'intermediate');
+    expect(rep.freq.wrist_flexors).toBeGreaterThan(0);
+    expect(rep.freq.pronators).toBeGreaterThan(0);
+    expect(rep.freq.brachialis).toBeGreaterThan(0);
+    const line = rep.lines.find((l) => l.startsWith('Частота:'))!;
+    expect(line).toContain('wrist_flexors');
+    expect(line).toContain('pronators');
+    expect(line).toContain('brachialis');
   });
   it('arm-report: предупреждение пикового перебора печатается без литерала «Н{пик}»', () => {
     const plan = buildArmPlan({ totalWeeks: 4, daysPerWeek: 4, level: 'enhanced' });
@@ -570,7 +800,10 @@ describe('раунд «менее изученных»: годовой макр�
       for (const name of readdirSync(dir)) {
         const p = path.join(dir, name);
         const st = statSync(p);
-        if (st.isDirectory()) { walk(p); continue; }
+        if (st.isDirectory()) {
+          walk(p);
+          continue;
+        }
         if (!/\.(ts|tsx)$/.test(name) || /\.test\.(ts|tsx)$/.test(name)) continue;
         if (/[\\/]__tests__[\\/]/.test(p)) continue;
         const isArm = p.includes('engines') || /arm-|Arm/.test(name);

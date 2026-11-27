@@ -6,20 +6,21 @@ import { ARM_EXERCISES, validateArmCatalog } from '../../../core/exercise-catalo
 import { buildArmPlanCsv, buildArmIcs, buildArmPrintHtml } from '../arm-export.engine';
 import { armIndirectOverflowWarnings } from '../arm-finalize.engine';
 
-/** Вес первого сета упражнения мышцы в неделе (0 если нет). */
+/** Вес первого сета упражнения мышцы в неделе (0 если нет). Приоритет — primary
+ *  (после MEV-floor у мышцы может быть второе, добивочное упражнение). */
 function weightOf(plan: any, week: number, muscle: string): number {
   const wk = plan.weeks.find((w: any) => w.week === week);
-  for (const s of wk?.sessions || []) for (const e of s.exercises || []) {
-    if (e.muscle === muscle && e.workSets?.[0]) return Number(e.workSets[0].weight) || 0;
-  }
-  return 0;
+  const all: any[] = [];
+  for (const s of wk?.sessions || []) for (const e of s.exercises || []) if (e.muscle === muscle) all.push(e);
+  const pick = all.find((e) => e.role === 'primary' && e.workSets?.[0]) || all.find((e) => e.workSets?.[0]);
+  return pick ? Number(pick.workSets[0].weight) || 0 : 0;
 }
 function repsRangeOf(plan: any, week: number, muscle: string): [number, number] | null {
   const wk = plan.weeks.find((w: any) => w.week === week);
-  for (const s of wk?.sessions || []) for (const e of s.exercises || []) {
-    if (e.muscle === muscle) return [e.repsRange[0], e.repsRange[1]];
-  }
-  return null;
+  const all: any[] = [];
+  for (const s of wk?.sessions || []) for (const e of s.exercises || []) if (e.muscle === muscle) all.push(e);
+  const pick = all.find((e) => e.role === 'primary') || all[0];
+  return pick ? [pick.repsRange[0], pick.repsRange[1]] : null;
 }
 function totalSets(plan: any, week: number): number {
   const wk = plan.weeks.find((w: any) => w.week === week);
@@ -29,32 +30,52 @@ function totalSets(plan: any, week: number): number {
 }
 function allIds(plan: any): string[] {
   const out: string[] = [];
-  for (const w of plan.weeks || []) for (const s of w.sessions || []) for (const e of s.exercises || []) if (e.exerciseId) out.push(e.exerciseId);
+  for (const w of plan.weeks || [])
+    for (const s of w.sessions || []) for (const e of s.exercises || []) if (e.exerciseId) out.push(e.exerciseId);
   return out;
 }
 function topWeightOf(plan: any, muscle: string): number {
   let m = 0;
-  for (const w of plan.weeks || []) for (const s of w.sessions || []) for (const e of s.exercises || []) {
-    if (e.muscle === muscle) for (const ws of e.workSets || []) m = Math.max(m, Number(ws.weight) || 0);
-  }
+  for (const w of plan.weeks || [])
+    for (const s of w.sessions || [])
+      for (const e of s.exercises || []) {
+        if (e.muscle === muscle) for (const ws of e.workSets || []) m = Math.max(m, Number(ws.weight) || 0);
+      }
   return m;
 }
 function exNameOf(plan: any, muscle: string): string {
-  for (const w of plan.weeks || []) for (const s of w.sessions || []) for (const e of s.exercises || []) if (e.muscle === muscle) return String(e.name);
+  for (const w of plan.weeks || [])
+    for (const s of w.sessions || []) for (const e of s.exercises || []) if (e.muscle === muscle) return String(e.name);
   return '';
 }
 const todayIso = new Date().toISOString().slice(0, 10);
 const isoInWeeks = (n: number) => new Date(Date.now() + n * 7 * 86400000).toISOString().slice(0, 10);
 const BASE = {
-  discipline: 'armwrestling', patternId: 'arm_3_full', level: 'intermediate', goal: 'strength', technique: 'toproll',
-  weeks: 8, workMax: { wrist_flexors: 100, pronators: 80, brachialis: 80, back_pressure: 80, grip_support: 80, core_anchor: 80, default: 50 },
+  discipline: 'armwrestling',
+  patternId: 'arm_3_full',
+  level: 'intermediate',
+  goal: 'strength',
+  technique: 'toproll',
+  weeks: 8,
+  workMax: {
+    wrist_flexors: 100,
+    pronators: 80,
+    brachialis: 80,
+    back_pressure: 80,
+    grip_support: 80,
+    core_anchor: 80,
+    default: 50,
+  },
 } as any;
 
 describe('arm-planner PRO: мезо-блоки и прогрессия цикла', () => {
-  it('без цикла/ставки — backward-compatible: множитель 1.0, без строки прогрессии', () => {
+  it('без цикла/ставки — авто-дефолт +0.5%/нед (было: множитель ровно 1.0)', () => {
     const plan = finalizeArmPlan(buildArmPlan({ ...BASE }), { level: 'intermediate' });
-    expect(weightOf(plan, 5, 'wrist_flexors')).toBe(weightOf(plan, 1, 'wrist_flexors'));
-    expect(plan.rationale.some((l: string) => /Прогрессия весов/.test(l))).toBe(false);
+    // 26.10.2026 было→стало: план без cycleId и без ставки не прогрессировал вовсе
+    // (множитель 1.0 все недели), хотя ArmBuilderInput.correctionPct объявляет
+    // «СРЦ-дефолт 0.5». Теперь auto = +0.5%/нед, строка помечена «авто-дефолт».
+    expect(weightOf(plan, 5, 'wrist_flexors')).toBeGreaterThan(weightOf(plan, 1, 'wrist_flexors'));
+    expect(plan.rationale.some((l: string) => /авто-дефолт/.test(l))).toBe(true);
     expect(plan.progressionStyle).toBe('auto');
     expect((plan.blocks || []).length).toBeGreaterThan(0);
     expect(String(plan.weeks[0].block || '')).toContain('База');
@@ -65,12 +86,16 @@ describe('arm-planner PRO: мезо-блоки и прогрессия цикл�
     expect(weightOf(plan, 5, 'wrist_flexors')).toBeGreaterThan(weightOf(plan, 1, 'wrist_flexors'));
   });
   it('явная ставка cyclePctPerWeek приоритетнее дефолта цикла', () => {
-    const plan = finalizeArmPlan(buildArmPlan({ ...BASE, cycleId: 'strengthlog_8', cyclePctPerWeek: 2 } as any), { level: 'intermediate' });
+    const plan = finalizeArmPlan(buildArmPlan({ ...BASE, cycleId: 'strengthlog_8', cyclePctPerWeek: 2 } as any), {
+      level: 'intermediate',
+    });
     expect(plan.rationale.some((l: string) => /\+2%/.test(l))).toBe(true);
     expect(plan.rationale.some((l: string) => /дефолт цикла/.test(l))).toBe(false);
   });
   it('double: повторы растут внутри блока, вес между блоками', () => {
-    const plan = finalizeArmPlan(buildArmPlan({ ...BASE, progressionStyle: 'double', weeks: 8 } as any), { level: 'intermediate' });
+    const plan = finalizeArmPlan(buildArmPlan({ ...BASE, progressionStyle: 'double', weeks: 8 } as any), {
+      level: 'intermediate',
+    });
     const w1 = repsRangeOf(plan, 1, 'wrist_flexors')!;
     const w3 = repsRangeOf(plan, 3, 'wrist_flexors')!;
     expect(w3[0]).toBe(w1[0] + 2);
@@ -89,7 +114,12 @@ describe('arm-planner PRO: мезо-блоки и прогрессия цикл�
 describe('arm-planner PRO: мульти-старты внутри плана', () => {
   it('A-старт Н6: тейпер-окно 4-6, восстановление Н7, маркеры недель', () => {
     const plan = finalizeArmPlan(
-      buildArmPlan({ ...BASE, weeks: 10, patternId: 'arm_4_upper_lower', peaks: [{ week: 6, priority: 'A', name: 'Финал' }] } as any),
+      buildArmPlan({
+        ...BASE,
+        weeks: 10,
+        patternId: 'arm_4_upper_lower',
+        peaks: [{ week: 6, priority: 'A', name: 'Финал' }],
+      } as any),
       { level: 'intermediate' },
     );
     expect(plan.weeks[5].peak).toMatchObject({ priority: 'A', name: 'Финал' });
@@ -102,10 +132,9 @@ describe('arm-planner PRO: мульти-старты внутри плана', (
     expect(plan.rationale.some((l: string) => /🏁 Старт \(A\)/.test(l))).toBe(true);
   });
   it('C-старт: шарпенинг без перевода фазы в peaking (не режет до 45%)', () => {
-    const plan = finalizeArmPlan(
-      buildArmPlan({ ...BASE, weeks: 8, peaks: [{ week: 6, priority: 'C' }] } as any),
-      { level: 'intermediate' },
-    );
+    const plan = finalizeArmPlan(buildArmPlan({ ...BASE, weeks: 8, peaks: [{ week: 6, priority: 'C' }] } as any), {
+      level: 'intermediate',
+    });
     expect(plan.weeks[5].peak?.priority).toBe('C');
     expect(plan.weeks[5].phase).not.toBe('peaking');
     expect(totalSets(plan, 6)).toBeGreaterThan(0);
@@ -138,7 +167,10 @@ describe('arm-planner PRO: база-якорь', () => {
     expect(anchor!.exercises.map((e: any) => e.name)).toContain('Присед со штангой (якорь)');
     expect(anchor!.exercises.every((e: any) => (e.workSets || []).length === e.sets)).toBe(true);
     const w4 = plan.weeks.find((w: any) => w.week === 4)!;
-    expect(w4.sessions.some((s: any) => s.sessionTag === 'LegsCore'), 'делод без якоря').toBe(false);
+    expect(
+      w4.sessions.some((s: any) => s.sessionTag === 'LegsCore'),
+      'делод без якоря',
+    ).toBe(false);
     expect(plan.rationale.some((l: string) => /База-якорь/.test(l))).toBe(true);
     // якорь не должен ловить ложный «чужеродный пул» (sg выставлен носителям)
     expect((plan.safetyWarnings || []).join(' ')).not.toContain('вне своей группы');
@@ -151,7 +183,9 @@ describe('arm-planner PRO: база-якорь', () => {
 describe('arm-planner PRO: P0 — факт дневника, разминка, авто-пик, блоки', () => {
   it('разминка-рампа у всех тяжёлых упражнений с весом (ступени возрастают)', () => {
     const plan = finalizeArmPlan(buildArmPlan({ ...BASE }), { level: 'intermediate' });
-    const heavy = plan.weeks.flatMap((w: any) => w.sessions).flatMap((s: any) => s.exercises)
+    const heavy = plan.weeks
+      .flatMap((w: any) => w.sessions)
+      .flatMap((s: any) => s.exercises)
       .filter((e: any) => e.character === 'тяж' && (e.workSets?.[0]?.weight || 0) > 0);
     expect(heavy.length).toBeGreaterThan(0);
     for (const e of heavy) {
@@ -162,13 +196,21 @@ describe('arm-planner PRO: P0 — факт дневника, разминка, �
   });
   it('план ↔ факт: stalled → −2% с нотами/варнингом, beat → ставка', () => {
     const prev = finalizeArmPlan(buildArmPlan({ ...BASE }), { level: 'intermediate' });
-    const sessions = [{
-      date: todayIso,
-      exercises: [
-        { exerciseName: exNameOf(prev, 'pronators'), sets: [{ weightKg: topWeightOf(prev, 'pronators') * 0.8, reps: 8 }] },
-        { exerciseName: exNameOf(prev, 'wrist_flexors'), sets: [{ weightKg: topWeightOf(prev, 'wrist_flexors') * 1.1, reps: 8 }] },
-      ],
-    }];
+    const sessions = [
+      {
+        date: todayIso,
+        exercises: [
+          {
+            exerciseName: exNameOf(prev, 'pronators'),
+            sets: [{ weightKg: topWeightOf(prev, 'pronators') * 0.8, reps: 8 }],
+          },
+          {
+            exerciseName: exNameOf(prev, 'wrist_flexors'),
+            sets: [{ weightKg: topWeightOf(prev, 'wrist_flexors') * 1.1, reps: 8 }],
+          },
+        ],
+      },
+    ];
     const plan = buildArmPlan({ ...BASE, previousPlan: prev, diarySessions: sessions } as any);
     expect(plan.rationale.some((l: string) => /План vs факт/.test(l))).toBe(true);
     expect(plan.rationale.some((l: string) => /Плато по факту/.test(l))).toBe(true);
@@ -181,7 +223,10 @@ describe('arm-planner PRO: P0 — факт дневника, разминка, �
     expect(plan.rationale.some((l: string) => /План vs факт/.test(l))).toBe(false);
   });
   it('авто-пик из даты старта: пик на неделе 10−5, A по календарю', () => {
-    const plan = finalizeArmPlan(buildArmPlan({ ...BASE, weeks: 10, competitionDateIso: isoInWeeks(5), calPriority: 'A' } as any), { level: 'intermediate' });
+    const plan = finalizeArmPlan(
+      buildArmPlan({ ...BASE, weeks: 10, competitionDateIso: isoInWeeks(5), calPriority: 'A' } as any),
+      { level: 'intermediate' },
+    );
     expect(plan.peakWindows?.length).toBe(1);
     expect(plan.peakWindows![0].week).toBe(5);
     expect(plan.peakWindows![0].priority).toBe('A');
@@ -192,7 +237,12 @@ describe('arm-planner PRO: P0 — факт дневника, разминка, �
     expect(plan.peakWindows?.[0]?.week).toBe(5);
   });
   it('авто-пик: якорь planStartWeek — неделя считается от начала плана', () => {
-    const plan = buildArmPlan({ ...BASE, weeks: 8, planStartWeek: isoInWeeks(2), competitionDateIso: isoInWeeks(7) } as any);
+    const plan = buildArmPlan({
+      ...BASE,
+      weeks: 8,
+      planStartWeek: isoInWeeks(2),
+      competitionDateIso: isoInWeeks(7),
+    } as any);
     expect(plan.peakWindows?.[0]?.week).toBe(5); // 7 − 2 = 5 недель от старта плана
     expect(plan.rationale.some((l: string) => /от начала плана/.test(l))).toBe(true);
   });
@@ -224,14 +274,23 @@ describe('arm-planner PRO: P0 — факт дневника, разминка, �
   it('P1-7: локальная перегрузка дневника режет объём мышцы первые 2 недели', () => {
     const day = (offset: number, sets: number) => ({
       date: new Date(Date.now() - offset * 86400000).toISOString().slice(0, 10),
-      exercises: [{ exerciseName: 'Пронация на блоке (90)', muscle: 'pronators', sets: Array.from({ length: sets }, () => ({ weightKg: 30, reps: 8 })) }],
+      exercises: [
+        {
+          exerciseName: 'Пронация на блоке (90)',
+          muscle: 'pronators',
+          sets: Array.from({ length: sets }, () => ({ weightKg: 30, reps: 8 })),
+        },
+      ],
     });
     const diary = [day(0, 12), day(8, 3), day(15, 3), day(22, 3)];
     const base = buildArmPlan({ ...BASE } as any);
     const hot = buildArmPlan({ ...BASE, diarySessions: diary } as any);
     const w1Sets = (plan: any) => {
       const wk = plan.weeks.find((w: any) => w.week === 1);
-      return wk.sessions.flatMap((s: any) => s.exercises).filter((e: any) => e.muscle === 'pronators').reduce((a: number, e: any) => a + e.sets, 0);
+      return wk.sessions
+        .flatMap((s: any) => s.exercises)
+        .filter((e: any) => e.muscle === 'pronators')
+        .reduce((a: number, e: any) => a + e.sets, 0);
     };
     expect(w1Sets(hot)).toBeLessThan(w1Sets(base));
     expect(hot.rationale.some((l: string) => /Локальная перегрузка дневника/.test(l))).toBe(true);
@@ -239,15 +298,25 @@ describe('arm-planner PRO: P0 — факт дневника, разминка, �
   it('P1-9: drop-set только при opt-in (гипертрофия, памп-изоляция)', () => {
     const off = buildArmPlan({ ...BASE, goal: 'hypertrophy', weeks: 4 } as any);
     const on = buildArmPlan({ ...BASE, goal: 'hypertrophy', weeks: 4, intensityTechniques: true } as any);
-    const dropCount = (plan: any) => plan.weeks.flatMap((w: any) => w.sessions).flatMap((s: any) => s.exercises)
-      .filter((e: any) => String(e.comment || '').includes('drop-set')).length;
+    const dropCount = (plan: any) =>
+      plan.weeks
+        .flatMap((w: any) => w.sessions)
+        .flatMap((s: any) => s.exercises)
+        .filter((e: any) => String(e.comment || '').includes('drop-set')).length;
     expect(dropCount(off)).toBe(0);
     expect(dropCount(on)).toBeGreaterThan(0);
-    for (const w of on.weeks) for (const s of w.sessions) for (const e of s.exercises) expect(e.sets).toBe(e.workSets.length);
+    for (const w of on.weeks)
+      for (const s of w.sessions) for (const e of s.exercises) expect(e.sets).toBe(e.workSets.length);
   });
   it('P1-6: косвенный/эффективный объём в MRV-контроле (warning, не срез)', () => {
     const plan: any = {
-      weeks: [{ week: 1, phase: 'accumulation', sessions: [{ exercises: [{ muscle: 'wrist_flexors', name: 'X', sets: 13, movementPattern: 'cupping' }] }] }],
+      weeks: [
+        {
+          week: 1,
+          phase: 'accumulation',
+          sessions: [{ exercises: [{ muscle: 'wrist_flexors', name: 'X', sets: 13, movementPattern: 'cupping' }] }],
+        },
+      ],
       mrvByMuscle: { wrist_flexors: 10 },
     };
     const warn = armIndirectOverflowWarnings(plan, 'intermediate');
@@ -257,13 +326,21 @@ describe('arm-planner PRO: P0 — факт дневника, разминка, �
     expect(armIndirectOverflowWarnings(plan, 'intermediate')).toEqual([]);
   });
   it('P2-12: ICS несёт блок и маркер старта', () => {
-    const plan = finalizeArmPlan(buildArmPlan({ ...BASE, weeks: 8, peaks: [{ week: 6, priority: 'A' }] } as any), { level: 'intermediate' });
+    const plan = finalizeArmPlan(buildArmPlan({ ...BASE, weeks: 8, peaks: [{ week: 6, priority: 'A' }] } as any), {
+      level: 'intermediate',
+    });
     const ics = buildArmIcs(plan, '2026-10-01');
     expect(ics).toContain('🏁 старт A');
     expect(ics).toMatch(/· База/);
   });
   it('P1-10: боль в чек-инах ≥4 две недели → первая неделя разгрузочная', () => {
-    const ci = (week: number, dateIso: string, pain: number) => ({ id: `c${week}`, week, dateIso, elbowPain010: pain, weightKg: 80 });
+    const ci = (week: number, dateIso: string, pain: number) => ({
+      id: `c${week}`,
+      week,
+      dateIso,
+      elbowPain010: pain,
+      weightKg: 80,
+    });
     const plan = buildArmPlan({ ...BASE, checkins: [ci(1, '2026-09-01', 5), ci(2, '2026-09-08', 4)] } as any);
     expect(plan.weeks[0].phase).toBe('deload');
     expect(plan.rationale.some((l: string) => /Чек-ин недели/.test(l))).toBe(true);
@@ -271,16 +348,28 @@ describe('arm-planner PRO: P0 — факт дневника, разминка, �
   });
   it('P1-10: тренд веса быстрее цели → честная строка (план не переписывается)', () => {
     const ci = (week: number, dateIso: string, weightKg: number) => ({ id: `c${week}`, week, dateIso, weightKg });
-    const plan = buildArmPlan({ ...BASE, targetWeightKg: 74, checkins: [ci(1, '2026-09-01', 80), ci(2, '2026-09-08', 78.5)] } as any);
+    const plan = buildArmPlan({
+      ...BASE,
+      targetWeightKg: 74,
+      checkins: [ci(1, '2026-09-01', 80), ci(2, '2026-09-08', 78.5)],
+    } as any);
     expect(plan.rationale.some((l: string) => /быстрее/.test(l))).toBe(true);
     expect(plan.weeks[0].phase).not.toBe('deload'); // боль нет — разгрузки нет
   });
   it('P2: снаряд платформы приоритетен в пулах хвата (gripImplement)', () => {
-    const common = { ...BASE, discipline: 'armlifting', patternId: 'grip_3_support', level: 'intermediate', technique: 'balanced', gripFocus: 'pinch' } as any;
+    const common = {
+      ...BASE,
+      discipline: 'armlifting',
+      patternId: 'grip_3_support',
+      level: 'intermediate',
+      technique: 'balanced',
+      gripFocus: 'pinch',
+    } as any;
     const withBias = buildArmPlan({ ...common, gripImplement: 'hub' } as any);
     const noBias = buildArmPlan({ ...common } as any);
     const pinchId = (p: any) => {
-      for (const w of p.weeks) for (const s of w.sessions) for (const e of s.exercises) if (e.muscle === 'grip_pinch') return e.exerciseId;
+      for (const w of p.weeks)
+        for (const s of w.sessions) for (const e of s.exercises) if (e.muscle === 'grip_pinch') return e.exerciseId;
       return null;
     };
     expect(['hub_pinch', 'anvil_hub', 'little_big_horn']).toContain(pinchId(withBias));
@@ -288,7 +377,12 @@ describe('arm-planner PRO: P0 — факт дневника, разминка, �
     expect(withBias.rationale.some((l: string) => /Снаряд платформы/.test(l))).toBe(true);
   });
   it('P2-14: сгонка — строка + недельные весовые цели (объём не меняется)', () => {
-    const plan = buildArmPlan({ ...BASE, competitionDateIso: isoInWeeks(6), bodyWeightKg: 80, targetWeightKg: 74 } as any);
+    const plan = buildArmPlan({
+      ...BASE,
+      competitionDateIso: isoInWeeks(6),
+      bodyWeightKg: 80,
+      targetWeightKg: 74,
+    } as any);
     expect(plan.rationale.some((l: string) => /Сгонка к старту/.test(l))).toBe(true);
     expect(String(plan.weeks[0].note || '')).toContain('вес ≤');
     expect(String(plan.weeks[5].note || '')).toContain('вес ≤ 74');
@@ -300,19 +394,33 @@ describe('arm-planner PRO: P0 — факт дневника, разминка, �
     expect(html).toContain('12 точек');
   });
   it('блоки специализации: два блока по неделям + донорское перераспределение', () => {
-    const plan = finalizeArmPlan(buildArmPlan({
-      ...BASE, weeks: 8, specialization: true, weakPoints: ['pronators', 'risers'],
-      specializationSchedule: [
-        { id: 'b1', weekStart: 1, weekEnd: 4, targets: ['pronators'], tradeoff: { mode: 'reduce_direct_to_floor', donorMuscles: ['wrist_flexors'] } },
-        { id: 'b2', weekStart: 5, weekEnd: 8, targets: ['risers'] },
-      ],
-    } as any), { level: 'intermediate' });
+    const plan = finalizeArmPlan(
+      buildArmPlan({
+        ...BASE,
+        weeks: 8,
+        specialization: true,
+        weakPoints: ['pronators', 'risers'],
+        specializationSchedule: [
+          {
+            id: 'b1',
+            weekStart: 1,
+            weekEnd: 4,
+            targets: ['pronators'],
+            tradeoff: { mode: 'reduce_direct_to_floor', donorMuscles: ['wrist_flexors'] },
+          },
+          { id: 'b2', weekStart: 5, weekEnd: 8, targets: ['risers'] },
+        ],
+      } as any),
+      { level: 'intermediate' },
+    );
     expect(String(plan.specializationSchedule?.rationale || '')).toContain('нед 1-4: [pronators]');
     expect(String(plan.specializationSchedule?.rationale || '')).toContain('нед 5-8: [risers]');
     expect(plan.rationale.some((l: string) => /Донорское перераспределение/.test(l))).toBe(true);
-    for (const w of plan.weeks) for (const s of w.sessions) for (const e of s.exercises) {
-      expect(e.sets, `${e.name}: sets=workSets`).toBe(e.workSets.length);
-    }
+    for (const w of plan.weeks)
+      for (const s of w.sessions)
+        for (const e of s.exercises) {
+          expect(e.sets, `${e.name}: sets=workSets`).toBe(e.workSets.length);
+        }
   });
 });
 
@@ -321,12 +429,37 @@ describe('arm-planner PRO: каталог и CSV', () => {
     expect(ARM_EXERCISES.length).toBe(92); // 26.10.2026 было→стало: 92 (PRO-PLAN 91 + thumb_opposition_band для pinch mobility)
     expect(validateArmCatalog()).toEqual([]);
     const ids = new Set(ARM_EXERCISES.map((e) => e.id));
-    for (const id of ['kingsmove_wrist_back', 'kingsmove_hold_iso', 'wrist_ext_db', 'wrist_ext_band', 'riser_lift_db', 'rising_hold_iso', 'finger_containment_hold', 'scott_hook_curl', 'hook_hold_iso', 'side_press_db_bench', 'side_hold_iso_pulley', 'back_pressure_low_row', 'back_hold_table_iso', 'machine_wrist_curl', 'machine_reverse_curl', 'press_chain_pushdown', 'kettlebell_hold', 'bodyweight_dead_hang']) {
+    for (const id of [
+      'kingsmove_wrist_back',
+      'kingsmove_hold_iso',
+      'wrist_ext_db',
+      'wrist_ext_band',
+      'riser_lift_db',
+      'rising_hold_iso',
+      'finger_containment_hold',
+      'scott_hook_curl',
+      'hook_hold_iso',
+      'side_press_db_bench',
+      'side_hold_iso_pulley',
+      'back_pressure_low_row',
+      'back_hold_table_iso',
+      'machine_wrist_curl',
+      'machine_reverse_curl',
+      'press_chain_pushdown',
+      'kettlebell_hold',
+      'bodyweight_dead_hang',
+    ]) {
       expect(ids.has(id), id).toBe(true);
     }
   });
   it('новичок не получает advanced-упражнения (kingsmove) — гейт сложности', () => {
-    const plan = buildArmPlan({ ...BASE, discipline: 'armlifting', patternId: 'grip_3_support', level: 'beginner', technique: 'balanced' } as any);
+    const plan = buildArmPlan({
+      ...BASE,
+      discipline: 'armlifting',
+      patternId: 'grip_3_support',
+      level: 'beginner',
+      technique: 'balanced',
+    } as any);
     const ids = allIds(plan);
     expect(ids).not.toContain('kingsmove_wrist_back');
     expect(ids).not.toContain('kingsmove_hold_iso');
@@ -340,6 +473,6 @@ describe('arm-planner PRO: каталог и CSV', () => {
     const mutated = JSON.parse(JSON.stringify(plan));
     mutated.weeks[0].sessions[0].exercises[0].comment = '=SUM(A1)';
     const csv2 = buildArmPlanCsv(mutated);
-    expect(csv2).toContain("\"'=SUM(A1)\"");
+    expect(csv2).toContain('"\'=SUM(A1)"');
   });
 });
