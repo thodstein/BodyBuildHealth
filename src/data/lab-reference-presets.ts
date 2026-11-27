@@ -18,6 +18,8 @@
  *  - ОЖСС: «45,3 – 77,1 мкмоль/л» — helix.ru/kb/item/06-018
  *  - Трансферрин: «2 – 3,6 г/л» — helix.ru/kb/item/06-040
  *  - Калий: «3,5–5,1 ммоль/л» — helix.ru/kb/item/06-064
+ *  - Калий (Гемотест): «от 3,5 до 5,1 ммоль/л» — gemotest.ru (страница теста
+ *    «Калий (К+)» проверена 2026-11-27)
  *  - Кальций общий: «18–60 лет 2,15 – 2,5 ммоль/л» — helix.ru/kb/item/06-020
  *
  *  Пресеты КДЛ, CMD и ИНВИТРО добавлены с их собственных страниц тестов:
@@ -32,7 +34,7 @@ import { ucumKey } from '../core/constants';
 import { tierMarkerKey } from './lab-tier-ranges';
 
 /** Лаборатории, для которых заведён хотя бы один пресет. */
-export type LabId = 'helix' | 'invitro' | 'kdl' | 'cmd';
+export type LabId = 'helix' | 'invitro' | 'gemotest' | 'kdl' | 'cmd';
 
 /** Источник границ, выбранный на поле бланка. */
 export type RefSource = 'app' | 'blank' | LabId;
@@ -47,6 +49,7 @@ export interface LabSourceInfo {
 export const LAB_SOURCES: LabSourceInfo[] = [
   { id: 'helix', label: 'Хеликс', note: 'пресеты по страницам helix.ru' },
   { id: 'invitro', label: 'ИНВИТРО', note: 'пресеты по страницам invitro.ru' },
+  { id: 'gemotest', label: 'Гемотест', note: 'пресеты по страницам gemotest.ru' },
   { id: 'kdl', label: 'КДЛ', note: 'пресеты по страницам kdlmed.ru' },
   { id: 'cmd', label: 'CMD', note: 'пресеты по страницам cmd-online.ru' },
 ];
@@ -235,6 +238,18 @@ export const LAB_REFERENCE_PRESETS: Record<LabId, Record<string, LabPresetRow>> 
       source: 'ИНВИТРО 2852 Общий анализ крови · «6 лет - 120 лет 150 - 400» (тыс/мкл = 10^9/л)',
       sourceUrl: 'https://www.invitro.ru/analizes/for-doctors/156/2852/',
       note: '6–120 лет',
+    },
+  },
+  gemotest: {
+    // Бланк печатает код «K», поэтому ключ — `K`. `labPreset` приводит написание
+    // через `ucumKey` и `PRESET_CODE_ALIAS`, поэтому запись находится и по
+    // каноническому `POTASSIUM`.
+    K: {
+      lln: 3.5,
+      uln: 5.1,
+      unit: 'mmol/L',
+      source: 'Калий (К+), Гемотест: «от 3,5 до 5,1 ммоль/л»',
+      sourceUrl: 'https://gemotest.ru/moskva/catalog/issledovaniya-krovi/biokhimiya/makro-i-mikroelementy/kaliy-k/',
     },
   },
   kdl: {
@@ -447,7 +462,7 @@ export const LAB_REFERENCE_PRESETS: Record<LabId, Record<string, LabPresetRow>> 
  * называется `PARATHYROID`. Без перевода выбор пресета на поле «PTH» молча
  * отвечал бы «пресета нет», хотя число есть.
  */
-const PRESET_CODE_ALIAS: Record<string, string> = { PTH: 'PARATHYROID' };
+const PRESET_CODE_ALIAS: Record<string, string> = { PTH: 'PARATHYROID', POTASSIUM: 'K' };
 
 /** Лаборатории, у которых есть хотя бы один пресет (для списка выбора). */
 export function labsWithPresets(): LabId[] {
@@ -471,7 +486,7 @@ export function labPreset(lab: LabId | null | undefined, code: string): LabPrese
   const raw = String(code || '').trim();
   if (!raw) return null;
   const canon = PRESET_CODE_ALIAS[raw.toUpperCase()] ?? ucumKey(raw) ?? raw.toUpperCase();
-  return table[canon] ?? table[tierMarkerKey(canon)] ?? null;
+  return table[canon] ?? table[PRESET_CODE_ALIAS[canon]] ?? table[tierMarkerKey(canon)] ?? null;
 }
 
 /**

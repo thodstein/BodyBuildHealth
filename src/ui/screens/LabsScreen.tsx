@@ -32,6 +32,8 @@ import { LabCompareLabel } from './LabsScreen_parts/LabCompareLabel';
 import { trendPointStyle, trendSparklineDash } from './LabsScreen_parts/lab-trend-visuals';
 import LabsProblemPanelsTab from './LabsScreen_parts/LabsProblemPanelsTab';
 import { describeOcrFailure, processUploadedFile, saveParsedLabs, type ParsedLabValue, type OCRResult } from '../../core/ocr-engine';
+import { mergeLabAiCandidates } from '../../core/lab-ai-merge';
+import { recognizeFoodPhoto } from '../../engines/food-vision.engine';
 import { applyLabsSummaryToProfile } from '../../core/labs-profile-sync';
 import { getProfile, updateProfile } from '../../core/profile-manager';
 import { PopupNumber, PopupBool, PopupSelect } from '../components/PopupXxx';
@@ -244,6 +246,15 @@ export const LabsScreen: React.FC<{ initialSubTab?: string }> = ({ initialSubTab
   const fileInputRef = useRef<HTMLInputElement>(null);
   const cameraInputRef = useRef<HTMLInputElement>(null);
   const ocrRequestRef = useRef(0);
+  // AI-проверка бланка: исходное фото живёт отдельно от OCR-результата, чтобы
+  // не просить пользователя выбрать файл ещё раз.
+  const lastOcrFileRef = useRef<File | null>(null);
+  const [aiBusy, setAiBusy] = useState(false);
+  // Синхронный lock на время запроса: state-флаг не успевает обновиться при
+  // двойном клике, и два AI-ответа могли перезаписать один и тот же ocrResult.
+  const aiBusyRef = useRef(false);
+  const [aiChecked, setAiChecked] = useState(false);
+  const [aiMergeStats, setAiMergeStats] = useState<{ added: number; enriched: number; conflicts: number } | null>(null);
   const cancelOcr = useCallback(() => {
     ocrRequestRef.current += 1;
     setOcrLoading(false);
@@ -645,6 +656,12 @@ export const LabsScreen: React.FC<{ initialSubTab?: string }> = ({ initialSubTab
     const requestId = ++ocrRequestRef.current;
     const name = (file.name || '').toLowerCase();
     const type = (file.type || '').toLowerCase();
+    // AI-проверка работает только по фото; PDF/текст оставляют ref пустым,
+    // чтобы кнопка не отправляла на сервер нечитаемый для vision файл.
+    const isImageFile = type.startsWith('image/') || /\.(png|jpe?g|webp|bmp|gif|heic|heif)$/.test(name);
+    lastOcrFileRef.current = isImageFile ? file : null;
+    setAiChecked(false);
+    setAiMergeStats(null);
     const okType = type.includes('pdf') || type.startsWith('image/') || type.includes('text') || type.includes('csv') || /\.(pdf|png|jpe?g|webp|bmp|gif|txt|csv)$/.test(name);
     if (!okType) {
       setOcrLoading(false);
@@ -667,8 +684,9 @@ export const LabsScreen: React.FC<{ initialSubTab?: string }> = ({ initialSubTab
       // пользователь видел "Таймаут" и считал, что "не работает".
       // Бюджет распознавания в АПК — 150с (движок + проходы), таймаут UI
       // должен быть больше, иначе телефон обрывает уже начатое распознавание.
-      const ocrTimeoutMs = isNativeApp() ? 200000 : 30000;
-      const ocrTimeoutLabel = isNativeApp() ? '200с' : '30с';
+      // В web серверный lab-OCR (PSM + доп. проходы) тоже бывает дольше 30с.
+      const ocrTimeoutMs = isNativeApp() ? 200000 : 60000;
+      const ocrTimeoutLabel = isNativeApp() ? '200с' : '60с';
       // purpose: 'labs' — включает лабовые проходы оффлайн-OCR фото в АПК
       // (PSM-4 плотной таблицы, английский проход для латинских аббревиатур
       // HbA1c/TSH/ALT, выбор прохода по числу распознанных маркеров) и
@@ -743,6 +761,45 @@ export const LabsScreen: React.FC<{ initialSubTab?: string }> = ({ initialSubTab
     setSelectedLabs(new Set());
   }, [ocrResult, selectedLabs, selectedPhase, profileSex]);
 
+  // AI-проверка фото бланка: тот же серверный провайдер, что у питания
+  // (GEMINI_API_KEY на сервере). Результат только сверяется с OCR: конфликты
+  // не переписывают числа, AI-добавки не выбираются автоматически.
+  const runAiLabCheck = useCallback(async () => {
+    const file = lastOcrFileRef.current;
+    if (typeof navigator !== 'undefined' && navigator.onLine === false) { setAiOffline(true); return; }
+    if (!file || !ocrResult || aiBusyRef.current) return;
+    aiBusyRef.current = true;
+    const requestId = ocrRequestRef.current;
+    setAiBusy(true);
+    setAiChecked(false);
+    setAiMergeStats(null);
+    try {
+      const r = await recognizeFoodPhoto(file, { purpose: 'lab', hint: ocrResult.text });
+      if (requestId !== ocrRequestRef.current) return;
+      if (!r.ok || !r.lab?.length) {
+        const reason = r.error || r.warnings[0] || 'AI не нашёл показателей на фото.';
+        setOcrResult(prev => prev ? { ...prev, warnings: [...prev.warnings, `AI-проверка: ${reason}`] } : prev);
+        return;
+      }
+      const merged = mergeLabAiCandidates(ocrResult.labs, r.lab, ocrResult.text);
+      // selectedLabs не трогаем: AI-добавки приходят непроверенными и должны
+      // сохраняться только после осознанного выбора пользователем.
+      setOcrResult(prev => prev ? {
+        ...prev,
+        labs: merged.labs,
+        warnings: [...prev.warnings, ...merged.warnings],
+      } : prev);
+      setAiMergeStats({ added: merged.added, enriched: merged.enriched, conflicts: merged.conflicts });
+      setAiChecked(true);
+    } catch (e: any) {
+      if (requestId !== ocrRequestRef.current) return;
+      setOcrResult(prev => prev ? { ...prev, warnings: [...prev.warnings, `AI-проверка не удалась: ${e?.message || String(e)}`] } : prev);
+    } finally {
+      aiBusyRef.current = false;
+      setAiBusy(false);
+    }
+  }, [ocrResult]);
+
   const toggleLabSelection = useCallback((code: string) => {
     setSelectedLabs(prev => { const next = new Set(prev); if (next.has(code)) next.delete(code); else next.add(code); return next; });
   }, []);
@@ -779,6 +836,21 @@ export const LabsScreen: React.FC<{ initialSubTab?: string }> = ({ initialSubTab
   }, [nativePhotoBusy, handleFileUpload]);
 
   const anyNoLabs = globalNoLabs || noLabsSystems.length > 0;
+  // В APK без сети не показываем заведомо недоступную AI-кнопку: офлайн-OCR
+  // уже дал результат, а сетевой запрос только повесил бы экран на 50с.
+  // Статус слушаем событиями: WebView может вернуть сеть без перерисовки.
+  const [aiOffline, setAiOffline] = useState(() => typeof navigator !== 'undefined' && navigator.onLine === false);
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    const update = () => setAiOffline(typeof navigator !== 'undefined' && navigator.onLine === false);
+    update();
+    window.addEventListener('online', update);
+    window.addEventListener('offline', update);
+    return () => {
+      window.removeEventListener('online', update);
+      window.removeEventListener('offline', update);
+    };
+  }, []);
   const deviationCount = labRisks?.markerDeviations?.length ?? 0;
   // Проход 154: вердикт для копии/CSV/архива считается по тем же записям, что
   // печатаются (весь склад, а не текущий срез), и тем же единственным модулем
@@ -2464,6 +2536,9 @@ export const LabsScreen: React.FC<{ initialSubTab?: string }> = ({ initialSubTab
                       <button onClick={async () => {
                         const ta = document.getElementById('lab-text-paste') as HTMLTextAreaElement;
                         if (!ta?.value?.trim()) return;
+                        lastOcrFileRef.current = null;
+                        setAiChecked(false);
+                        setAiMergeStats(null);
                         setOcrLoading(true);
                         try {
                           const res = await processUploadedFile(new File([ta.value], 'pasted.txt', { type: 'text/plain' }));
@@ -2500,6 +2575,9 @@ export const LabsScreen: React.FC<{ initialSubTab?: string }> = ({ initialSubTab
                       )}
                     </div>
                   )}
+                  <div style={{ marginBottom: 8, fontSize: 10, color: '#fff', opacity: 0.65, lineHeight: 1.5 }}>
+                    ⚠️ OCR и AI могут ошибаться. Это не диагноз: сверьте цифры с бланком, при отклонениях обратитесь к врачу.
+                  </div>
                   {ocrResult.labs.length === 0 && ocrResult.text.trim().length > 0 && (
                     <details style={{ marginBottom: 8, padding: '8px 10px', borderRadius: 8, background: 'rgba(21,38,66,0.60)', border: '1px solid rgba(140,190,255,0.14)' }}>
                       <summary style={{ fontSize: 12, color: '#fff', fontWeight: 700, cursor: 'pointer', minHeight: 44, display: 'flex', alignItems: 'center' }}>
@@ -2552,6 +2630,26 @@ export const LabsScreen: React.FC<{ initialSubTab?: string }> = ({ initialSubTab
                       </React.Fragment>
                     );
                   })}
+                  {ocrResult.source === 'image' && lastOcrFileRef.current && (
+                    <div style={{ marginTop:12, padding:'12px', borderRadius:14, background:'rgba(21,38,66,0.60)', border:'1px solid rgba(140,190,255,0.14)' }}>
+                      <button type="button" onClick={() => void runAiLabCheck()} disabled={aiBusy || aiOffline} style={{
+                        width:'100%', padding:'12px 14px', minHeight:48,
+                        background: aiBusy ? 'rgba(255,255,255,0.06)' : 'rgba(var(--labs-accent-rgb, 0,230,138),0.12)',
+                        color: aiBusy ? '#fff' : 'var(--accent, #00e68a)',
+                        border:'1px solid rgba(var(--labs-accent-rgb, 0,230,138),0.35)', borderRadius:14,
+                        fontWeight:800, fontSize:13, cursor: aiBusy ? 'wait' : 'pointer',
+                      }}>{aiBusy ? '⏳ AI проверяет…' : aiOffline ? '📴 AI-проверка недоступна офлайн' : '🤖 AI-проверка фото'}</button>
+                      <div style={{ marginTop:6, fontSize:10, color:'#fff', opacity:0.65, lineHeight:1.5 }}>
+                        {aiOffline ? 'Офлайн-OCR уже выполнен на устройстве. AI-проверка доступна при подключении к интернету.' : 'Отправит фото на сервер для AI-проверки (тот же AI-сервис, что в питании). AI сверяется с OCR и не сохраняет анализы автоматически.'}
+                      </div>
+                      {aiChecked && (
+                        <div style={{ marginTop:6, fontSize:11, color:'#22c55e', fontWeight:700 }}>
+                          ✅ AI-проверка выполнена
+                          {aiMergeStats ? ` · добавлено: ${aiMergeStats.added} · совпало: ${aiMergeStats.enriched} · расхождений: ${aiMergeStats.conflicts}` : ''}
+                        </div>
+                      )}
+                    </div>
+                  )}
                   <button onClick={confirmOcrLabs} disabled={selectedLabs.size === 0} style={{
                     width:'100%', marginTop:12, padding:'14px', minHeight:52,
                     background: selectedLabs.size > 0 ? 'linear-gradient(135deg, var(--labs-accent, #00e68a), var(--accent-2, #00e68a))' : 'rgba(255,255,255,0.06)',

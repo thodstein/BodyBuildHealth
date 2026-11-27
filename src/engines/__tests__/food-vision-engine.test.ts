@@ -167,6 +167,36 @@ describe('mapLabPayload', () => {
   });
 });
 
+describe('recognizeFoodPhoto: purpose=lab', () => {
+  it('отправляет purpose=lab и OCR-подсказку, возвращает lab без дневника', async () => {
+    const fetchImpl = vi.fn(async () =>
+      jsonResponse({
+        ok: true,
+        purpose: 'lab',
+        payload: {
+          values: [{ code: 'HGB', name: 'Гемоглобин', value: 152, unit: 'г/л', confidence: 0.95 }],
+          labName: 'Инвитро',
+        },
+      }),
+    );
+    const result = await recognizeFoodPhoto(new File([], 'lab.jpg', { type: 'image/jpeg' }), {
+      purpose: 'lab',
+      hint: 'ИНВИТРО\nГемоглобин 152 г/л',
+      endpoint: 'https://example.test/api/food-vision',
+      imageBase64: 'AAAA',
+      fetchImpl: fetchImpl as any,
+      noCache: true,
+    });
+
+    expect(result.ok).toBe(true);
+    expect(result.lab).toHaveLength(1);
+    expect(result.meals).toEqual([]);
+    const body = JSON.parse((fetchImpl.mock.calls[0] as any)[1].body);
+    expect(body.purpose).toBe('lab');
+    expect(body.hint).toBe('ИНВИТРО\nГемоглобин 152 г/л');
+  });
+});
+
 describe('recognizeFoodPhoto', () => {
   const payload = {
     ok: true,

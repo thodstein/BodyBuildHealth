@@ -88,26 +88,36 @@ async function recognizePass(buffer: Buffer, language: keyof typeof TESSERACT_LA
  * строк-двойников (латиница вместо кириллицы), и парсер видел позицию дважды.
  */
 const CYRILLIC_NUTRITION_MARKER = /ккал|калори|белк|жир|углев|порци|завтрак|обед|ужин|перекус/gi;
+// В lab-режиме ранний выход только по однозначно пищевым словам: «Углеводный
+// обмен» в бланке — не этикетка, а «Белки»/«Жиры» не должны глушить eng-проход
+// с латинскими метками (HbA1c, TSH, ALT, HDL). Границы слов не дают поймать
+// «обеднённый» или «пропорции».
+const CYRILLIC_LAB_SAFE_MARKER =
+  /(?:^|[^а-яёa-z])(?:ккал|калорийн(?:ость|ости)|завтрак|обед|ужин|перекус|пищевая\s+ценность)(?![а-яёa-z])/i;
 const LATIN_OCR_MARKER = /\b(?:hba1c|tsh|alt|ast|hdl|ldl|vldl|crp|psa|gfr|esr|mcv|mch|mchc|rdw|wbc|rbc|plt|hgb|ggt|t3|t4|ft3|ft4|igf|apob|homocysteine|vitamin\s*[a-k]|protein|fat|carbs?|carbohydrates?|kcal|kj|energy|fiber|sodium|potassium|magnesium|calcium|iron|zinc)\b/gi;
 
 function countMatches(text: string, pattern: RegExp): number {
   return (text.match(pattern) || []).length;
 }
 
-export function mergeOcrPasses(rusText: string, engText: string): string {
+export function mergeOcrPasses(rusText: string, engText: string, purpose: 'nutrition' | 'labs' = 'nutrition'): string {
   const rus = (rusText || '').trim();
   const eng = (engText || '').trim();
   if (!rus) return eng;
   if (!eng) return rus;
   // Русская этикетка/дневник уже прочитаны — латинский проход только продублирует строки.
-  if (countMatches(rus, CYRILLIC_NUTRITION_MARKER) >= 1) return rus;
+  if (countMatches(rus, purpose === 'labs' ? CYRILLIC_LAB_SAFE_MARKER : CYRILLIC_NUTRITION_MARKER) >= 1) return rus;
   const rusLatin = countMatches(rus, LATIN_OCR_MARKER);
   const engLatin = countMatches(eng, LATIN_OCR_MARKER);
   if (engLatin > rusLatin) return `${rus}\n${eng}`;
   return rus;
 }
 
-async function recognizeImage(buffer: Buffer): Promise<string> {
+export function resolveOcrPurpose(value: unknown): 'labs' | 'nutrition' {
+  return value === 'labs' ? 'labs' : 'nutrition';
+}
+
+async function recognizeImage(buffer: Buffer, purpose: 'nutrition' | 'labs' = 'nutrition'): Promise<string> {
   const rus = (await recognizePass(buffer, 'rus')).trim();
   // Вторая модель — латинские аббревиатуры. На русском бланке анализов метки
   // (HbA1c, TSH, ALT, HDL) печатаются латиницей, и проход 'rus' читает их как
@@ -116,7 +126,7 @@ async function recognizeImage(buffer: Buffer): Promise<string> {
   // текст уже получен.
   let eng = '';
   try { eng = (await recognizePass(buffer, 'eng')).trim(); } catch { /* опциональный проход */ }
-  const merged = mergeOcrPasses(rus, eng);
+  const merged = mergeOcrPasses(rus, eng, purpose);
   if (merged) return merged;
   throw new Error('OCR returned empty text');
 }
@@ -142,7 +152,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     if (buffer.length === 0 || buffer.length > MAX_BYTES) {
       return res.status(413).json({ ok: false, error: 'Image must be between 1 byte and 12 MB' });
     }
-    const text = await recognizeImage(buffer);
+    const purpose = resolveOcrPurpose(req.body?.purpose);
+    const text = await recognizeImage(buffer, purpose);
     return res.status(200).json({ ok: true, text });
   } catch (error: any) {
     console.error('[ocr-image]', error);

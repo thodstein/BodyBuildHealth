@@ -24,6 +24,7 @@ import {
 const LAB_HOST: Record<LabId, RegExp> = {
   helix: /^https:\/\/helix\.ru\/kb\/item\/\d{2}-\d{3}$/,
   invitro: /^https:\/\/www\.invitro\.ru\//,
+  gemotest: /^https:\/\/gemotest\.ru\//,
   kdl: /^https:\/\/www\.kdlmed\.ru\//,
   cmd: /^https:\/\/www\.cmd-online\.ru\//,
 };
@@ -83,6 +84,15 @@ describe('проход 208: пресеты референсов лаборато
     expect(labPreset('helix', 'АЛТ')).toBeNull();
     expect(labPreset('cmd', 'HOMOCYSTEINE')).toBeNull();
     expect(labPreset(null, 'POTASSIUM')).toBeNull();
+  });
+
+  it('Гемотест: калий 3,5–5,1 ммоль/л найден по коду бланка «K»', () => {
+    const row = labPreset('gemotest', 'K');
+    expect(row).toMatchObject({ lln: 3.5, uln: 5.1, unit: 'mmol/L' });
+    // Канонический код UCUM_MAP — POTASSIUM; бланк печатает K.
+    expect(labPreset('gemotest', 'POTASSIUM')).toMatchObject({ lln: 3.5, uln: 5.1, unit: 'mmol/L' });
+    expect(row?.sourceUrl).toMatch(/^https:\/\/gemotest\.ru\//);
+    expect(refSourceLabel('gemotest', 'K')).toContain('Гемотест');
   });
 
   it('ПТГ: норма приложения и пресет различаются, но код один', () => {

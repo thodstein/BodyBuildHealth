@@ -451,7 +451,7 @@ function shouldRetryPdfWithOcr(text: string, labs: ParsedLabValue[]): boolean {
   return labs.length < 2 && (headerHits === 0 || numericTokens < 2);
 }
 
-function finalizeLabCandidates(labs: ParsedLabValue[]): ParsedLabValue[] {
+export function finalizeLabCandidates(labs: ParsedLabValue[]): ParsedLabValue[] {
   const byCode = new Map<string, ParsedLabValue>();
   for (const lab of labs) {
     const code = mapToUcumCode(lab.code);
@@ -581,8 +581,17 @@ async function serverOcrScannedPdf(file: File): Promise<string> {
   return typeof payload.text === 'string' ? payload.text : '';
 }
 
-async function serverOcrImage(file: File): Promise<{ text: string; meals?: ParsedMeal[] }> {
-  const upload = await prepareImageForServer(file);
+async function serverOcrImage(
+  file: File,
+  purpose: 'labs' | 'nutrition' = 'nutrition',
+): Promise<{ text: string; meals?: ParsedMeal[] }> {
+  // Бланк анализов: те же лимиты, что и у оффлайн-ветки (1800/2.6МП). Дефолтный
+  // серверный аплоад (1280/1.6МП) делает цифры референсных колонок (~8-10pt)
+  // неразборчивыми — повышаем разрешение именно для lab-режима.
+  const upload =
+    purpose === 'labs'
+      ? await prepareImageForServer(file, { maxSide: 1800, maxPixels: 2_600_000 })
+      : await prepareImageForServer(file);
   if (upload.size > 10 * 1024 * 1024) {
     throw new Error('Фото слишком большое для мобильного OCR. Уменьшите изображение или сделайте скриншот экрана.');
   }
@@ -602,23 +611,51 @@ async function serverOcrImage(file: File): Promise<{ text: string; meals?: Parse
       return path;
     }
   };
-  const endpoints = [resolveEndpoint('./api/ocr-scanned-pdf'), resolveEndpoint('./api/ocr-image')];
+  // Лабовому режиму нужен image-эндпоинт первым: scanned-pdf для kind='image'
+  // идёт через PSM 3 без препроцессинга и без lab-safe слияния проходов, поэтому
+  // он остаётся только fallback'ом. Для питания порядок прежний (legacy).
+  const endpoints =
+    purpose === 'labs'
+      ? [resolveEndpoint('./api/ocr-image'), resolveEndpoint('./api/ocr-scanned-pdf')]
+      : [resolveEndpoint('./api/ocr-scanned-pdf'), resolveEndpoint('./api/ocr-image')];
+  // Цифры мелкие, а сервер делает два языковых прохода. Держим ОДИН общий
+  // бюджет на цепочку endpoint'ов: иначе UI (60с) обрывает fallback раньше,
+  // чем он успевает начаться. Первый endpoint получает до 45с, второй —
+  // только остаток бюджета (не меньше 5с); питание сохраняет свои 35с.
+  const labDeadline = purpose === 'labs' ? Date.now() + 50_000 : 0;
   const errors: string[] = [];
 
   for (const endpoint of endpoints) {
+    let attemptMs = 35_000;
+    if (purpose === 'labs') {
+      const remaining = labDeadline - Date.now();
+      if (remaining < 5_000) break;
+      attemptMs = Math.min(45_000, remaining);
+    }
     const controller = new AbortController();
-    const timeout = setTimeout(() => controller.abort(), 35_000);
+    const timeout = setTimeout(() => controller.abort(), attemptMs);
     try {
       const response = await fetch(endpoint, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          data: btoa(binary),
-          filename: file.name || 'nutrition-screenshot',
-          mimeType: file.type || 'application/octet-stream',
-          kind: 'image',
-          mode: 'fatsecret',
-        }),
+        body: JSON.stringify(
+          purpose === 'labs'
+            ? {
+                data: btoa(binary),
+                filename: file.name || 'lab-image',
+                mimeType: file.type || 'application/octet-stream',
+                kind: 'image',
+                mode: 'labs',
+                purpose: 'labs',
+              }
+            : {
+                data: btoa(binary),
+                filename: file.name || 'nutrition-screenshot',
+                mimeType: file.type || 'application/octet-stream',
+                kind: 'image',
+                mode: 'fatsecret',
+              },
+        ),
         signal: controller.signal,
       });
       const payload = await response.json().catch(() => ({}));
@@ -628,7 +665,7 @@ async function serverOcrImage(file: File): Promise<{ text: string; meals?: Parse
       errors.push(`${endpoint}: ${payload.error || `HTTP ${response.status}`}`);
     } catch (error: any) {
       errors.push(
-        `${endpoint}: ${error?.name === 'AbortError' ? 'таймаут 35 секунд' : error?.message || String(error)}`,
+        `${endpoint}: ${error?.name === 'AbortError' ? `таймаут ${Math.round(attemptMs / 1000)} секунд` : error?.message || String(error)}`,
       );
     } finally {
       clearTimeout(timeout);
@@ -1219,7 +1256,7 @@ export async function processUploadedFile(
         }
       } else {
         try {
-          serverResult = await serverOcrImage(file);
+          serverResult = await serverOcrImage(file, opts?.purpose ?? 'nutrition');
           rawText = serverResult.text;
           warnings.push('Фото обработано на сервере OCR.');
         } catch (serverError: any) {
