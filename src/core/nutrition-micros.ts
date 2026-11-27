@@ -66,3 +66,50 @@ export function sumMicro(items: { food: FoodItem; grams: number }[], key: string
   for (const it of items) s += getMicro(it.food, key) * (it.grams || 0) / 100;
   return s;
 }
+
+/**
+ * Клетчатка на 100 г продукта.
+ *
+ * В `FOOD_DB` клетчатка лежит в верхнеуровневом `fiber` (395 позиций с >0),
+ * в записях OFF/USDA — тоже в `fiber`, а распознанная этикетка/фото кладёт её
+ * в канон `micros.fiber_g`. Приоритет: верхнеуровневое `fiber` → `micros.fiber_g`.
+ * Нет данных — 0 (никаких «типичных 5 г»).
+ */
+export function fiberPer100(food: { fiber?: number; micros?: Record<string, number> } | null | undefined): number {
+  if (!food) return 0;
+  const top = Number(food.fiber);
+  if (Number.isFinite(top) && top > 0) return top;
+  const m = food.micros;
+  const canon = Number(m?.fiber_g ?? m?.Fiber);
+  return Number.isFinite(canon) && canon > 0 ? canon : 0;
+}
+
+/** Клетчатка порции в граммах, округлённая до 0.1 г. Нет данных — 0. */
+export function fiberPortionG(per100: number, grams: number): number {
+  if (!(per100 > 0) || !(grams > 0)) return 0;
+  return Math.round(((per100 * grams) / 100) * 10) / 10;
+}
+
+/**
+ * Добавить `fiber_g` в микросы ПОРЦИИ. Существующее значение не перетираем:
+ * этикетка/фото могли дать точную клетчатку, а каталог — среднюю по продукту.
+ * Пустой результат (ни микросов, ни клетчатки) → undefined, чтобы не плодить `{}`.
+ */
+export function addFiberMicros(
+  micros: Record<string, number> | undefined,
+  food: { fiber?: number; micros?: Record<string, number> } | null | undefined,
+  grams: number,
+): Record<string, number> | undefined {
+  const base: Record<string, number> = micros ? { ...micros } : {};
+  // `Fiber` — второй ключ того же нутриента (есть у ~7 позиций FOOD_DB). Дневные
+  // итоги суммируют ЛЮБЫЕ ключи, а UI читает только `fiber_g`, поэтому переносим
+  // значение в канон и убираем дубль: иначе клетчатка терялась (у `Fiber` нет
+  // подписи в UI) или считалась дважды (оба ключа в одной записи).
+  if (Number(base.Fiber) > 0) {
+    if (!(Number(base.fiber_g) > 0)) base.fiber_g = Number(base.Fiber);
+    delete base.Fiber;
+  }
+  const add = fiberPortionG(fiberPer100(food), grams);
+  if (add > 0 && !(Number(base.fiber_g) > 0)) base.fiber_g = add;
+  return Object.keys(base).length > 0 ? base : undefined;
+}

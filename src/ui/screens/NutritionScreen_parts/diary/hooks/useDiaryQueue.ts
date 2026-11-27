@@ -10,12 +10,13 @@ import { processUploadedFile } from '../../../../../core/ocr-engine';
 import { isFoodVisionAvailable, recognizeFoodOrLabel } from '../../../../../engines/food-vision.engine';
 import { isCapacitorNative } from '../../../../../core/app-platform';
 import { FOOD_DB } from '../../../../../core/nutrition-database';
+import { addFiberMicros } from '../../../../../core/nutrition-micros';
 import { type DiaryItem, type FoodItemLike } from '../../types';
 import { readProgramRestrictions, summarizeImportChecks } from '../diary-import-guards';
 import { touchFavorite } from '../food-favorites';
 import { useLabelScan } from './useLabelScan';
 import { buildRecipeDiaryEntry, recipeMicros, scaleDiaryRecipeMeta } from '../recipe-to-diary';
-import { clampItemGrams } from '../portion-limits';
+import { clampItemGrams, MIN_ITEM_GRAMS } from '../portion-limits';
 import type { Recipe } from '../../../../../engines/nutrition-periodization.engine';
 import type { CustomFoodEntry } from '../../../../../engines/meal-custom-food';
 
@@ -89,7 +90,7 @@ export function useDiaryQueue({
 
   const addFoodFromDB = useCallback(
     (food: FoodItemLike, qty = 100) => {
-      const grams = Math.max(10, Math.min(2000, Math.round(Number(qty) || 100)));
+      const grams = Math.max(MIN_ITEM_GRAMS, Math.min(2000, Math.round(Number(qty) || 100)));
       setParsedItems((prev) => [
         ...prev,
         {
@@ -102,7 +103,7 @@ export function useDiaryQueue({
           category: food.category || 'other',
           foodId: String((food as any).id || '') || undefined,
           barcode: foodBarcode(food),
-          micros: scaleMicros((food as any).micros, grams / 100),
+          micros: addFiberMicros(scaleMicros((food as any).micros, grams / 100), food as any, grams),
         },
       ]);
       // Поиск НЕ сбрасываем: иначе после каждого «＋» список результатов
@@ -120,6 +121,10 @@ export function useDiaryQueue({
             fat: food.fat,
             carbs: food.carbs,
             category: food.category,
+            // Клетчатка/микросы обязаны ехать вместе со снимком: продукт из ⭐
+            // иначе давал 0 г клетчатки, хотя из поиска — реальные граммы.
+            fiber: Number((food as any).fiber),
+            micros: (food as any).micros,
           },
           12,
         );
@@ -162,6 +167,7 @@ export function useDiaryQueue({
         ['vitamin_e_mg', entry.vitamin_e_mg],
         ['vitamin_k_mcg', entry.vitamin_k_mcg],
         ['vitamin_b12_mcg', entry.vitamin_b12_mcg],
+        ['fiber_g', entry.fiber],
       ];
       for (const [key, value] of microMap) {
         if (typeof value === 'number' && Number.isFinite(value) && value > 0) micros[key] = value;
@@ -191,7 +197,7 @@ export function useDiaryQueue({
 
   const handleDirectAdd = useCallback(
     (food: FoodItemLike, qty = 100) => {
-      const grams = Math.max(10, Math.min(2000, Math.round(Number(qty) || 100)));
+      const grams = Math.max(MIN_ITEM_GRAMS, Math.min(2000, Math.round(Number(qty) || 100)));
       const factor = grams / 100;
       const data = { ...diaryData };
       if (!data[selectedDate]) data[selectedDate] = { meals: {} };
@@ -207,7 +213,7 @@ export function useDiaryQueue({
         category: food.category,
         foodId: (food as any).id,
         barcode: foodBarcode(food),
-        micros: scaleMicros((food as any).micros, factor),
+        micros: addFiberMicros(scaleMicros((food as any).micros, factor), food as any, grams),
       });
       saveDiary(data);
       // Сверка с действующими ограничениями программы: дневник — факт, поэтому
@@ -256,7 +262,7 @@ export function useDiaryQueue({
           category: (item as any).category || 'other',
           foodId: (item as any).id,
           barcode: product.barcode,
-          micros: scaleMicros(item.micros, qty / 100),
+          micros: addFiberMicros(scaleMicros(item.micros, qty / 100), item as any, qty),
           confidence: 1,
         },
       ]);
@@ -659,11 +665,12 @@ export function useDiaryQueue({
   const extractQty = useCallback((item: any): number => {
     if (typeof item.qty === 'string') {
       const m = String(item.qty).match(/[\d.,]+/);
-      if (m) return Math.max(10, Math.round(parseFloat(m[0].replace(',', '.')))) || 100;
+      if (m) return Math.max(MIN_ITEM_GRAMS, Math.round(parseFloat(m[0].replace(',', '.')))) || 100;
     }
-    if (typeof item.qty === 'number' && Number.isFinite(item.qty)) return Math.max(10, Math.round(item.qty));
+    if (typeof item.qty === 'number' && Number.isFinite(item.qty))
+      return Math.max(MIN_ITEM_GRAMS, Math.round(item.qty));
     if (typeof item.qtyGrams === 'number' && Number.isFinite(item.qtyGrams))
-      return Math.max(10, Math.round(item.qtyGrams));
+      return Math.max(MIN_ITEM_GRAMS, Math.round(item.qtyGrams));
     return 100;
   }, []);
 

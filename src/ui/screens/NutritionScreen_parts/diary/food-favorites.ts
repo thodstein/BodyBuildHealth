@@ -18,6 +18,23 @@ export interface FavFood {
   fat: number;
   carbs: number;
   category?: string;
+  /**
+   * Клетчатка на 100 г и микросы: раньше снимок избранного хранил только КБЖУ,
+   * поэтому продукт из ⭐ давал 0 г клетчатки, хотя из поиска — реальные граммы.
+   */
+  fiber?: number;
+  micros?: Record<string, number>;
+}
+
+/** Только числовые микросы: в избранное не тащим undefined/строки из localStorage. */
+function cleanMicros(value: unknown): Record<string, number> | undefined {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) return undefined;
+  const out: Record<string, number> = {};
+  for (const [key, raw] of Object.entries(value as Record<string, unknown>)) {
+    const num = Number(raw);
+    if (Number.isFinite(num)) out[key] = num;
+  }
+  return Object.keys(out).length > 0 ? out : undefined;
 }
 
 const IDS_KEY = 'he_food_favs';
@@ -44,9 +61,7 @@ export function readFavIds(): string[] {
 
 export function readFavMeta(): Record<string, FavFood> {
   const value = readJson<unknown>(META_KEY, {});
-  return value && typeof value === 'object' && !Array.isArray(value)
-    ? (value as Record<string, FavFood>)
-    : {};
+  return value && typeof value === 'object' && !Array.isArray(value) ? (value as Record<string, FavFood>) : {};
 }
 
 export function isFavorite(id: string): boolean {
@@ -60,7 +75,7 @@ export function isFavorite(id: string): boolean {
 export function touchFavorite(food: FavFood, limit: number = LIMIT): void {
   if (!food || !food.id) return;
   try {
-    const ids = [food.id, ...readFavIds().filter(id => id !== food.id)].slice(0, limit);
+    const ids = [food.id, ...readFavIds().filter((id) => id !== food.id)].slice(0, limit);
     const meta = readFavMeta();
     meta[food.id] = {
       id: food.id,
@@ -70,10 +85,16 @@ export function touchFavorite(food: FavFood, limit: number = LIMIT): void {
       fat: Number(food.fat) || 0,
       carbs: Number(food.carbs) || 0,
       category: food.category,
+      // Снимок обязан помнить клетчатку: иначе один и тот же продукт считался
+      // по-разному в зависимости от того, добавлен он из поиска или из ⭐.
+      fiber: Number.isFinite(Number(food.fiber)) ? Number(food.fiber) : undefined,
+      micros: cleanMicros(food.micros),
     };
     localStorage.setItem(IDS_KEY, JSON.stringify(ids));
     localStorage.setItem(META_KEY, JSON.stringify(meta));
-  } catch { /* приватный режим / квота */ }
+  } catch {
+    /* приватный режим / квота */
+  }
 }
 
 export function addFavorite(food: FavFood): void {
@@ -83,13 +104,15 @@ export function addFavorite(food: FavFood): void {
 export function removeFavorite(id: string): void {
   if (!id) return;
   try {
-    localStorage.setItem(IDS_KEY, JSON.stringify(readFavIds().filter(x => x !== id)));
+    localStorage.setItem(IDS_KEY, JSON.stringify(readFavIds().filter((x) => x !== id)));
     const meta = readFavMeta();
     if (meta[id]) {
       delete meta[id];
       localStorage.setItem(META_KEY, JSON.stringify(meta));
     }
-  } catch { /* ignore */ }
+  } catch {
+    /* ignore */
+  }
 }
 
 /** Возвращает новое состояние: true — теперь в избранном. */
@@ -109,7 +132,7 @@ export function resolveFavorites(): FavFood[] {
   const seen = new Set<string>();
   for (const id of readFavIds()) {
     if (seen.has(id)) continue;
-    const fromDb = (FOOD_DB as any[]).find(f => f && f.id === id);
+    const fromDb = (FOOD_DB as any[]).find((f) => f && f.id === id);
     const food: FavFood | undefined = fromDb || meta[id];
     if (!food || !food.name) continue;
     seen.add(id);
@@ -121,6 +144,8 @@ export function resolveFavorites(): FavFood[] {
       fat: Number((food as any).fat) || 0,
       carbs: Number((food as any).carbs) || 0,
       category: (food as any).category,
+      fiber: Number.isFinite(Number((food as any).fiber)) ? Number((food as any).fiber) : undefined,
+      micros: cleanMicros((food as any).micros),
     });
   }
   return out;

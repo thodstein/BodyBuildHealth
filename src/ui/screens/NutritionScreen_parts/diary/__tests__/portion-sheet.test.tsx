@@ -108,4 +108,28 @@ describe('PortionSheet — порция из поиска', () => {
     renderSheet({ open: false });
     expect(screen.queryByRole('dialog')).toBeNull();
   });
+
+  it('стартует с типовой порции продукта (клетчатка — 10 г, не 100)', () => {
+    renderSheet({ food: { ...food, defaultPortion: 10 } });
+    const input = screen.getByLabelText('Порция в граммах') as HTMLInputElement;
+    expect(input.value).toBe('10');
+    // 121 ккал/100 г × 0,1 = 12,1 → 12 ккал.
+    expect(document.body.textContent).toContain('12 ккал');
+  });
+
+  it('порция «1 ч. л. (4 г)» даёт чип 4 г, а не 1 г', () => {
+    renderSheet({ food: { ...food, servingSize: '1 ч. л. (4 г)' } });
+    fireEvent.click(screen.getByLabelText('4 грамм'));
+    const chip = screen.getByLabelText('4 грамм');
+    expect(chip.getAttribute('aria-pressed')).toBe('true');
+  });
+
+  it('сухую клетчатку можно ввести меньше 10 г (чайная ложка ~4 г)', () => {
+    const { props } = renderSheet({ food: { ...food, kcal: 375, protein: 0, fat: 0, carbs: 100, defaultPortion: 4 } });
+    const input = screen.getByLabelText('Порция в граммах') as HTMLInputElement;
+    // Стартовая порция — 4 г с этикетки, а не флор 10 г.
+    expect(input.value).toBe('4');
+    fireEvent.click(screen.getByLabelText('Добавить в очередь'));
+    expect(props.onAddToQueue).toHaveBeenCalledWith(expect.objectContaining({ id: 'f1' }), 4);
+  });
 });

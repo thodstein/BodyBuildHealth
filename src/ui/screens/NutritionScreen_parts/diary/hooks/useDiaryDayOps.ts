@@ -1,6 +1,7 @@
 import { useState, useCallback } from 'react';
 import { FOOD_DB } from '../../../../../core/nutrition-database';
 import { fillMissingMicros, quantityToGrams } from '../../../../../engines/nutrition-ocr-parser';
+import { addFiberMicros } from '../../../../../core/nutrition-micros';
 import { mergeMealsFromPrevious, previousDateKey } from '../diary-quick-repeat';
 import { withDiaryItemQty } from '../diary-item-qty';
 
@@ -158,7 +159,12 @@ export function useDiaryDayOps({ diaryData, selectedDate, saveDiary, showToast, 
         const label = m.label || 'Приём пищи';
         if (!data[selectedDate].meals[label]) data[selectedDate].meals[label] = [];
         (Array.isArray(m.items) ? m.items : []).forEach((it: any) => {
-          data[selectedDate].meals[label].push({ name: it.name, qty: Number(it.amount) || 100, kcal: it.kcal || 0, p: it.p || 0, f: it.f || 0, c: it.c || 0, category: it.category, foodId: it.id || it.foodId, micros: it.micros });
+          // Позиции плана приходят без микросов: клетчатку берём из каталога,
+          // остальные микро импорт плана не дополняет (это его прежнее поведение).
+          const planFoodId = it.id || it.foodId;
+          const planFood = (planFoodId ? FOOD_DB.find((f) => f.id === planFoodId) : undefined)
+            || FOOD_DB.find((f) => f.name.toLowerCase() === String(it.name || '').toLowerCase());
+          data[selectedDate].meals[label].push({ name: it.name, qty: Number(it.amount) || 100, kcal: it.kcal || 0, p: it.p || 0, f: it.f || 0, c: it.c || 0, category: it.category, foodId: it.id || it.foodId, micros: addFiberMicros(it.micros, planFood as any, Number(it.amount) || 100) });
         });
       });
       saveDiary(data);

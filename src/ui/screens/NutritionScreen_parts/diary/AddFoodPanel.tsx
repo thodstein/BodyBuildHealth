@@ -1,6 +1,7 @@
 import React, { useState, useRef, useEffect, useMemo } from 'react';
 import { FOOD_DB } from '../../../../core/nutrition-database';
 import { RU_DELI_FOODS } from '../../../../data/ru-deli-foods';
+import { FIBER_FOODS } from '../../../../data/fiber-foods';
 import { CAT_MAP_EMOJI } from '../../../../core/nutrition-utils';
 import { type FoodItemLike } from '../types';
 import { BarcodeScanner } from '../../../components/BarcodeScanner';
@@ -314,6 +315,10 @@ export const AddFoodPanel: React.FC<AddFoodPanelProps> = ({
       fat: food.fat,
       carbs: food.carbs,
       category: food.category,
+      // Клетчатка/микросы — в снимок: из ⭐ продукт должен считаться так же,
+      // как из поиска.
+      fiber: food.fiber,
+      micros: food.micros,
     });
     setFavIds(readFavIds());
     try {
@@ -371,11 +376,14 @@ export const AddFoodPanel: React.FC<AddFoodPanelProps> = ({
     const custom = take(customFoods.map(customFoodToFoodItem) as any[], 8);
     // Бытовая гастрономия (ветчина/сосиски/окорок) живёт вне FOOD_DB: см. src/data/ru-deli-foods.ts.
     const deli = take(RU_DELI_FOODS as any[], 8);
+    // Сухая клетчатка (псиллиум, отруби) — src/data/fiber-foods.ts, тоже вне FOOD_DB:
+    // новые позиции в FOOD_DB сдвигают пулы автоплана (см. шапку файла каталога).
+    const fiber = take(FIBER_FOODS as any[], 8);
     const internal = take(FOOD_DB as any[], 24);
     const usda = take(usdaFoods as any[], 24);
     const seen = new Set<string>();
     const out: any[] = [];
-    for (const f of [...custom, ...deli, ...internal, ...usda]) {
+    for (const f of [...custom, ...deli, ...fiber, ...internal, ...usda]) {
       const key = String(f.id || f.name || '').toLowerCase();
       if (key && seen.has(key)) continue;
       seen.add(key);
@@ -639,7 +647,7 @@ export const AddFoodPanel: React.FC<AddFoodPanelProps> = ({
     if (editingIdx < 0 || !onEditParsedItem) return;
     onEditParsedItem(editingIdx, {
       name: editName || 'Блюдо',
-      qty: Math.max(10, editQty),
+      qty: clampItemGrams(editQty),
       kcal: Math.max(0, editKcal),
       p: Math.max(0, editP),
       f: Math.max(0, editF),

@@ -8,6 +8,7 @@ import { calcNutritionV2 } from '../../engines/nutrition-v2.engine';
 import { NutritionDiary } from './NutritionScreen_parts/NutritionDiary';
 import { searchByName as searchOFF, productToFoodItem } from '../../engines/openfoodfacts.engine';
 import { localIsoDate, parseLocalIsoDate } from '../../core/local-date';
+import { addFiberMicros } from '../../core/nutrition-micros';
 import { readProgramRestrictions, summarizeImportChecks } from './NutritionScreen_parts/diary/diary-import-guards';
 import {
   addFavorite,
@@ -4640,7 +4641,7 @@ export const NutritionScreen: React.FC<{ initialSubTab?: string }> = ({ initialS
         // отчётах по качеству, аллергенах и повторном скане.
         foodId: foodId || undefined,
         category: category || undefined,
-        micros: scaledMicros,
+        micros: addFiberMicros(scaledMicros, item as any, qty),
         barcode: p.barcode,
         source: p.barcode ? 'barcode' : 'offline',
       };

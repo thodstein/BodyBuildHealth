@@ -27,6 +27,7 @@ import { DiarySection } from './diary/DiarySection';
 import { WeekDaySelector } from './diary/WeekDaySelector';
 import { StorageErrorBanner } from './diary/StorageErrorBanner';
 import { MacroSummary } from './diary/MacroSummary';
+import { fiberTargetG } from '../../../core/fiber-target';
 import { MealCard } from './diary/MealCard';
 import { AddFoodPanel } from './diary/AddFoodPanel';
 import { DayMealsList } from './diary/DayMealsList';
@@ -208,7 +209,9 @@ export const NutritionDiary: React.FC<{
     vitamin_c_mg: { name: 'Витамин C', unit: 'мг', target: sex === 'female' ? 75 : 90 },
     vitamin_d_mcg: { name: 'Витамин D', unit: 'мкг', target: 15 },
     vitamin_b12_mcg: { name: 'Витамин B12', unit: 'мкг', target: 2.4 },
-    fiber_g: { name: 'Клетчатка', unit: 'г', target: 30 },
+    // Норма клетчатки — 14 г/1000 ккал дневной цели (AI, PMID 26514720),
+    // а не одно число «30 г» для всех целей и калорий.
+    fiber_g: { name: 'Клетчатка', unit: 'г', target: fiberTargetG(targets?.kcal || 2500) },
   };
 
   // Состояние поиска/очереди/дня/пресетов — см. diary/hooks/* (разрез без смены поведения)
@@ -602,7 +605,7 @@ export const NutritionDiary: React.FC<{
             {Math.round(dayTotals.kcal)}/{targets?.kcal || 2500} ккал
           </span>
         </div>
-        <MacroSummary dayTotals={dayTotals} targets={targets} />
+        <MacroSummary dayTotals={dayTotals} targets={targets} fiber={Number(dayMicros.fiber_g) || 0} />
       </div>
 
       {/* Перехода «＋ Добавить еду» в середине экрана больше нет: он дублировал

@@ -79,6 +79,22 @@ describe('🍽 dietCoverage ВКЛ', () => {
     expect(on.dietCoverage.find((c) => c.key === 'fiberG')?.state).toBe('covered');
   });
 
+  it('клетчатка из реальной формы дневника (micros.fiber_g) тоже считается', () => {
+    // Все пути добавления пишут канон `micros.fiber_g`; верхнеуровневого `fiber`
+    // у записи нет. Раньше движок читал только `e.fiber` и видел 0 г.
+    const today = localIsoDate();
+    localStorage.setItem(
+      'nutrition_diary_v2',
+      JSON.stringify({
+        [today]: { meals: { breakfast: [{ kcal: 600, p: 40, f: 15, c: 60, micros: { fiber_g: 30 } }] } },
+      }),
+    );
+    const on = runSupportUnified(pctState({ dietCoverage: true }));
+
+    expect(on.dietCoverage.find((c) => c.key === 'fiberG')?.state).toBe('covered');
+    expect(on.substances.find((s) => s.id === 'fiber')?.note).toContain('120%');
+  });
+
   it('клетчатка 5 г: пометки нет, покрытие посчитано как недостаточное', () => {
     seedDiaryFiber(5);
     const on = runSupportUnified(pctState({ dietCoverage: true }));

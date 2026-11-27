@@ -1,4 +1,5 @@
 import { FOOD_DB, type FoodItem } from '../core/nutrition-database';
+import { fiberPer100 } from '../core/nutrition-micros';
 
 export interface ParsedMeal {
   date: string;
@@ -565,21 +566,35 @@ function numberFrom(text: string | undefined, fallback: number): number {
 function foodMicrosPer100(food?: FoodItem): NutritionMicros {
   const source = food?.micros || {};
   const map: Record<string, string> = { Ca: 'calcium_mg', Fe: 'iron_mg', Mg: 'magnesium_mg', P: 'phosphorus_mg', K: 'potassium_mg', Na: 'sodium_mg', Zn: 'zinc_mg', Se: 'selenium_mcg', VitA: 'vitamin_a_mcg', VitC: 'vitamin_c_mg', VitD: 'vitamin_d_mcg', VitE: 'vitamin_e_mg', VitK: 'vitamin_k_mcg', VitB12: 'vitamin_b12_mcg' };
-  return Object.entries(map).reduce<NutritionMicros>((out, [from, to]) => {
+  const out = Object.entries(map).reduce<NutritionMicros>((acc, [from, to]) => {
     const value = source[from];
-    if (typeof value === 'number' && Number.isFinite(value)) out[to] = value;
-    return out;
+    if (typeof value === 'number' && Number.isFinite(value)) acc[to] = value;
+    return acc;
   }, {});
+  // Клетчатка в FOOD_DB/OFF/USDA лежит в верхнеуровневом `fiber`, у распознанной
+  // этикетки — в `micros.fiber_g`; без неё микро дневника недоучитывают её.
+  const fiber = fiberPer100(food as any);
+  if (fiber > 0 && out.fiber_g === undefined) out.fiber_g = fiber;
+  return out;
 }
 
 export function fillMissingMicros(name: string, grams: number, existing: NutritionMicros = {}): NutritionMicros {
+  const out: NutritionMicros = { ...existing };
+  // Клетчатка живёт под двумя ключами: `Fiber` в micros FOOD_DB и `fiber_g` —
+  // канон дневника. Переносим в канон и убираем дубль, иначе агрегат дня
+  // считает её дважды, а UI (читает только fiber_g) показывает ноль.
+  const legacyFiber = Number((out as any).Fiber);
+  if (legacyFiber > 0) {
+    if (!(Number((out as any).fiber_g) > 0)) (out as any).fiber_g = legacyFiber;
+    delete (out as any).Fiber;
+  }
   const food = findFood(name);
-  if (!food || !Number.isFinite(grams) || grams <= 0) return { ...existing };
+  if (!food || !Number.isFinite(grams) || grams <= 0) return out;
   const factor = grams / 100;
-  return Object.entries(foodMicrosPer100(food)).reduce<NutritionMicros>((out, [key, value]) => {
-    if (out[key] === undefined) out[key] = Math.round(value * factor * 100) / 100;
-    return out;
-  }, { ...existing });
+  return Object.entries(foodMicrosPer100(food)).reduce<NutritionMicros>((acc, [key, value]) => {
+    if (acc[key] === undefined) acc[key] = Math.round(value * factor * 100) / 100;
+    return acc;
+  }, out);
 }
 
 export function quantityToGrams(qty: string, food?: FoodItem): number {

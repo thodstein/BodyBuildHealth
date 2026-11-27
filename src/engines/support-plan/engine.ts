@@ -905,7 +905,9 @@ export function nutritionDiaryTotalsToday(): {
       proteinG: (acc.proteinG || 0) + (e.p || 0),
       fatG: (acc.fatG || 0) + (e.f || 0),
       carbsG: (acc.carbsG || 0) + (e.c || 0),
-      fiberG: (acc.fiberG || 0) + (e.fiber || 0),
+      // Дневник хранит клетчатку в каноне `micros.fiber_g` (так пишут все пути
+      // добавления), верхнеуровневый `fiber` — у старых записей и позиций плана.
+      fiberG: (acc.fiberG || 0) + (Number(e.fiber ?? e.micros?.fiber_g ?? e.micros?.Fiber) || 0),
       waterL: (acc.waterL || 0) + (e.water || 0),
     }), {});
     return {

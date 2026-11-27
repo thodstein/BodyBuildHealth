@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { fillMissingMicros, normalizeOcrArtifacts, parseFatSecretText, parseMicroLine, parseMyFitnessPalText, parseNutritionScreenshot, parseNutritionText, quantityToGrams, parseVerticalNutritionTable } from '../nutrition-ocr-parser';
+import { fillMissingMicros, findFood, normalizeOcrArtifacts, parseFatSecretText, parseMicroLine, parseMyFitnessPalText, parseNutritionScreenshot, parseNutritionText, quantityToGrams, parseVerticalNutritionTable } from '../nutrition-ocr-parser';
 
 describe('nutrition-ocr-parser', () => {
   describe('MyFitnessPal APK screenshots', () => {
@@ -430,6 +430,14 @@ describe('nutrition-ocr-parser', () => {
       const micros = fillMissingMicros('Курица', 200, { sodium_mg: 999 });
       expect(micros.sodium_mg).toBe(999);
       expect(micros.potassium_mg).toBeGreaterThan(0);
+    });
+
+    it('fills fiber from the catalog food into fiber_g for the actual portion', () => {
+      const food = findFood('Овсяные хлопья');
+      expect(food?.fiber).toBeGreaterThan(0);
+      const micros = fillMissingMicros('Овсяные хлопья', 100);
+      expect(micros.fiber_g).toBeGreaterThan(0);
+      expect(micros.fiber_g).toBe(food!.fiber);
     });
 
     it('converts legacy saved portions to grams', () => {
