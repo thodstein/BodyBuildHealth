@@ -69,6 +69,10 @@ function changedFiles(cwd: string): string[] {
     .filter((path) => path && !path.endsWith('/'));
 }
 
+function isHarnessChange(file: string): boolean {
+  return file.startsWith('.opencode/') || file === 'AGENTS.md' || file === 'opencode.json';
+}
+
 function format(results: StepResult[]): string {
   const failed = results.filter((r) => !r.ok);
   const head = `verify: ${results.length - failed.length}/${results.length} OK`;
@@ -145,6 +149,11 @@ export default Plugin.define({
             steps.push('npm run verify:apk-design');
           }
 
+          if (files.some(isHarnessChange)) {
+            steps.push('node .opencode/plugin-syntax-check.cjs .opencode/plugins/*.ts');
+            steps.push('npx prettier --check ".opencode/**" AGENTS.md opencode.json');
+          }
+
           if (steps.length === 0) {
             const preview = files.slice(0, 20).join('\n');
             return {
@@ -158,6 +167,8 @@ export default Plugin.define({
             'npm run test:ui': 'vitest (ui)',
             'npm run test:core': 'vitest (core)',
             'npm run verify:apk-design': 'apk-design markers',
+            'node .opencode/plugin-syntax-check.cjs .opencode/plugins/*.ts': 'plugin syntax',
+            'npx prettier --check ".opencode/**" AGENTS.md opencode.json': 'harness formatting',
           };
 
           const results: StepResult[] = [];

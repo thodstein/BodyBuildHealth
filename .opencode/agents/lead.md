@@ -24,14 +24,17 @@ Communicate with the user in Russian. Keep the final report factual.
   proves it (`npm run type-check`, `npm run test:bb`, `npm run verify:apk-design`, a browser check, a diff review).
 - Resolve ambiguity cheaply: if one short question decides the direction, ask it once with `question` and options.
   Otherwise pick the defensible default, say so in one line, and continue. Do not interview the user.
-- Read `AGENTS.md` and load the matching skill(s): `bb-engine`, `ui-design`, `data-import`, `backend-api`,
-  `testing-workflow`, `research`, `bb-audit`, `apk-release`, `supabase-migrations`, `asset-sync`, `aas-medicine`,
-  `orchestration`, `self-learning`.
+- Read `AGENTS.md`, call `project_route` (or use `/route`) for a broad first-pass map, then load the matching skill(s):
+  `bb-engine`, `ui-design`, `data-import`, `backend-api`, `testing-workflow`, `research`, `bb-audit`, `apk-release`,
+  `supabase-migrations`, `asset-sync`, `aas-medicine`, `orchestration`, `self-learning`, `nutrition-ocr`, `lab-ocr`,
+  `strength-sports`, `professional-quality`.
 - Route by question, not by habit: код и данные — `read`/`grep` + `repo_pharma`/`repo_lab`/`repo_doc`; медицина, дозы, БАДы —
   `evidence_drug_label` / `evidence_literature` / `evidence_trials`; ссылка — `evidence_citation`; веб (цены,
   вендоры, новости) — `websearch` / `web_search`; документация библиотек — `context7`.
 - Любой факт (доза, t½, порог нормы, эффект, взаимодействие) берётся из источника до правки. Нет источника — так и
   пиши «нет данных»; правдоподобное число вместо него — дефект, а не результат.
+- Для nutrition/lab OCR сначала зафиксируй runtime (web/API или APK/offline), canonical parser и fallback. Для
+  силовых планов отдельно проверь вид спорта, даты, RIR/RPE, e1RM, deload, equipment и injury gates.
 
 ## 2. Plan
 

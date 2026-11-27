@@ -20,7 +20,23 @@ Write criteria that a command can prove, not adjectives:
 
 If a criterion cannot be verified automatically, say how it will be checked by hand.
 
-## 1a. Triage the task before planning
+## 1a. Route and triage the task before planning
+
+For BodyBuildHealth, begin with `project_route` / `/route`. Treat its output as a routing hint, not as evidence: load the
+listed skills and independently inspect the listed files. The router covers these domains:
+
+| Domain          | Primary skill(s)                           | First files/areas                                                                        |
+| --------------- | ------------------------------------------ | ---------------------------------------------------------------------------------------- |
+| Nutrition OCR   | `nutrition-ocr`, `data-import`             | `src/core/ocr-engine.ts`, `src/engines/nutrition-ocr-parser.ts`, label parser, `FOOD_DB` |
+| Laboratory OCR  | `lab-ocr`, `data-import`, `research`       | `ocr-engine`, `lab-auto-parser`, `labs-mapping`, biomarker regex, lab norms              |
+| Medicine/AAS    | `aas-medicine`, `research`                 | pharma DB, PK/PD, interactions, risk, lab norms                                          |
+| Strength sports | `strength-sports`, `bb-engine`, `research` | `src/engines/bb`, `strength-sport`, `arm`, sports UI                                     |
+| UI/APK          | `ui-design`, `professional-quality`        | `src/ui`, styles, public assets, APK marker script                                       |
+
+Do not create one giant mixed workstream when these domains can be separated. OCR parsing, medical evidence, training
+logic and UI should have disjoint file assignments and fan in only after their contracts are explicit.
+
+## 1b. Triage the task before planning
 
 Classify it on three axes, in one line each; the class decides the sources of truth and the checks:
 
@@ -35,7 +51,8 @@ means the answer is "no data", never a plausible number. If research is needed b
 workstream (`explore` with the `research` skill) whose report the lead quotes.
 
 Which tool answers which question is the table in `.opencode/skills/research/SKILL.md` §1; do not guess and do not
-substitute memory for a lookup.
+substitute memory for a lookup. For OCR, the first truth is the actual pipeline and fixtures; for medical interpretation,
+the parser output is not evidence and must not be presented as a diagnosis.
 
 ## 2. Partition before spawning
 
@@ -72,7 +89,8 @@ Rules of thumb:
 ## 4. Fan-in loop
 
 1. Collect every report; check that nothing outside the assigned files changed (`git status`).
-2. Run `project_verify` yourself — a child's green check is not the project's green check.
+2. Run `project_verify` yourself — a child's green check is not the project's green check. If harness files changed,
+   include plugin syntax and `.opencode` Prettier checks.
 3. On failure: fix directly or dispatch one focused `worker`; re-run. Repeat until green.
 4. Cap at 5 fix rounds per failing check; then report the exact failure instead of looping.
 
@@ -94,3 +112,15 @@ into a worktree. Merge results yourself; the lead remains the only one who commi
 - Pin models per agent when useful (`model: provider/model#variant` in frontmatter): cheap/fast for `explore`,
   strongest for `lead` and `reviewer`.
 - A background child that reports nothing useful twice should be stopped by narrowing the task, not retried verbatim.
+
+## Domain-specific stop gates
+
+- Nutrition OCR: no product is saved when the parser has no reliable match; APK has an offline path; macros retain their
+  basis (`per 100 g`, serving, or unknown).
+- Lab OCR: canonical code and unit are normalized; provider reference ranges remain provenance, not universal norms;
+  unknown markers produce warnings rather than invented values.
+- Medicine/AAS: every dose, half-life, threshold, interaction or effect has a source and evidence level; off-label and
+  harm-reduction boundaries are explicit.
+- Strength sports: plan output is deterministic; missing RIR/RPE is not fabricated; dates, deload, equipment, injury and
+  competition edge cases are tested.
+- UI/APK: design tokens, safe-area, native-safe controls, offline fallback and `verify:apk-design` remain green.

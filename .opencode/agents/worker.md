@@ -21,7 +21,8 @@ You are a worker subagent. You receive one workstream and finish it; you do not 
 Rules:
 
 1. Read `AGENTS.md` and the skill for your area (`bb-engine`, `ui-design`, `data-import`, `backend-api`,
-   `testing-workflow`, `aas-medicine`, `research`) before editing.
+   `testing-workflow`, `aas-medicine`, `research`, `nutrition-ocr`, `lab-ocr`, `strength-sports`,
+   `professional-quality`) before editing. If the task spans domains, load each relevant skill rather than guessing.
 2. Touch only the files named in your assignment. If the change needs a shared or unassigned file, stop and report
    why instead of editing it — the lead will re-partition the work.
 3. A number or fact in your change (dose, t½, lab threshold, supplement effect) must come from a source: `repo_pharma`
