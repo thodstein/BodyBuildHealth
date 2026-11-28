@@ -14,11 +14,11 @@ const source = readFileSync(join(process.cwd(), 'src/ui/screens/LabsScreen.tsx')
 
 describe('LabsScreen: AI-проверка бланка', () => {
   it('вызывает recognizeFoodPhoto с purpose=lab и OCR-подсказкой', () => {
-    expect(source).toContain("recognizeFoodPhoto(file, { purpose: 'lab', hint: ocrResult.text })");
+    expect(source).toContain("recognizeFoodPhoto(target, { purpose: 'lab', hint: ocrResult.text.slice(0, 1600) })");
   });
 
   it('сливает AI-значения с OCR через mergeLabAiCandidates', () => {
-    expect(source).toContain('mergeLabAiCandidates(ocrResult.labs, r.lab, ocrResult.text)');
+    expect(source).toContain('mergeLabAiCandidates(mergedLabs, r.lab, ocrResult.text)');
   });
 
   it('не выбирает AI-добавки автоматически: в runAiLabCheck нет setSelectedLabs', () => {
@@ -34,5 +34,11 @@ describe('LabsScreen: AI-проверка бланка', () => {
     expect(source).toContain("ocrResult.source === 'image'");
     expect(source).toContain('aiOffline');
     expect(source).toContain('disabled={aiBusy || aiOffline}');
+  });
+
+  it('PDF: страницы рендерятся в JPEG и AI-проверка доступна для source=pdf', () => {
+    expect(source).toContain('renderPdfPagesForVision');
+    expect(source).toContain("ocrResult.source === 'pdf'");
+    expect(source).toContain('maxPages: 3');
   });
 });

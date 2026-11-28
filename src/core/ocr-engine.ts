@@ -451,7 +451,7 @@ function shouldRetryPdfWithOcr(text: string, labs: ParsedLabValue[]): boolean {
   return labs.length < 2 && (headerHits === 0 || numericTokens < 2);
 }
 
-export function finalizeLabCandidates(labs: ParsedLabValue[]): ParsedLabValue[] {
+export function finalizeLabCandidates(labs: ParsedLabValue[], warnings?: string[]): ParsedLabValue[] {
   const byCode = new Map<string, ParsedLabValue>();
   for (const lab of labs) {
     const code = mapToUcumCode(lab.code);
@@ -495,7 +495,14 @@ export function finalizeLabCandidates(labs: ParsedLabValue[]): ParsedLabValue[] 
         if (biomarkerUnit) unit = biomarkerUnit;
       }
     }
-    if (unit === undefined || unit === null) continue; // truly unknown marker with no known unit (empty string is valid for dimensionless markers like INR)
+    if (unit === undefined || unit === null) {
+      // Неизвестный маркер без единицы раньше исчезал молча. Не подставляем
+      // норму/единицу от себя, но говорим пользователю, что строка не
+      // сопоставлена с каталогом и её нужно проверить вручную.
+      const label = String(lab.name || lab.code || '').replace(/\s+/g, ' ').trim().slice(0, 80);
+      if (label.length >= 2) warnings?.push(`Показатель «${label}» не сопоставлен с каталогом — проверьте вручную.`);
+      continue;
+    }
     const current = byCode.get(code);
     if (!current) {
       byCode.set(code, { ...lab, code, unit });
@@ -1135,7 +1142,7 @@ export async function processUploadedFile(
         const ocrText = await serverOcrScannedPdf(file);
         rawText = ocrText;
         const parsedAll = parseLabTextAllWays(rawText, 'server-tesseract');
-        labs = finalizeLabCandidates(parsedAll.labs);
+        labs = finalizeLabCandidates(parsedAll.labs, warnings);
         formDate = parsedAll.date;
         warnings.push('PDF обработан на сервере для Telegram Mobile.');
         warnings.push(...parsedAll.warnings);
@@ -1188,7 +1195,7 @@ export async function processUploadedFile(
           );
         }
       }
-      labs = finalizeLabCandidates(parsedAll.labs);
+      labs = finalizeLabCandidates(parsedAll.labs, warnings);
       const providerName = parsedAll.provider;
       confidence = labs.length > 0 ? 0.85 : 0.3;
       if (providerName !== 'unknown') {
@@ -1304,7 +1311,7 @@ export async function processUploadedFile(
         } catch (labParseError: any) {
           warnings.push(`Лабораторный парсер пропущен: ${labParseError?.message || String(labParseError)}`);
         }
-        labs = finalizeLabCandidates(parsedAll.labs);
+        labs = finalizeLabCandidates(parsedAll.labs, warnings);
         const providerName = parsedAll.provider;
         if (providerName !== 'unknown') warnings.push(`Распознан бланк: ${providerName}`);
 
@@ -1347,7 +1354,7 @@ export async function processUploadedFile(
     try {
       rawText = await readFileAsText(file);
       const parsedAll = parseLabTextAllWays(rawText, 'text');
-      labs = finalizeLabCandidates(parsedAll.labs);
+      labs = finalizeLabCandidates(parsedAll.labs, warnings);
       formDate = parsedAll.date;
       const providerName = parsedAll.provider;
       warnings.push(...parsedAll.warnings);

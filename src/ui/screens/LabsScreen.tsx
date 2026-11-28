@@ -656,10 +656,11 @@ export const LabsScreen: React.FC<{ initialSubTab?: string }> = ({ initialSubTab
     const requestId = ++ocrRequestRef.current;
     const name = (file.name || '').toLowerCase();
     const type = (file.type || '').toLowerCase();
-    // AI-проверка работает только по фото; PDF/текст оставляют ref пустым,
-    // чтобы кнопка не отправляла на сервер нечитаемый для vision файл.
+    // AI-проверка работает по фото и PDF (страницы рендерятся в JPEG);
+    // текстовый файл оставляет ref пустым — vision его не читает.
     const isImageFile = type.startsWith('image/') || /\.(png|jpe?g|webp|bmp|gif|heic|heif)$/.test(name);
-    lastOcrFileRef.current = isImageFile ? file : null;
+    const isPdfFile = type.includes('pdf') || /\.pdf$/i.test(name);
+    lastOcrFileRef.current = isImageFile || isPdfFile ? file : null;
     setAiChecked(false);
     setAiMergeStats(null);
     const okType = type.includes('pdf') || type.startsWith('image/') || type.includes('text') || type.includes('csv') || /\.(pdf|png|jpe?g|webp|bmp|gif|txt|csv)$/.test(name);
@@ -774,22 +775,49 @@ export const LabsScreen: React.FC<{ initialSubTab?: string }> = ({ initialSubTab
     setAiChecked(false);
     setAiMergeStats(null);
     try {
-      const r = await recognizeFoodPhoto(file, { purpose: 'lab', hint: ocrResult.text });
-      if (requestId !== ocrRequestRef.current) return;
-      if (!r.ok || !r.lab?.length) {
-        const reason = r.error || r.warnings[0] || 'AI не нашёл показателей на фото.';
-        setOcrResult(prev => prev ? { ...prev, warnings: [...prev.warnings, `AI-проверка: ${reason}`] } : prev);
+      const isPdf = (file.type || '').includes('pdf') || /\.pdf$/i.test(file.name || '');
+      // PDF нельзя отправить в vision напрямую: рендерим первые страницы в JPEG
+      // тем же pdfjs, что и OCR. 3 страниц хватает для типового бланка; больше
+      // не берём, чтобы не гонять 5-минутные AI-запросы.
+      const targets = isPdf
+        ? await (await import('../../engines/pdf-parser.engine')).renderPdfPagesForVision(file, { maxPages: 3 })
+        : [file];
+      let mergedLabs = ocrResult.labs;
+      let added = 0;
+      let enriched = 0;
+      let conflicts = 0;
+      let pagesWithAi = 0;
+      const aiWarnings: string[] = [];
+      for (const target of targets) {
+        const r = await recognizeFoodPhoto(target, { purpose: 'lab', hint: ocrResult.text.slice(0, 1600) });
+        if (requestId !== ocrRequestRef.current) return;
+        if (!r.ok || !r.lab?.length) {
+          aiWarnings.push(r.error || r.warnings[0] || 'AI не нашёл показателей на странице.');
+          continue;
+        }
+        pagesWithAi += 1;
+        const merged = mergeLabAiCandidates(mergedLabs, r.lab, ocrResult.text);
+        mergedLabs = merged.labs;
+        added += merged.added;
+        enriched += merged.enriched;
+        conflicts += merged.conflicts;
+        aiWarnings.push(...merged.warnings);
+      }
+      if (pagesWithAi === 0) {
+        setOcrResult(prev => prev ? {
+          ...prev,
+          warnings: [...prev.warnings, `AI-проверка: ${aiWarnings.join(' ') || 'не найдено показателей.'}`],
+        } : prev);
         return;
       }
-      const merged = mergeLabAiCandidates(ocrResult.labs, r.lab, ocrResult.text);
       // selectedLabs не трогаем: AI-добавки приходят непроверенными и должны
       // сохраняться только после осознанного выбора пользователем.
       setOcrResult(prev => prev ? {
         ...prev,
-        labs: merged.labs,
-        warnings: [...prev.warnings, ...merged.warnings],
+        labs: mergedLabs,
+        warnings: [...prev.warnings, ...aiWarnings],
       } : prev);
-      setAiMergeStats({ added: merged.added, enriched: merged.enriched, conflicts: merged.conflicts });
+      setAiMergeStats({ added, enriched, conflicts });
       setAiChecked(true);
     } catch (e: any) {
       if (requestId !== ocrRequestRef.current) return;
@@ -2630,7 +2658,7 @@ export const LabsScreen: React.FC<{ initialSubTab?: string }> = ({ initialSubTab
                       </React.Fragment>
                     );
                   })}
-                  {ocrResult.source === 'image' && lastOcrFileRef.current && (
+                  {(ocrResult.source === 'image' || ocrResult.source === 'pdf') && lastOcrFileRef.current && (
                     <div style={{ marginTop:12, padding:'12px', borderRadius:14, background:'rgba(21,38,66,0.60)', border:'1px solid rgba(140,190,255,0.14)' }}>
                       <button type="button" onClick={() => void runAiLabCheck()} disabled={aiBusy || aiOffline} style={{
                         width:'100%', padding:'12px 14px', minHeight:48,
@@ -2638,9 +2666,9 @@ export const LabsScreen: React.FC<{ initialSubTab?: string }> = ({ initialSubTab
                         color: aiBusy ? '#fff' : 'var(--accent, #00e68a)',
                         border:'1px solid rgba(var(--labs-accent-rgb, 0,230,138),0.35)', borderRadius:14,
                         fontWeight:800, fontSize:13, cursor: aiBusy ? 'wait' : 'pointer',
-                      }}>{aiBusy ? '⏳ AI проверяет…' : aiOffline ? '📴 AI-проверка недоступна офлайн' : '🤖 AI-проверка фото'}</button>
+                      }}>{aiBusy ? '⏳ AI проверяет…' : aiOffline ? '📴 AI-проверка недоступна офлайн' : ocrResult.source === 'pdf' ? '🤖 AI-проверка PDF' : '🤖 AI-проверка фото'}</button>
                       <div style={{ marginTop:6, fontSize:10, color:'#fff', opacity:0.65, lineHeight:1.5 }}>
-                        {aiOffline ? 'Офлайн-OCR уже выполнен на устройстве. AI-проверка доступна при подключении к интернету.' : 'Отправит фото на сервер для AI-проверки (тот же AI-сервис, что в питании). AI сверяется с OCR и не сохраняет анализы автоматически.'}
+                        {aiOffline ? 'Офлайн-OCR уже выполнен на устройстве. AI-проверка доступна при подключении к интернету.' : ocrResult.source === 'pdf' ? 'Отправит до 3 страниц PDF на сервер (тот же AI-сервис, что в питании). AI сверяется с OCR и не сохраняет анализы автоматически.' : 'Отправит фото на сервер для AI-проверки (тот же AI-сервис, что в питании). AI сверяется с OCR и не сохраняет анализы автоматически.'}
                       </div>
                       {aiChecked && (
                         <div style={{ marginTop:6, fontSize:11, color:'#22c55e', fontWeight:700 }}>
