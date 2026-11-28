@@ -26,6 +26,7 @@
 
 import { isAxialLoadExercise } from '../exercise-selector.engine';
 import { isMobilityRestricted } from './bb-mobility.engine';
+import { bbExerciseTier } from './bb-exercise-tier.engine';
 
 export type BBMinLevel = 'beginner' | 'intermediate' | 'advanced';
 
@@ -88,20 +89,38 @@ export const LEVEL_REGRESSIONS: Record<string, string[]> = {
   squat_bar: ['goblet_squat', 'leg_press', 'squat_split'],
   squat_back: ['goblet_squat', 'leg_press', 'squat_split'],
   squat_lowbar: ['goblet_squat', 'leg_press', 'squat_split'],
+  squat_v2: ['goblet_squat', 'leg_press', 'squat_split'],
   front_squat: ['goblet_squat', 'leg_press', 'squat_split'],
+  front_squat_v2: ['goblet_squat', 'leg_press', 'squat_split'],
+  front_squat_v3: ['goblet_squat', 'leg_press', 'squat_split'],
+  front_squat_clean: ['goblet_squat', 'leg_press', 'squat_split'],
+  front_squat_clean_grip: ['goblet_squat', 'leg_press', 'squat_split'],
   deadlift: ['deadlift_trapbar', 'rdl_db', 'hyperextension'],
+  deadlift_v2: ['deadlift_trapbar', 'rdl_db', 'hyperextension'],
+  deadlift_conventional: ['deadlift_trapbar', 'rdl_db', 'hyperextension'],
   sumo_dl: ['deadlift_trapbar', 'rdl_db', 'hyperextension'],
-  good_morning: ['rdl_db', 'hyperextension', 'banded_good_morning'],
-  pullup: ['pulldown', 'pulldown_wide', 'row_inverted', 'dead_hang'],
-  pullup_neutral: ['pulldown_rev', 'row_inverted', 'dead_hang'],
-  chinup: ['pulldown_rev', 'row_inverted', 'dead_hang'],
-  dips_chest: ['bench_dips', 'pushup_incline', 'pushup'],
-  dips_tricep: ['tricep_bench_dip', 'pushup_incline', 'pushup'],
-  ohp: ['ohp_smith', 'landmine_press_shoulder', 'machine_chest_press'],
+  sumo_dl_v2: ['deadlift_trapbar', 'rdl_db', 'hyperextension'],
+  deadlift_stiff_leg: ['rdl_db', 'hyperextension', 'leg_curl_seated'],
+  deadlift_deficit: ['deadlift_trapbar', 'rdl_db', 'hyperextension'],
+  deadlift_snatch_grip: ['deadlift_trapbar', 'rdl_db', 'hyperextension'],
+  paused_deadlift: ['deadlift_trapbar', 'rdl_db', 'hyperextension'],
+  good_morning: ['rdl_db', 'hyperextension'],
+  pullup: ['pulldown', 'pulldown_wide', 'row_inverted'],
+  pullup_weighted: ['pulldown', 'pulldown_wide', 'row_inverted'],
+  pullup_neutral: ['pulldown_rev', 'pulldown_vbar', 'row_inverted'],
+  chinup: ['pulldown_rev', 'pulldown_vbar', 'row_inverted'],
+  chinup_weighted: ['pulldown_rev', 'pulldown_vbar', 'row_inverted'],
+  dips_chest: ['pushup_incline', 'pushup', 'machine_chest_press'],
+  dips_tricep: ['tricep_bench_dip', 'tricep_pushdown_rope', 'tricep_pushdown_bar'],
+  ohp: ['ohp_smith', 'ohp_db', 'landmine_press_shoulder'],
   bench_bar: ['machine_chest_press', 'pushup_incline', 'pushup'],
   row_bar: ['row_db', 'seated_row', 'row_inverted'],
   pistol_squat: ['squat_split', 'curtsy_lunge', 'lunge_reverse'],
-  overhead_squat: ['goblet_squat', 'ohp_smith', 'squat_split'],
+  shrimp_squat: ['squat_split', 'curtsy_lunge', 'lunge_reverse'],
+  cossack_squat: ['squat_split', 'curtsy_lunge', 'lunge_reverse'],
+  sissy_squat_weighted: ['leg_ext', 'goblet_squat', 'leg_press'],
+  push_press: ['ohp_smith', 'ohp_db'],
+  overhead_squat: ['goblet_squat', 'squat_split', 'leg_press'],
   // Нордик — эксцентрик-доминантный скилл: новичку сгибания в тренажёре.
   nordic_curl: ['leg_curl_seated', 'leg_curl'],
 };
@@ -152,8 +171,49 @@ export function isPoolAllowed(userLevel: string | undefined, ex: { id?: string; 
   if (rank === undefined || rank >= 2) return true;
   const id = String((ex as any)?.id || '').toLowerCase();
   const nm = String((ex as any)?.name || '');
+  if (rank < 1 && String((ex as any)?.difficulty || '').toLowerCase() === 'advanced') return false;
   if (rank < 1 && (INTERMEDIATE_ID.has(id) || INTERMEDIATE_NAME_RE.test(nm) || INTERMEDIATE_NAME_RE.test(id))) return false;
   return !isHardAdvanced(ex);
+}
+
+export interface CandidateGateCtx {
+  level?: string;
+  strictLevel?: boolean;
+  equipment?: string[];
+  excludedIds?: string[];
+  excludedExercises?: string[];
+  avoidAxialLoad?: boolean;
+  mobilityRestrictions?: string[];
+  maxTier?: number;
+}
+
+/**
+ * Единый гейт кандидата для пула и всех поздних добивок:
+ * уровень (строгий isLevelAllowed или relaxed isPoolAllowed), тир, оборудование,
+ * исключения, осевая нагрузка и мобильность.
+ */
+export function isCandidateAllowed(
+  ex: { id?: string; name?: string; difficulty?: string; equipment?: any },
+  ctx: CandidateGateCtx = {},
+): boolean {
+  if (!ex) return false;
+  const lvl = ctx.level;
+  const strict = ctx.strictLevel !== false;
+  if (lvl && (strict ? !isLevelAllowed(lvl, ex) : !isPoolAllowed(lvl, ex))) return false;
+  if (ctx.maxTier != null && bbExerciseTier(ex as any) > ctx.maxTier) return false;
+  const excl = [...(ctx.excludedIds || []), ...(ctx.excludedExercises || [])];
+  if (excl.length && (excl.includes(String(ex.id || '')) || excl.includes(String(ex.name || '')))) return false;
+  if (ctx.avoidAxialLoad) {
+    try { if (isAxialLoadExercise(ex as any)) return false; } catch { /* ignore */ }
+  }
+  if (ctx.mobilityRestrictions?.length) {
+    try { if (isMobilityRestricted(ex as any, ctx.mobilityRestrictions)) return false; } catch { /* ignore */ }
+  }
+  if (ctx.equipment?.length) {
+    const eq = Array.isArray(ex.equipment) ? ex.equipment : [String(ex.equipment || '')];
+    if (eq.length && !eq.includes('bodyweight') && !eq.some((e: string) => ctx.equipment!.includes(e))) return false;
+  }
+  return true;
 }
 
 /** Ранг-гейт для пулов с релаксом (пустой пул новичка → intermediate, но никогда advanced). */
@@ -256,12 +316,20 @@ export function swapExerciseForLevel(
     if (!isLevelAllowed(userLevel, c as any)) return false;
     return equipOk(c);
   });
-  // Канон/машина/кабель раньше гири и экзотики.
+  // Новичку ставим приоритет на стабильную опору (machine/smith/cable), опытным — свободные веса, экзотика в конце.
+  const isBeginner = String(userLevel || '').toLowerCase() === 'beginner';
+  const origType = String((exercise as any)?.type || '').toLowerCase();
   const rankEquip = (c: any): number => {
     const e = String((c as any).equipment || '').toLowerCase();
-    if (/barbell|dumbbell/.test(e)) return 0;
-    if (/machine|smith|cable/.test(e)) return 1;
-    return 2;
+    const typePenalty = origType && String((c as any).type || '').toLowerCase() !== origType ? 5 : 0;
+    if (isBeginner) {
+      if (/machine|smith|cable/.test(e)) return 0 + typePenalty;
+      if (/barbell|dumbbell/.test(e)) return 1 + typePenalty;
+      return 2 + typePenalty;
+    }
+    if (/barbell|dumbbell/.test(e)) return 0 + typePenalty;
+    if (/machine|smith|cable/.test(e)) return 1 + typePenalty;
+    return 2 + typePenalty;
   };
   pool.sort((a, b) => rankEquip(a) - rankEquip(b));
   const best = pool[0];

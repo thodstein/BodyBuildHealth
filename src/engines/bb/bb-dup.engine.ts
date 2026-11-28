@@ -61,10 +61,14 @@ export const DUP_PRESETS: Record<Exclude<DUPMode, 'none'>, DUPDayCharacter[]> = 
  */
 export function applyDUPOverlay(plan: BBPlan, config: DUPConfig): BBPlan {
   if (config.mode === 'none') return plan;
-  // BUG-FIX (audit 2026-08): DUP — проф-методика, новичку не нужна
-  // (блочная периодизация накопление→интенсификация→разгрузка проще и
-  // безопаснее; волновая периодизация — для intermediate+).
-  if ((plan as any).level === 'beginner') return plan;
+  // BUG-FIX (audit 2026-08 + 2026-11 P0-3): DUP — волновая периодизация (intermediate+);
+  // новичку не применяется с честным пояснением вместо тихого NO-OP.
+  if ((plan as any).level === 'beginner') {
+    const note = `⛔ DUP (${config.mode}) отключён для уровня beginner — используется линейная блочная периодизация.`;
+    const rat = Array.isArray(plan.rationale) ? plan.rationale : [];
+    if (rat.includes(note)) return plan;
+    return { ...plan, rationale: [...rat, note] };
+  }
 
   const preset = DUP_PRESETS[config.mode];
   if (!preset) return plan;
@@ -73,6 +77,9 @@ export function applyDUPOverlay(plan: BBPlan, config: DUPConfig): BBPlan {
   const dupMuscles: Set<string> | null = Array.isArray(config.muscles) && config.muscles.length > 0
     ? new Set(config.muscles)
     : null;
+
+  const isPctOrCruise = (plan as any).inputSnapshot?.pedPhase === 'pct' || (plan as any).inputSnapshot?.pedPhase === 'cruise';
+  const rirFloor = isPctOrCruise ? 2 : (plan as any).level === 'intermediate' ? 1 : 0;
 
   // Глубокая копия плана — deep clone workSets и rationale (fix P0/P1-2: без мутации оригинала)
   const newPlan: BBPlan = {
@@ -84,43 +91,45 @@ export function applyDUPOverlay(plan: BBPlan, config: DUPConfig): BBPlan {
     })),
   };
 
-  // P1-2: per-muscle счётчик (раньше глобальный счётчик на Upper/Lower делал Upper всегда тяжёлым,
-  // а Lower всегда лёгким — нулевая волна по мышце!).
+  // P1-2 + P0-3: per-muscle счётчик обновляется ОДИН РАЗ за сессию (а не после 1-го
+  // упражнения в сессии — иначе 2-е primary той же мышцы в этот же день перепрыгивало на следующую фазу).
   const dupCounterByMuscle: Record<string, number> = {};
-  const workingWeeks = newPlan.weeks.filter(w => w.phase !== 'deload').length;
+  const workingWeeks = newPlan.weeks.filter((w: any) =>
+    w.phase !== 'deload' && !w.deload && w.phase !== 'peaking' && !w.taper && !w.taperApplied && !w.peakWeek && !w.overreachingDeload && !w.isDeloadLike && !w.contestPhase,
+  ).length;
   let workingWeekIdx = 0;
 
-  for (const w of newPlan.weeks) {
-    if (w.phase === 'deload') continue;
+  for (const w of newPlan.weeks as any[]) {
+    if (w.phase === 'deload' || w.deload || w.phase === 'peaking' || w.taper || w.taperApplied || w.peakWeek || w.overreachingDeload || w.isDeloadLike || w.contestPhase) continue;
     // Сохраняем недельную прогрессию RIR: к концу блока RIR плавно снижается (0 → -1).
     const rirProgressShift = workingWeeks >= 4 && workingWeekIdx >= Math.floor(workingWeeks / 2) ? -1 : 0;
     workingWeekIdx++;
+    const weekRirFloor = w.cruiseWeek ? Math.max(2, rirFloor) : rirFloor;
 
     for (const s of w.sessions) {
       let sessionChar: DayCharacter | null = null;
       const seenMusclesInSession = new Set<string>();
 
-      // Применяем DUP только к primary упражнениям (accessory остаются как есть)
+      // Применяем DUP только к primary упражнениям (кроме спец-протоколов DC/BFR/FST7/GVT/Gironda и разминки)
       for (const ex of s.exercises) {
-        if (ex.role !== 'primary') continue;
+        if ((ex as any).warmupActivator || ex.role !== 'primary') continue;
+        if (ex.techniqueTag === 'widowmaker' || /DC Rest-Pause|DoggCrapp|widowmaker|BFR|30-15-15-15/i.test(String(ex.comment || ''))) continue;
+        if (Number((ex as any).schemeAssignedSets) > 0) continue;
         // P2 E: per-muscle гейт — если заданы мышцы, применяем только к ним.
         if (dupMuscles && !dupMuscles.has(ex.muscle)) continue;
 
         const mKey = String(ex.muscle || 'other');
         const mIdx = dupCounterByMuscle[mKey] ?? 0;
         const dupDay = preset[mIdx % preset.length];
-        if (!seenMusclesInSession.has(mKey)) {
-          dupCounterByMuscle[mKey] = mIdx + 1;
-          seenMusclesInSession.add(mKey);
-        }
+        seenMusclesInSession.add(mKey);
         if (!sessionChar) sessionChar = dupDay.character;
 
         // Изменяем character
         ex.character = dupDay.character;
 
-        // Изменяем reps, RIR и ПЕРЕСЧИТЫВАЕМ вес по Brzycki/Epley e1RM (P1-2: иначе 100кг×6 превращались в 100кг×15)
+        // Изменяем reps, RIR и ПЕРЕСЧИТЫВАЕМ вес по Brzycki/Epley e1RM
         const [repMin, repMax] = dupDay.repTarget;
-        const targetRir = Math.max(0, Math.min(5, dupDay.rirTarget + rirProgressShift));
+        const targetRir = Math.max(weekRirFloor, Math.min(5, dupDay.rirTarget + rirProgressShift));
         for (const ws of ex.workSets) {
           const oldReps = Math.max(1, Number(ws.reps) || 8);
           const oldRir = Math.max(0, Math.min(5, Number(ws.rir ?? ex.rir ?? 2)));
@@ -137,14 +146,18 @@ export function applyDUPOverlay(plan: BBPlan, config: DUPConfig): BBPlan {
           else if (dupDay.character === 'памп' && (ws.restSeconds ?? 90) > 120) ws.restSeconds = 75;
         }
 
-        // Обновляем repsRange и RIR упражнения
+        // Обновляем repsRange, RIR и restSeconds упражнения (единый контракт с workSets)
         ex.repsRange = [repMin, repMax];
         ex.rir = targetRir;
+        if (ex.workSets[0]?.restSeconds) ex.restSeconds = ex.workSets[0].restSeconds;
 
         // Добавляем DUP-метку в комментарий (идемпотентно, заменяя прежнюю)
         const dupLabel = `[DUP: ${dupDay.label}]`;
         const cleaned = String(ex.comment || '').replace(/\[DUP:[^\]]*\]\s*/g, '').trim();
         ex.comment = `${dupLabel} ${cleaned}`.trim();
+      }
+      for (const mKey of seenMusclesInSession) {
+        dupCounterByMuscle[mKey] = (dupCounterByMuscle[mKey] ?? 0) + 1;
       }
 
       if (!dupMuscles && sessionChar) {
@@ -169,7 +182,7 @@ export function recommendDUPMode(
   level: string,
   daysPerWeek: number,
 ): DUPConfig {
-  if (daysPerWeek < 3) {
+  if (level === 'beginner' || daysPerWeek < 3) {
     return { mode: 'none', cycleDays: 0 };
   }
 
@@ -177,7 +190,7 @@ export function recommendDUPMode(
     return { mode: 'strength_hypertrophy', cycleDays: 2 };
   }
 
-  if (goal === 'mass' && level === 'advanced') {
+  if (goal === 'mass' && (level === 'advanced' || level === 'enhanced')) {
     return { mode: 'full_dup', cycleDays: 3 };
   }
 

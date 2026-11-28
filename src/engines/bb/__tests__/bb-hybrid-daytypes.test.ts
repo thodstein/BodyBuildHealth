@@ -75,12 +75,15 @@ describe('bb-day-types', () => {
 });
 
 describe('perExerciseCap', () => {
-  it('стандарт 5, enhanced back/chest/quads 8 при 3+ годах', () => {
+  it('стандарт 5, onCourse main 6, beginner 4/3', () => {
     expect(perExerciseCap('intermediate', 'chest')).toBe(5);
     expect(perExerciseCap('enhanced', 'chest', 1)).toBe(5);
-    expect(perExerciseCap('enhanced', 'chest', 3)).toBe(8);
-    expect(perExerciseCap('enhanced', 'biceps', 6)).toBe(5);
-    expect(perExerciseCap('enhanced', 'back', 6)).toBe(8);
+    expect(perExerciseCap('enhanced', 'chest', 3)).toBe(5);
+    expect(perExerciseCap('enhanced', 'chest', 3, true)).toBe(6);
+    expect(perExerciseCap('enhanced', 'biceps', 6, true)).toBe(5);
+    expect(perExerciseCap('enhanced', 'back', 6, true)).toBe(6);
+    expect(perExerciseCap('beginner', 'chest')).toBe(4);
+    expect(perExerciseCap('beginner', 'biceps')).toBe(3);
   });
 });
 

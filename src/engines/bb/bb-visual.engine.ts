@@ -435,7 +435,7 @@ export function compareBBVariants(a: BBPlan, b: BBPlan): BBVariantDiff[] {
         return ws.length ? Math.round((ws.reduce((acc: number, v: number) => acc + v, 0) / ws.length) * 10) / 10 : 0;
       };
       const awA = avgW(wa); const awB = avgW(wb);
-      if (awA > 0 && awB > 0 && Math.abs(awA - awB) >= 1) {
+      if (awA > 0 && awB > 0 && Math.abs(awA - awB) >= 0.5) {
         detail.push(`Ср. вес: ${awA} → ${awB} кг (${awB > awA ? '+' : ''}${Math.round((awB - awA) * 10) / 10})`);
       }
     }

@@ -215,6 +215,42 @@ function isDirectContributor(e: any, muscle: string): boolean {
   catch { return e.muscle === muscle; }
 }
 
+/**
+ * Единый gate объёмных схем (FST-7 / GVT 10×10 / Gironda 8×8) для cycle/program
+ * путей в полном паритете с `buildBBPlan`:
+ * - FST-7: только enhanced без joint-guard и соло-инсулина;
+ * - GVT / Gironda: классические высокообъёмные протоколы с уровня advanced+.
+ */
+function resolveCycleVolumeScheme(
+  rawScheme: string | undefined,
+  opts: {
+    mode: string;
+    level: string;
+    jointGuard: boolean;
+    soloInsulin: boolean;
+    rationale?: string[];
+  },
+): 'standard' | 'gvt' | 'fst7' | 'gironda' {
+  const scheme = (rawScheme || 'standard') as 'standard' | 'gvt' | 'fst7' | 'gironda';
+  if (opts.mode === 'faithful' || scheme === 'standard') return 'standard';
+  if (scheme === 'fst7') {
+    if (opts.level !== 'enhanced' || opts.jointGuard || opts.soloInsulin) {
+      opts.rationale?.push('⛔ FST-7 7-in-1: оставлен в standard (faithful/уровень/joint-guard/соло-инсулин).');
+      return 'standard';
+    }
+    return 'fst7';
+  }
+  if (scheme === 'gvt' || scheme === 'gironda') {
+    if ((opts.level !== 'advanced' && opts.level !== 'enhanced') || opts.jointGuard) {
+      const label = scheme === 'gvt' ? 'GVT 10×10' : 'Gironda 8×8';
+      opts.rationale?.push(`⛔ ${label}: классическая схема высокой плотности доступна с уровня advanced/enhanced без joint-guard (уровень ${opts.level}). Схема: standard.`);
+      return 'standard';
+    }
+    return scheme;
+  }
+  return scheme;
+}
+
 function buildCycleVolumeTargets(
   allLandmarks: Record<string, { mev: number; mav: number; mrv: number } | undefined>,
   opts: {
@@ -435,7 +471,8 @@ function expandPlanToTargets(
       if (!worst) break;
       const [m] = worst;
       const pool = week.sessions
-        .flatMap(s => s.exercises.filter(e => !(e as any).warmupActivator && e.muscle === m && !/FST-7/.test(String((e as any).comment || ''))))
+        .flatMap(s => s.exercises.filter(e => !(e as any).warmupActivator && e.muscle === m
+          && !(Number((e as any).schemeAssignedSets) > 0) && !/FST-7/.test(String((e as any).comment || ''))))
         .filter(e => (e.sets || 0) > 2)
         .sort((a, b) => (a.role === 'primary' ? 1 : 0) - (b.role === 'primary' ? 1 : 0) || (b.sets || 0) - (a.sets || 0));
       if (!pool.length) break;
@@ -452,7 +489,7 @@ function expandPlanToTargets(
       let best: any = null; let bestVal = 0;
       for (const s of week.sessions) for (const e of s.exercises) {
         if ((e as any).warmupActivator || (e.sets || 0) <= 2) continue;
-        if (/FST-7/.test(String((e as any).comment || ''))) continue;
+        if (/FST-7/.test(String((e as any).comment || '')) || Number((e as any).schemeAssignedSets) > 0) continue;
         let val = 0;
         try {
           const contribs = exerciseVolumeContributions(e as any) as any[];
@@ -1766,15 +1803,14 @@ export function convertCycleToBBPlan(input: CycleToPlanInput): BBPlan {
   });
   const cycleJointGuard = !!cyclePedMethod.jointGuard;
   const cycleSoloInsulin = !!cyclePedMethod.insulinSafety?.soloWithoutAasGh;
-  const cycleVolumeScheme: 'standard' | 'gvt' | 'fst7' | 'gironda' = (() => {
-    const scheme = input.volumeScheme || 'standard';
-    if (mode === 'faithful') return 'standard';
-    if (scheme !== 'fst7') return scheme;
-    if (level !== 'enhanced' || cycleJointGuard || cycleSoloInsulin) return 'standard';
-    return 'fst7';
-  })();
+  const cycleVolumeScheme = resolveCycleVolumeScheme(input.volumeScheme, {
+    mode,
+    level,
+    jointGuard: cycleJointGuard,
+    soloInsulin: cycleSoloInsulin,
+    rationale,
+  });
   const cycleFst7Seven = cycleVolumeScheme === 'fst7' && mode === 'adapt';
-  if (input.volumeScheme === 'fst7' && cycleVolumeScheme === 'standard') rationale.push('⛔ FST-7 7-in-1: cycle path оставлен в standard (faithful/уровень/joint-guard/соло-инсулин).');
 
   // Предписанные цели объёма по ВСЕМ мышцам (паритет с generic) — только adapt.
   const cycleVolumeTargets = mode === 'adapt'
@@ -1786,10 +1822,28 @@ export function convertCycleToBBPlan(input: CycleToPlanInput): BBPlan {
         doseAwareMrv: pedAdapt.combinedMrvMultiplier,
       })
     : undefined;
+  const cycleMrvByMuscle: Record<string, number> | undefined = mode === 'adapt' ? (() => {
+    const mrvMap: Record<string, number> = {};
+    for (const [m, lmRaw] of Object.entries(allLandmarks as Record<string, { mrv?: number; mev?: number } | undefined>)) {
+      const lm = lmRaw as { mrv?: number; mev?: number } | undefined;
+      if (!lm?.mrv) continue;
+      let capMrv = Math.round((lm as any).mrv * mrvMult);
+      if (input.sex === 'female' && (m === 'glutes' || m === 'hamstrings')) capMrv = Math.round(capMrv * 1.2);
+      mrvMap[m] = capMrv;
+    }
+    raiseBackCapToOwnerCanon(mrvMap, { level, trainingYears: input.trainingYears, onCourse, courseIntensity: input.courseIntensity });
+    const specTargets = new Set([...weakPoints, ...(specSchedule.blocks.flatMap(b => b.targets))]);
+    for (const t of specTargets) {
+      const lm = (allLandmarks as any)[t];
+      if (lm?.mrv) mrvMap[t] = Math.round(mrvMap[t] * specializationMrvFactor(t, specResForWeekSchedule(specSchedule, 1)) || mrvMap[t]);
+    }
+    return mrvMap;
+  })() : undefined;
 
   const finalized = finalizeBBPlan({
     ...finalPlan,
     ...(cycleVolumeTargets ? { volumeTargets: cycleVolumeTargets } : {}),
+    ...(cycleMrvByMuscle ? { mrvByMuscle: cycleMrvByMuscle } : {}),
     volumeLandmarks,
     muscleFrequency,
     // Ф1.1: цикл управляет своей периодизацией (meta.deloadWeeks или выведенные
@@ -1925,22 +1979,7 @@ export function convertCycleToBBPlan(input: CycleToPlanInput): BBPlan {
   // indirect — против этого капа; после прямого капа добираем трим по
   // эффективному объёму: изоляции/accessory последними сетами).
   if (mode === 'adapt') {
-    const mrvByMuscle: Record<string, number> = {};
-    for (const [m, lmRaw] of Object.entries(allLandmarks as Record<string, { mrv?: number; mev?: number } | undefined>)) {
-      const lm = lmRaw as { mrv?: number; mev?: number } | undefined;
-      if (!lm?.mrv) continue;
-      let capMrv = Math.round((lm as any).mrv * mrvMult);
-      // Female posterior boost: кап поднимается в такт объёмному ×1.2 (glutes/hams),
-      // иначе кап стирает женский акцент; реальный перебор всё равно режется.
-      if (input.sex === 'female' && (m === 'glutes' || m === 'hamstrings')) capMrv = Math.round(capMrv * 1.2);
-      mrvByMuscle[m] = capMrv;
-    }
-    raiseBackCapToOwnerCanon(mrvByMuscle, { level, trainingYears: input.trainingYears, onCourse, courseIntensity: input.courseIntensity });
-    const specTargets = new Set([...weakPoints, ...(specSchedule.blocks.flatMap(b => b.targets))]);
-    for (const t of specTargets) {
-      const lm = (allLandmarks as any)[t];
-      if (lm?.mrv) mrvByMuscle[t] = Math.round(mrvByMuscle[t] * specializationMrvFactor(t, specResForWeekSchedule(specSchedule, 1)) || mrvByMuscle[t]);
-    }
+    const mrvByMuscle: Record<string, number> = cycleMrvByMuscle ? { ...cycleMrvByMuscle } : {};
     const floorSetsFor = (muscle: string, ex: any): number => {
       const cap = perExerciseCap(level, muscle, input.trainingYears, onCourse);
       return Math.min(2, cap);
@@ -3048,10 +3087,7 @@ export function programToBBPlan(program: FullProgram, opts: ProgramToBBPlanOpts)
   // Единый passthrough методик program-пути (аудит 2026-09):
   //  • volumeScheme: FST-7 7-in-1 только enhanced без joint-guard (паритет с generic);
   //  • rotationMode / intensityLevel / onCourse / trainingVolumeMode — в finalize.
-  const programVolumeScheme: 'standard' | 'gvt' | 'fst7' | 'gironda' = (() => {
-    const scheme = (opts as any).volumeScheme as 'standard' | 'gvt' | 'fst7' | 'gironda' | undefined;
-    if (mode === 'faithful') return 'standard';
-    if (scheme !== 'fst7') return scheme || 'standard';
+  const programVolumeScheme = (() => {
     const lvl = String(opts.level ?? levelForLandmarks);
     const pedMethod = recommendPEDMethodology({
       peds: (opts.peds || []) as any,
@@ -3060,8 +3096,12 @@ export function programToBBPlan(program: FullProgram, opts: ProgramToBBPlanOpts)
       goal: opts.goal,
       focus: opts.trainingFocus,
     });
-    if (lvl !== 'enhanced' || pedMethod.jointGuard || pedMethod.insulinSafety?.soloWithoutAasGh) return 'standard';
-    return 'fst7';
+    return resolveCycleVolumeScheme((opts as any).volumeScheme, {
+      mode,
+      level: lvl,
+      jointGuard: !!pedMethod.jointGuard,
+      soloInsulin: !!pedMethod.insulinSafety?.soloWithoutAasGh,
+    });
   })();
   const programFst7Seven = programVolumeScheme === 'fst7' && mode === 'adapt';
   // Частота МЫШЦЫ = число СЕССИЙ/нед (не «число недель»): спина в PPL = 2, не 1.
@@ -3086,9 +3126,32 @@ export function programToBBPlan(program: FullProgram, opts: ProgramToBBPlanOpts)
         doseAwareMrv: pedAdapt.combinedMrvMultiplier,
       })
     : undefined;
+  const programMrvByMuscle: Record<string, number> | undefined = mode === 'adapt' ? (() => {
+    const mrvMap: Record<string, number> = {};
+    for (const [m, lmRaw] of Object.entries(allLandmarks as Record<string, { mrv?: number } | undefined>)) {
+      const mrv = lmRaw?.mrv;
+      if (!mrv) continue;
+      let capMrv = Math.round(mrv * pedMrvMult);
+      if (opts.trainingVolumeMode === 'high') {
+        const lvl = String(opts.level ?? levelForLandmarks);
+        const boost = lvl === 'enhanced' && (opts.trainingYears ?? 0) >= 6 ? 1.35 : lvl === 'enhanced' ? 1.30 : 1.25;
+        capMrv = Math.round(capMrv * boost);
+      }
+      if (opts.sex === 'female' && (m === 'glutes' || m === 'hamstrings')) capMrv = Math.round(capMrv * 1.2);
+      mrvMap[m] = capMrv;
+    }
+    raiseBackCapToOwnerCanon(mrvMap, { level: String(opts.level ?? levelForLandmarks), trainingYears: opts.trainingYears, onCourse: programOnCourse, courseIntensity: opts.courseIntensity });
+    const specTargetsProgram = new Set([...weakPoints, ...specSchedule.blocks.flatMap(b => b.targets)]);
+    for (const t of specTargetsProgram) {
+      const lmSpec = (allLandmarks as any)[t];
+      if (lmSpec?.mrv) mrvMap[t] = Math.round(mrvMap[t] * specializationMrvFactor(t, specResForWeekSchedule(specSchedule, 1)) || mrvMap[t]);
+    }
+    return mrvMap;
+  })() : undefined;
   const finalized = finalizeBBPlan({
     ...finalPlan,
     ...(programVolumeTargets ? { volumeTargets: programVolumeTargets } : {}),
+    ...(programMrvByMuscle ? { mrvByMuscle: programMrvByMuscle } : {}),
     volumeLandmarks,
     muscleFrequency,
     // Контекст специализации/лимитов сохраняется для повторной финализации.
@@ -3256,7 +3319,11 @@ export function programToBBPlan(program: FullProgram, opts: ProgramToBBPlanOpts)
           if (totalSets <= programSessionLimits.maxWorkingSets) break;
           const cands = working
             .filter((e: any) => e.role !== 'primary' && e.sets > 1 && !/MGF\/IGF1 слот/.test(String(e.comment || '')))
-            .sort((a: any, b: any) => (a.sets || 0) - (b.sets || 0));
+            .sort((a: any, b: any) => {
+              const sa = (Number((a as any).schemeAssignedSets) > 0 || SCHEME_MARK_RE.test(String(a.comment || ''))) ? 1 : 0;
+              const sb = (Number((b as any).schemeAssignedSets) > 0 || SCHEME_MARK_RE.test(String(b.comment || ''))) ? 1 : 0;
+              return (sa - sb) || ((a.sets || 0) - (b.sets || 0));
+            });
           if (cands.length === 0) break;
           const victim = cands[0];
           victim.sets -= 1;

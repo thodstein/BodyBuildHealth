@@ -27,10 +27,13 @@ describe('All buttons/paths', () => {
     const push = plan.weeks[0].sessions.find(s=>s.sessionTag==='Push')!;
     expect(push.exercises.some(e=>/наклон|incline/i.test(e.name))).toBe(true);
   });
-  it('DUP varies characters', () => {
+  it('DUP varies per-muscle characters/reps', () => {
     const base = buildBBPlan({ patternId: 'ppl_6', level: 'intermediate', goal: 'mass', weeks: 1, workMax: WM });
     const dup = applyDUPOverlay(JSON.parse(JSON.stringify(base)), { mode: 'full_dup', cycleDays: 3 });
-    expect(dup.weeks[0].sessions.map(s=>s.character).join(',')).not.toBe(base.weeks[0].sessions.map(s=>s.character).join(','));
+    const sig = (pl: any) => pl.weeks[0].sessions.flatMap((s: any) =>
+      s.exercises.map((e: any) => `${e.name}:${e.character}:${e.repsRange?.join('-')}`)
+    ).join('|');
+    expect(sig(dup)).not.toBe(sig(base));
   });
   it('superset adds pairs', () => {
     const plan = buildBBPlan({ patternId: 'ppl_6', level: 'intermediate', goal: 'mass', weeks: 1, workMax: WM, supersetMode: 'antagonist' as any });

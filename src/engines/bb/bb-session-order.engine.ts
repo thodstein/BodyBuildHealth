@@ -229,14 +229,6 @@ export function orderSessionExercises(exercises: BBExercise[], opts: OrderOpts =
   const leadMuscles = new Set(
     [...leadCandidates].filter(m => forOrder.some(e => collapseMuscle(e.muscle || '') === m && isCompoundEx(e))),
   );
-  // O-2: номер упражнения этой мышцы в сессии (для «кругового» чередования).
-  const occSeen: Record<string, number> = {};
-  const occIndex = forOrder.map(e => {
-    const m = collapseMuscle(e.muscle || '');
-    const idx = occSeen[m] || 0;
-    occSeen[m] = idx + 1;
-    return idx;
-  });
   const ctx: RankCtx = {
     primaryMuscle,
     tagMuscleSet,
@@ -247,28 +239,89 @@ export function orderSessionExercises(exercises: BBExercise[], opts: OrderOpts =
     axialAware: !!opts.axialAware,
     goal,
   };
-  const indexed = forOrder.map((ex, idx) => ({ ex, idx, key: rankKey(ex, ctx, occIndex[idx]) }));
-  // Лексикографическое сравнение кортежа.
-  indexed.sort((a, b) => {
+  const baseIndexed = forOrder.map((ex, idx) => ({ ex, idx, key: rankKey(ex, { ...ctx, interleave: false }, 0) }));
+  baseIndexed.sort((a, b) => {
     const ka = a.key, kb = b.key;
     for (let i = 0; i < ka.length; i++) {
       if (ka[i] !== kb[i]) return ka[i] - kb[i];
     }
-    return a.idx - b.idx; // стабильность при полном равенстве
+    return a.idx - b.idx;
   });
-  const sortedRest = indexed.map(x => x.ex);
-  // Правило №1 модуля: compound раньше изоляции. Кортеж группирует мышцы и в
-  // FB/Legs может поставить изоляцию «мышцы дня» (или первую изоляцию списка)
-  // перед базой другой мышцы. Один финальный перенос ведущего компаунда
-  // выправляет первый слот, не перетасовывая остальную сессию.
-  // Методики, где изоляция-праймер намеренно первая, не трогаем.
+  let sortedRest = baseIndexed.map(x => x.ex);
+  if (opts.interleave) {
+    // O-2: compute occIndex AFTER deterministic intra-muscle sort so #0 is always
+    // the heaviest compound of each muscle regardless of input array ordering.
+    const occSeen: Record<string, number> = {};
+    const interIndexed = sortedRest.map((ex, idx) => {
+      const m = collapseMuscle(ex.muscle || '');
+      const occ = occSeen[m] || 0;
+      occSeen[m] = occ + 1;
+      return { ex, idx, key: rankKey(ex, ctx, occ) };
+    });
+    interIndexed.sort((a, b) => {
+      const ka = a.key, kb = b.key;
+      for (let i = 0; i < ka.length; i++) {
+        if (ka[i] !== kb[i]) return ka[i] - kb[i];
+      }
+      return a.idx - b.idx;
+    });
+    sortedRest = interIndexed.map(x => x.ex);
+  }
+  // Правило №1 модуля: compound раньше изоляции. Методики pre_exhaust / mountain_dog / fst7
+  // сознательно ставят лёгкий праймер/предутомление первым; hyperemia оставляет базу первой.
   const isolationFirstMethod = methodology === 'pre_exhaust' || methodology === 'mountain_dog'
-    || methodology === 'fst7' || methodology === 'hyperemia';
+    || methodology === 'fst7';
   if (!isolationFirstMethod) {
     const gluteDay = /Glutes/i.test(opts.sessionTag || '');
     const leadIdx = sortedRest.findIndex(e => isMajorLeadCompound(e)
       && (!gluteDay || collapseMuscle(e.muscle || '') === 'glutes'));
     if (leadIdx > 0) sortedRest.unshift(sortedRest.splice(leadIdx, 1)[0]);
+  }
+  // pre_exhaust: только ОДИН праймер перед базой; лишние изоляции возвращаются за базу.
+  if (methodology === 'pre_exhaust') {
+    let primerSeen = false;
+    const demoted: BBExercise[] = [];
+    const kept: BBExercise[] = [];
+    for (const e of sortedRest) {
+      const isPrimIso = collapseMuscle(e.muscle || '') === collapseMuscle(primaryMuscle) && !isCompoundEx(e);
+      if (isPrimIso && !primerSeen) { primerSeen = true; kept.push(e); }
+      else if (isPrimIso && primerSeen && kept.some(k => collapseMuscle(k.muscle || '') === collapseMuscle(primaryMuscle) && isCompoundEx(k)) === false) {
+        demoted.push(e);
+      } else kept.push(e);
+    }
+    if (demoted.length) {
+      const compIdx = kept.findIndex(e => collapseMuscle(e.muscle || '') === collapseMuscle(primaryMuscle) && isCompoundEx(e));
+      if (compIdx >= 0) kept.splice(compIdx + 1, 0, ...demoted);
+      else kept.push(...demoted);
+      sortedRest = kept;
+    }
+  }
+  // Axial spacing: не ставим два осевых лифта подряд без передышки, если есть не-осевой буфер,
+  // не нарушая правило "compound раньше isolation" той же мышцы и не фрагментируя блок мышцы.
+  if (opts.axialAware && methodology !== 'pre_exhaust' && methodology !== 'post_exhaust' && sortedRest.length >= 3) {
+    for (let i = 0; i < sortedRest.length - 1; i++) {
+      const a = sortedRest[i];
+      const b = sortedRest[i + 1];
+      if ((a as any).supersetGroup != null || (b as any).supersetGroup != null) continue;
+      const ca = axialCostOf(a.name || '');
+      const cb = axialCostOf(b.name || '');
+      if (ca >= 1 && cb >= 1 && Math.max(ca, cb) >= 2) {
+        const bufIdx = sortedRest.findIndex((cand, j) => {
+          if (j <= i + 1 || (cand as any).supersetGroup != null || axialCostOf(cand.name || '') !== 0) return false;
+          const cm = collapseMuscle(cand.muscle || '');
+          const sameAsA = cm === collapseMuscle(a.muscle || '');
+          if (!sameAsA && !opts.interleave) return false;
+          if (!isCompoundEx(cand) && sortedRest.slice(i + 1, j).some(prev => collapseMuscle(prev.muscle || '') === cm && isCompoundEx(prev))) {
+            return false;
+          }
+          return sameAsA || cm === collapseMuscle(b.muscle || '') || opts.interleave;
+        });
+        if (bufIdx > i + 1) {
+          const [buf] = sortedRest.splice(bufIdx, 1);
+          sortedRest.splice(i + 1, 0, buf);
+        }
+      }
+    }
   }
   return warmups.length ? ([...warmups, ...sortedRest] as BBExercise[]) : sortedRest;
 }
@@ -296,8 +349,10 @@ function isStretchHolder(name: string): boolean {
  */
 export function axialCostOf(name: string): number {
   const n = (name || '').toLowerCase();
-  if (/становая|deadlift|сумо.*тяга|good.?morning|наклон.*штанга.*тяга|швунг|power.?clean|толчок/i.test(n)) return 2;
-  if (/присед|squat|выпад|lunge|жим.*стоя|overhead.?press|армейск|тяга.*наклон|bent.?over|т-образн|t-bar|hip.?thrust|румынск|rdl/i.test(n)) return 1;
+  if (/становая|deadlift|сумо.*тяга|good.?morning|гудморнинг|наклон.*штанга.*тяга|швунг|power.?clean|толчок/i.test(n)) return 2;
+  if ((/присед|squat|фронт/i.test(n)) && !/машин|machine|смит|smith|поясн|belt|гакк|хак|hack|гоблет|goblet|сидя|леж/i.test(n)) return 2;
+  if (/выпад|lunge|жим.*стоя|overhead.?press|армейск|тяга.*наклон|bent.?over|т-образн|t-bar|румынск|rdl/i.test(n)) return 1;
+  if ((/ягодичн.*мост|hip.?thrust/i.test(n)) && !/полу|floor|bodyweight|своим весом/i.test(n)) return 1;
   return 0;
 }
 
@@ -332,16 +387,16 @@ function rankKey(ex: BBExercise, ctx: RankCtx, occIndex = 0): number[] {
   let tier: number;
   if (methodology === 'pre_exhaust' && isPrimaryIsolation) tier = -1;
   // P2-9 (audit 2026-08): post_exhaust — изоляция primary мышцы идёт СРАЗУ после compound
-  // (tier=1, приоритетнее других изоляций). Раньше post_exhaust = compound_first без различий.
-  else if (methodology === 'post_exhaust' && isPrimaryIsolation) tier = 1;
+  // (tier=0.5, строго перед другими упражнениями).
+  else if (methodology === 'post_exhaust' && isPrimaryIsolation) tier = 0.5;
   // mountain_dog (Meadows): лёгкая активация (изоляция primary, RIR≥3 — НЕ в отказ)
   // первой, loaded stretch — последним. Остальное как compound_first.
   else if (methodology === 'mountain_dog' && isStretchHolder(ex.name || '')) tier = 4;
   else if (methodology === 'mountain_dog' && isPrimaryIsolation && exRir >= 3) tier = -0.5;
-  // fst7 (Rambod): лёгкий памп-праймер основной мышцы (RIR≥3, не в отказ)
-  // — front-loading the sevens (продвинутый вариант), loaded stretch — последним.
-  // Основной 7-сетовый финишер и так последний через isFinisher (tier 3).
+  // fst7 (Rambod): 7-сетовый финишер всегда в конце (tier 3); лёгкий памп-праймер
+  // основной мышцы (RIR≥3, не в отказ) — в начале (-0.5), loaded stretch — последним (4).
   else if (methodology === 'fst7' && isStretchHolder(ex.name || '')) tier = 4;
+  else if (methodology === 'fst7' && (/FST-?7/i.test(String((ex as any).comment || '')) || Number((ex as any).schemeAssignedSets) === 7)) tier = 3;
   else if (methodology === 'fst7' && isPrimaryIsolation && exRir >= 3 && ex.character !== 'тяж') tier = -0.5;
   // hyperemia (Sarcev): памп-изоляция аксессуара идёт раньше тяжёлой
   // аксессуарной работы — это обещание методики, а не только порядок внутри
@@ -360,15 +415,19 @@ function rankKey(ex: BBExercise, ctx: RankCtx, occIndex = 0): number[] {
   // её база встаёт ВНУТРИ блока мышцы дня по tier — то есть раньше изоляций
   // (tier 2) и финишёров (tier 3) этой же мышцы. Это и есть обещание
   // «отстающая мышца — раньше», не ломающее группировку дня.
-  const leadApplies = !isPrimaryMuscle && leadMuscles.has(exMuscle) && compound;
-  const priorityLevel = (isPrimaryMuscle || leadApplies) ? 0 : 1;
+  const leadApplies = !isPrimaryMuscle && leadMuscles.has(exMuscle);
+  const priorityLevel = (isPrimaryMuscle || (leadApplies && compound)) ? 0 : (leadApplies ? 1 : 2);
   const priorityFlag = priorityMuscles.has(exMuscle) ? 0 : 1;
-  // muscleGroup: внутри primary/не-primary — группировка по мышце.
-  // ВАЖНО: muscleGroup идёт ДО priorityFlag — все упражнения одной мышцы
-  // должны идти ПОДРЯД. Если priorityFlag раньше, weak-упражнение другой
-  // мышцы вклинивается между группами (ноги-спина-ноги), ломая сессию.
-  const primaryGroup = MUSCLE_ORDER[collapseMuscle(primaryMuscle)] ?? 12;
-  const muscleGroup = (isPrimaryMuscle || leadApplies) ? primaryGroup : (MUSCLE_ORDER[exMuscle] ?? 12);
+  // Каждая мышца держит свой собственный MUSCLE_ORDER — weak/lead мышца идёт
+  // отдельным цельным блоком сразу после мышцы дня (zero muscle fragmentation),
+  // кроме случая O-1: compound lead-мышцы встаёт внутри блока мышцы дня по tier.
+  const effectiveMuscleGroup = (leadApplies && compound)
+    ? (MUSCLE_ORDER[collapseMuscle(primaryMuscle)] ?? 12)
+    : (MUSCLE_ORDER[exMuscle] ?? 12);
+  const rawMuscle = (ex.muscle || '').toLowerCase();
+  const subMuscleIdx = (leadApplies && compound)
+    ? 0
+    : rawMuscle === 'delt_mid' ? 1 : rawMuscle === 'delt_rear' ? 2 : 0;
 
   // Характер нагрузки: тяж (0) всегда перед памп (1) и лёг (2) даже внутри одного tier (GVT vs тяжёлые махи).
   // hyperemia (Sarcev): у аксессуаров наоборот — кровь первее веса, памп раньше тяжестей.
@@ -401,12 +460,12 @@ function rankKey(ex: BBExercise, ctx: RankCtx, occIndex = 0): number[] {
     // совпадала с compound_first.
     if (methodology === 'hyperemia') {
       const bucket = isPrimaryHeavy ? 0 : (tier === 0.5 ? 0.5 : 1);
-      return [bucket, occIndex, muscleGroup, priorityFlag, tier, charRank, subOrder, axial, load];
+      return [bucket, occIndex, effectiveMuscleGroup, priorityFlag, tier, charRank, subOrder, axial, load];
     }
     const bucket = (isPrimaryMuscle || (compound && ex.character === 'тяж')) ? 0 : 1;
-    return [bucket, occIndex, muscleGroup, priorityFlag, tier, charRank, subOrder, axial, load];
+    return [bucket, occIndex, effectiveMuscleGroup, priorityFlag, tier, charRank, subOrder, axial, load];
   }
-  return [priorityLevel, muscleGroup, priorityFlag, tier, charRank, subOrder, axial, load];
+  return [priorityLevel, effectiveMuscleGroup, subMuscleIdx, tier, priorityFlag, charRank, subOrder, axial, load];
 }
 
 function collapseMuscle(m: string): string {

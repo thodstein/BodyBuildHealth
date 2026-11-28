@@ -263,12 +263,16 @@ describe('P2-7 (ядро): auto-MEV-feeder добивает точно и по �
         .toBeLessThanOrEqual(g.mev);
     }
     // Если бы разрыв брался из первой недели, число фидер-сетов было бы одинаковым
-    // во всех неделях мезо.
+    // во всех неделях мезо (проверяем на сплите с разными разрывами по неделям).
+    const ulPlan = buildBBPlan(makeInput({ patternId: 'upper_lower_4', weeks: 8 })) as any;
     const byMuscle = new Map<string, Set<number>>();
-    for (const g of list) {
-      const s = byMuscle.get(g.muscle) || new Set<number>();
-      s.add(g.sets);
-      byMuscle.set(g.muscle, s);
+    for (const w of ulPlan.weeks || []) {
+      for (const s of w.sessions || []) for (const e of s.exercises || []) {
+        if (!/Auto-MEV-feeder/i.test(String(e.comment || ''))) continue;
+        const st = byMuscle.get(e.muscle) || new Set<number>();
+        st.add(Number(e.sets) || 0);
+        byMuscle.set(e.muscle, st);
+      }
     }
     expect([...byMuscle.values()].some(s => s.size > 1)).toBe(true);
   });
@@ -366,7 +370,9 @@ describe('P2-8 (ядро): добивка плеч идёт по ГОЛОВКА�
   });
 
   it('добивка головки помечена ГРУППОЙ: нового ключа мышцы в дне не появляется', () => {
-    const p: any = buildBBPlan(makeInput({ patternId: 'ppl_6', level: 'intermediate', weeks: 1 }));
+    // ppl_6 уже набирает 9 сетов delt_mid нативно (≥ MEV 4); добивка головки
+    // срабатывает на fullbody_3 intermediate и должна нести метку группы 'shoulders'.
+    const p: any = buildBBPlan(makeInput({ patternId: 'fullbody_3', level: 'intermediate', weeks: 1 }));
     const headFeeds = feedersFor(p, /для delt_(mid|rear):/);
     expect(headFeeds.length).toBeGreaterThan(0);
     // До P2-8 добивка несла СОБСТВЕННУЮ метку `delt_mid`: в сессии появлялся новый

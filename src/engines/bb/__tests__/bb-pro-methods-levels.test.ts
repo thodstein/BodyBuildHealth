@@ -29,7 +29,7 @@ function invariants(plan: any, allowDeloadSingles = true): { over5: number; sing
     const isDeload = w.phase === 'deload';
     for (const s of w.sessions) for (const e of s.exercises) {
       if (e.warmupActivator) continue;
-      if (e.sets > 5) over5++;
+      if (!(Number(e.schemeAssignedSets) > 0) && e.sets > 5) over5++;
       if (!isDeload && e.sets < 2) single++;
     }
   }
@@ -88,23 +88,19 @@ describe('Проф-методики × уровни (матрица)', () => {
         }
       });
 
-      it(`${name} × ${split}: схема объёма gvt — применена (5×10, 75с), кап-аджуст может срезать; инварианты чисты`, () => {
+      it(`${name} × ${split}: схема объёма gvt — классическая 10×10 только с advanced+, инварианты чисты`, () => {
         const plan = buildBBPlan({ ...base, volumeScheme: 'gvt' });
         const inv = invariants(plan);
         expect(inv).toEqual({ over5: 0, single: 0, ovf: 0 });
-        // 26.09.2026 (аудит): taper-недели исключены — GVT (высокообъёмная схема) не
-        // должен возвращать объём в уже срезанные недели (иначе taper ×0.75/×0.50
-        // откатывается). Проверяем не-taper рабочие недели.
         const applied = plan.weeks.filter((w: any) => w.phase !== 'deload' && !(w as any).taper && !(w as any).taperApplied)
           .flatMap((w: any) => w.sessions)
           .flatMap((s: any) => s.exercises).filter((e: any) => (e.comment || '').includes('GVT'));
-        if (isBeginner) {
-          // Новичку GVT не применяется.
+        if (level === 'beginner' || level === 'intermediate') {
+          // Классический GVT 10×10 безопасно доступен с уровня advanced+.
           expect(applied.length).toBe(0);
         } else {
-          // Схема корректна там, где есть запас по MRV; кап-аджуст может срезать до 2.
           for (const e of applied) {
-            expect(e.sets).toBeLessThanOrEqual(5);
+            expect(e.sets).toBeLessThanOrEqual(10);
             expect(e.sets).toBeGreaterThanOrEqual(2);
             expect(e.repsRange[0]).toBe(10);
             expect(e.restSeconds).toBe(75);
@@ -128,14 +124,12 @@ describe('Проф-методики × уровни (матрица)', () => {
     }
   }
 
-  it('схема gvt на 12-нед плане реально даёт 5×10 (не только кап-срез)', () => {
-    // 26.09.2026 (аудит): на коротком 4-нед плане почти все рабочие недели — taper
-    // (GVT их не трогает), поэтому «полное применение 5×10» проверяем на длинном плане.
-    const plan = buildBBPlan({ patternId: 'upper_lower_4', level: 'intermediate', trainingYears: 3, goal: 'mass', weeks: 12, workMax: WM, volumeScheme: 'gvt' } as any);
+  it('схема gvt на 12-нед плане (advanced+) реально даёт 10×10 (не только кап-срез)', () => {
+    const plan = buildBBPlan({ patternId: 'upper_lower_4', level: 'advanced', trainingYears: 5, goal: 'mass', weeks: 12, workMax: WM, volumeScheme: 'gvt' } as any);
     const applied = plan.weeks.filter((w: any) => w.phase !== 'deload' && !(w as any).taper && !(w as any).taperApplied)
       .flatMap((w: any) => w.sessions).flatMap((s: any) => s.exercises)
       .filter((e: any) => (e.comment || '').includes('GVT'));
-    expect(applied.some((e: any) => e.sets === 5)).toBe(true);
+    expect(applied.some((e: any) => e.sets === 10)).toBe(true);
   });
 
   it('комбо (DUP + суперсеты + GVT) — все инварианты чисты на ключевых уровнях', () => {

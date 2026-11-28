@@ -145,21 +145,23 @@ describe('§6.1 FST-7 — протокол с темпом, а не только
   });
 });
 
-describe('§6.5 новичок — только дроп-сет, без отказных техник', () => {
-  it('в плане новичка нет rest-pause/myo-rep, а дроп-сет — не больше одного на сессию', () => {
+describe('§6.5 новичок — без принудительных дроп-сетов и отказных техник', () => {
+  it('в плане новичка 0 принудительных техник и никогда нет rest-pause/myo-rep', () => {
     const p = plan('beginner');
     const used: string[] = p.weeks.flatMap((w: any) => w.sessions)
       .flatMap((s: any) => s.exercises)
       .flatMap((e: any) => (e.workSets || []).map((ws: any) => String(ws.technique || '')))
       .filter(Boolean);
-    for (const t of used) expect(['dropset'], `новичок получил ${t}`).toContain(t);
-    expect(used.length, 'дроп-сет новичку не назначен ни разу — правило не работает').toBeGreaterThan(0);
-    for (const w of p.weeks) {
-      for (const s of w.sessions) {
-        const n = s.exercises.filter((e: any) => (e.workSets || []).some((ws: any) => ws.technique)).length;
-        expect(n).toBeLessThanOrEqual(1);
-      }
-    }
+    expect(used).toEqual([]);
+
+    // Даже при явной передаче rest_pause новичку отказные техники не применяются.
+    const explicit = plan('beginner', { intensityTechnique: 'rest_pause' as any });
+    const usedExplicit: string[] = explicit.weeks.flatMap((w: any) => w.sessions)
+      .flatMap((s: any) => s.exercises)
+      .flatMap((e: any) => (e.workSets || []).map((ws: any) => String(ws.technique || '')))
+      .filter(Boolean);
+    expect(usedExplicit).not.toContain('rest_pause');
+    expect(usedExplicit).not.toContain('myo_rep');
   });
 });
 

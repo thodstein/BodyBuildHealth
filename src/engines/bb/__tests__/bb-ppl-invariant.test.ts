@@ -178,9 +178,9 @@ describe('BB PPL invariants', () => {
         } else {
           expect(quadEx.length, 'хам-день квадры 3').toBeGreaterThanOrEqual(3);
           for (const e of quadEx) expect(e.character, 'квадры памп').toBe('памп');
-          const hasWell = hamEx.some((e: any) => /колодец|well.?squat|гакк.*бицепс|hack.*ham/i.test(e.name||''));
+          const hasWell = hamEx.some((e: any) => /колодц|well.?squat|гакк.*бицепс|hack.*ham/i.test(e.name||''));
           expect(hasWell, 'хам-день колодец/гакк-хами база').toBe(true);
-          const base = s.exercises.find((e: any) => /колодец|well.?squat|гакк.*бицепс/i.test(e.name||''));
+          const base = s.exercises.find((e: any) => /колодц|well.?squat|гакк.*бицепс/i.test(e.name||''));
           if (base) expect(base.character).toBe('тяж');
         }
       }

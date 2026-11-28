@@ -57,6 +57,7 @@ export function isAxialLoadExercise(ex: Exercise): boolean {
   if (n.includes('жим ног') || n.includes('leg press') || n.includes('пресс ног')
     || n.includes('болгар') || n.includes('bulgarian') || n.includes('гоблет')
     || n.includes('goblet') || n.includes('машина') || n.includes('machine') || n.includes('хак')
+    || n.includes('гакк') || n.includes('тренаж') || n.includes('поясн') || id.includes('belt') || id.includes('hack')
     || n.includes('сидя') || n.includes('грудью') || n.includes('chest_supported')
     || n.includes('блок') || n.includes('landmine') || n.includes('кардио')
     || n.includes('ходьб') || n.includes('осо') || n.includes('sled') || n.includes('walk') || n.includes('carry')) return false;
@@ -79,7 +80,7 @@ export function isAxialLoadExercise(ex: Exercise): boolean {
   if (n.includes('жим') && (n.includes('стоя') || n.includes('армей') || n.includes('overhead') || n.includes('над голов'))) return true;
   if (id.includes('ohp') || id.includes('overhead') || id.includes('standing_press')) return true;
   // За головой (behind the neck) — осевой + риск
-  if (n.includes('за голов')) return true;
+  if ((n.includes('жим') || n.includes('тяга')) && (n.includes('за голов') || n.includes('из-за голов'))) return true;
 
   // P10: Тяги в наклоне — НЕ все осевые. Уточнение:
   //   - chest_supported (грудью к скамье) / с опорой на скамью / single-arm с опорой — НЕ осевая

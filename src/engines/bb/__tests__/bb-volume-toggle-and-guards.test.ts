@@ -3,10 +3,10 @@ import { sessionLimitsFor } from '../bb-volume.engine';
 import { buildBBPlan } from '../bb-builder.engine';
 
 describe('F0: sessionLimitsFor капы от уровня (реализм сессии 2026-09)', () => {
-  it('beginner без фармы 24/10 — 60 недоступно', () => {
+  it('beginner без фармы 18/8 — 60 недоступно', () => {
     const l = sessionLimitsFor({ level: 'beginner', trainingYears: 2 });
-    expect(l.maxWorkingSets).toBe(24);
-    expect(l.maxExercises).toBe(10);
+    expect(l.maxWorkingSets).toBe(18);
+    expect(l.maxExercises).toBe(8);
   });
   it('intermediate без фармы 24/10', () => {
     const l = sessionLimitsFor({ level: 'intermediate', trainingYears: 1 });
@@ -94,13 +94,13 @@ describe('F0: validator NaN guard', () => {
 });
 
 describe('Объёмный vs обычный — капы freeze', () => {
-  it('beginner high volume still 24 cap via sessionLimits', () => {
+  it('beginner high volume still 18 cap via sessionLimits', () => {
     const standard = sessionLimitsFor({ level: 'beginner', trainingYears: 2 });
     const high = sessionLimitsFor({ level: 'beginner', trainingYears: 2, onCourse: false });
-    expect(standard.maxWorkingSets).toBe(24);
-    expect(high.maxWorkingSets).toBe(24);
+    expect(standard.maxWorkingSets).toBe(18);
+    expect(high.maxWorkingSets).toBe(18);
   });
-  it('buildBBPlan high volume (mrv) vs standard (mav) — high не превышает cap 24 для новичка', () => {
+  it('buildBBPlan high volume (mrv) vs standard (mav) — high не превышает cap 18 для новичка', () => {
     const base = {
       patternId: 'upper_lower_4', level: 'beginner', goal: 'mass' as const, weeks: 4,
       workMax: { chest: 100, back: 100, shoulders: 50, biceps: 40, triceps: 40, quads: 140, hamstrings: 100, glutes: 150 } as any,

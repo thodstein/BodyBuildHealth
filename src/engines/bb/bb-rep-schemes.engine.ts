@@ -441,14 +441,25 @@ export function applySchemeToPlan(
         ex.rir = loading.rir;
         ex.restSeconds = loading.restSec;
         ex.tempoSpec = loading.tempo;
+        const prevLast = ex.workSets?.[ex.workSets.length - 1];
+        const carryTech = scheme.id !== 'dc_rp' && prevLast?.technique
+          ? { technique: prevLast.technique, miniSets: (prevLast as any).miniSets }
+          : null;
         ex.sets = setCount;
-        ex.workSets = Array.from({ length: setCount }, () => ({
-          reps: loading.reps,
-          rir: loading.rir,
-          weight: Math.round(weight * 10) / 10,
-          tempo: loading.tempo,
-          restSeconds: loading.restSec,
-        }));
+        ex.workSets = Array.from({ length: setCount }, (_, idx) => {
+          const ws: any = {
+            reps: loading.reps,
+            rir: loading.rir,
+            weight: Math.round(weight * 10) / 10,
+            tempo: loading.tempo,
+            restSeconds: loading.restSec,
+          };
+          if (idx === setCount - 1 && carryTech) {
+            ws.technique = carryTech.technique;
+            if (carryTech.miniSets) ws.miniSets = carryTech.miniSets;
+          }
+          return ws;
+        });
         // Не оставлять старую заявку «3×8-12» рядом с новым числом сетов/повторов.
         if (!ex.comment?.includes(scheme.nameRu)) {
           const cleaned = String(ex.comment || '')

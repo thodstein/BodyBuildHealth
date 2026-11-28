@@ -101,9 +101,11 @@ function derivePatternUncached(ex: any): string {
   if (/тяга .*верхн|пулдаун|pulldown|подтяг|chin.?up|chinup|pullup/.test(hay)) return 'vertical_pull';
   // Пуловер (не тяга, не вертикальная, не горизонтальная)
   if (/пуловер|pullover|пулов/.test(hay)) return 'isolation_back';
+  if (/французск|skull.?crush|jm.?жим|разгибан.*(?:рук|триц|блок|канат|v-?рукоят|из-за.*голов)/i.test(nm)) return 'isolation_arms';
+  if (/скручиван|кранч|crunch|планк|подъ[её]м.*ног|вакуум/i.test(nm) && !/жим.*ног/i.test(nm)) return 'core';
   if (/выпад|лунг|болгар/.test(nm)) return 'lunge';
   // FIX: vertical_push ДО horizontal_push — иначе «Жим гантелей сидя/стоя» попадает в horizontal_push (грудь)
-  if (/армейск|над голов|вертик|выталк|push.?up|жим.*стоя|жим.*сидя|жим.*смите.*сидя/i.test(nm)) return 'vertical_push';
+  if (/армейск|арнольд|над голов|вертик|выталк|push.?up|жим.*стоя|жим.*сидя|жим.*смите.*сидя/i.test(nm)) return 'vertical_push';
   if (/отрицат|decline|опускан/.test(nm)) return 'decline_push';
   if (/отрицат|decline|опускан/.test(nm)) return 'decline_push';
   if (/жим|пресс.*груд| bench/i.test(nm)) return 'horizontal_push';
@@ -120,9 +122,11 @@ function derivePatternUncached(ex: any): string {
 
   const gMap: Record<string, string> = {
     chest: 'horizontal_push', back: 'horizontal_pull', legs: 'squat', shoulders: 'vertical_push',
-    arms: 'isolation_arms', core: 'core', traps: 'isolation_back', calves: 'isolation_calves',
-    delts: 'vertical_push', delts_rear: 'isolation_shoulders', forearms: 'isolation_arms',
-    glutes: 'glute_squat', quads: 'isolation_legs_quad', hamstrings: 'isolation_legs_ham',
+    arms: 'isolation_arms', biceps: 'isolation_arms', triceps: 'isolation_arms',
+    core: 'core', traps: 'isolation_back', calves: 'isolation_calves',
+    delts: 'vertical_push', delts_rear: 'isolation_shoulders',
+    delt_front: 'vertical_push', delt_mid: 'isolation_shoulders', delt_rear: 'isolation_shoulders',
+    forearms: 'isolation_arms', glutes: 'glute_squat', quads: 'isolation_legs_quad', hamstrings: 'isolation_legs_ham',
   };
   return gMap[g] || 'unknown';
 }
@@ -235,6 +239,9 @@ function trueMuscleOfUncached(ex: any): string | null {
     if (/французск|skull.?crush|jm.?жим|трицепс|разгибан[а-яё]*\s*(рук|триц)/i.test(nm)) return 'triceps';
     if (/обратн[а-яё]*\s*(сведен|разведен)|reverse.?(fly|pec)|задн[а-яё]*\s*дельт|rear.?delt|face.?pull|к лицу/i.test(nm)) return 'shoulders';
     if (/арнольд/i.test(nm)) return 'shoulders';
+    if (/разгибан.*из-?за.*голов|overhead.*tricep|pushdown/i.test(nm)) return 'triceps';
+    if (/пуловер.*дельт|bent.?arm.?pullover/i.test(nm)) return 'shoulders';
+    if (/пуловер.*попер[её]к/i.test(nm)) return 'chest';
     if (/шраг|shrug|келсо|kelso/i.test(nm)) return 'traps';
     if (/к подбородку|upright.?row/i.test(nm)) return 'traps';
     if (/жим.*носками|носками.*жим|calf.?press/i.test(nm)) return 'calves';

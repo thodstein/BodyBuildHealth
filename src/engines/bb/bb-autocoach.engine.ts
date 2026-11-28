@@ -66,18 +66,23 @@ export function prescribeLoad(
       // Compound: accumulation=12, intensification=8 (стандарт).
       // Isolation/cable: accumulation=15, intensification=12.
       const isIsol = exType === 'isolation' || exType === 'cable' || exType === 'machine' || role === 'accessory';
-      const repCap = isIsol
-        ? (phase === 'intensification' ? 12 : 15)
-        : (phase === 'intensification' ? 8 : 12);
+      let repCap: number;
+      if (phase === 'peaking') {
+        repCap = isIsol ? 10 : 6;
+      } else if (currentReps > 15) {
+        repCap = Math.max(isIsol ? 20 : 16, currentReps);
+      } else {
+        repCap = isIsol
+          ? (phase === 'intensification' ? 12 : 15)
+          : (phase === 'intensification' ? 8 : 12);
+      }
       if (currentReps < repCap) {
         return { nextWeight: currentWeight, nextReps: currentReps + 1, nextRIR: Math.max(0, currentRIR - 1), label: `Добейте ${currentReps + 1} повторов (цель ${repCap})` };
       }
-      // Фаза 1.3: микрозагрузка — скачок на ОДНУ доступную пластину (+2.5 кг компаунд,
-      // +1 кг изоляция/кабель, +1.25 кг с микропластинами), а не жёсткие +5%
-      // (для жима 150 кг +5% = +7.5 кг — нереалистично).
       const plate = plateStepFor(exType, role, microPlates);
       const safeJump = roundToPlate(currentWeight + plate, plate);
-      return { nextWeight: safeJump, nextReps: Math.max(6, repCap - 4), nextRIR: Math.max(0, currentRIR - 1), label: `Повысьте вес до ${safeJump} кг` };
+      const resetReps = phase === 'peaking' ? (isIsol ? 8 : Math.max(3, repCap - 2)) : Math.max(6, repCap - 4);
+      return { nextWeight: safeJump, nextReps: resetReps, nextRIR: Math.max(0, currentRIR - 1), label: `Повысьте вес до ${safeJump} кг` };
     }
     case 'linear': {
       const phaseMult = week < totalWeeks * 0.75 ? 1.0 : 0.5;
@@ -380,18 +385,25 @@ function applyIntensityTechniqueToExercise(
 
   switch (technique) {
     case 'rest_pause': {
-      // 1×8+15s+1×3-4+15s+1×3-4 — добавляем 2 mini-сета
-      e.workSets.push({ reps: 3, rir: lastSet.rir, weight: baseWeight, tempo: '2-0-1-0', restSeconds: 15 });
-      e.workSets.push({ reps: 3, rir: lastSet.rir, weight: baseWeight, tempo: '2-0-1-0', restSeconds: 15 });
+      // 1×8+15s+1×3-4+15s+1×3-4 — сохраняем в miniSets + маркируем lastSet.technique
+      // (workSets.length остаётся равным e.sets, чтобы syncBBPlanSetShape не срезал технику).
+      lastSet.technique = 'rest_pause';
+      (lastSet as any).miniSets = [
+        { reps: 3, rir: lastSet.rir, weight: baseWeight, tempo: '2-0-1-0', restSeconds: 15 },
+        { reps: 3, rir: lastSet.rir, weight: baseWeight, tempo: '2-0-1-0', restSeconds: 15 },
+      ];
       if (!e.comment || !e.comment.includes('Rest-pause')) {
-        e.comment = (e.comment || '') + (e.comment ? ' · ' : '') + '🎯 Rest-pause финальный сет';
+        e.comment = (e.comment || '') + (e.comment ? ' · ' : '') + '🎯 Rest-pause финальный сет (1× + 15с×3 + 15с×3)';
       }
       break;
     }
     case 'drop_set': {
       // 1×10 → -20% → 1×6 → -20% → 1×4
-      e.workSets.push({ reps: 6, rir: lastSet.rir, weight: Math.round(baseWeight * 0.8 * 10) / 10, tempo: '2-0-1-0', restSeconds: 30 });
-      e.workSets.push({ reps: 4, rir: lastSet.rir, weight: Math.round(baseWeight * 0.64 * 10) / 10, tempo: '2-0-1-0', restSeconds: 30 });
+      lastSet.technique = 'drop_set';
+      (lastSet as any).miniSets = [
+        { reps: 6, rir: lastSet.rir, weight: Math.round(baseWeight * 0.8 * 10) / 10, tempo: '2-0-1-0', restSeconds: 30 },
+        { reps: 4, rir: lastSet.rir, weight: Math.round(baseWeight * 0.64 * 10) / 10, tempo: '2-0-1-0', restSeconds: 30 },
+      ];
       if (!e.comment || !e.comment.includes('Drop-set')) {
         e.comment = (e.comment || '') + (e.comment ? ' · ' : '') + '🎯 Drop-set (-20%×2)';
       }
@@ -400,9 +412,10 @@ function applyIntensityTechniqueToExercise(
     case 'myo_reps': {
       // 1×12-15 (активация — последний set) + 4 mini-сета × 4 reps × 5с отдых
       const miniCount = 4;
-      for (let i = 0; i < miniCount; i++) {
-        e.workSets.push({ reps: 4, rir: lastSet.rir, weight: baseWeight, tempo: '1-0-1-0', restSeconds: 5 });
-      }
+      lastSet.technique = 'myo_rep';
+      (lastSet as any).miniSets = Array.from({ length: miniCount }, () => ({
+        reps: 4, rir: lastSet.rir, weight: baseWeight, tempo: '1-0-1-0', restSeconds: 5,
+      }));
       if (!e.comment || !e.comment.includes('Myo-reps')) {
         e.comment = (e.comment || '') + (e.comment ? ' · ' : '') + `🎯 Myo-reps (×${miniCount} mini)`;
       }
@@ -417,15 +430,19 @@ function applyIntensityTechniqueToExercise(
           ws.tempo = tParts.join('-');
         }
       }
+      lastSet.technique = 'pause_rep';
       if (!e.comment || !e.comment.includes('Pause-rep')) {
         e.comment = (e.comment || '') + (e.comment ? ' · ' : '') + '🎯 Pause-rep (пауза 2-3с в нижней точке)';
       }
       break;
     }
     case 'mechanical_drop': {
-      // 2 сета с той же нагрузкой но сменой угла (пометка в комменте)
-      e.workSets.push({ reps: Math.max(6, baseReps - 2), rir: lastSet.rir, weight: baseWeight, tempo: '2-0-1-0', restSeconds: 0 });
-      e.workSets.push({ reps: Math.max(6, baseReps - 4), rir: lastSet.rir, weight: baseWeight, tempo: '2-0-1-0', restSeconds: 0 });
+      // 2 смены угла/хвата без отдыха на финальном сете
+      lastSet.technique = 'mechanical_drop';
+      (lastSet as any).miniSets = [
+        { reps: Math.max(6, baseReps - 2), rir: lastSet.rir, weight: baseWeight, tempo: '2-0-1-0', restSeconds: 0 },
+        { reps: Math.max(6, baseReps - 4), rir: lastSet.rir, weight: baseWeight, tempo: '2-0-1-0', restSeconds: 0 },
+      ];
       if (!e.comment || !e.comment.includes('Mechanical drop')) {
         e.comment = (e.comment || '') + (e.comment ? ' · ' : '') + '🎯 Mechanical drop (смена угла)';
       }
@@ -457,9 +474,11 @@ function applyIntensityTechniqueToExercise(
     }
     case 'lengthened_partials': {
       // Частичные в растянутой позиции (Wolf 2023/2025) — мини-сет 8 частичных после
-      // последнего сета; объём +1 сет только при явном выборе техники.
-      e.workSets.push({ reps: 8, rir: lastSet.rir, weight: Math.round(baseWeight * 0.85 * 10) / 10, tempo: '2-1-1-0', restSeconds: 15, technique: 'lengthened_partials' } as any);
+      // последнего сета; хранится в miniSets, не обрезается syncBBPlanSetShape.
       lastSet.technique = 'lengthened_partials';
+      (lastSet as any).miniSets = [
+        { reps: 8, rir: lastSet.rir, weight: Math.round(baseWeight * 0.85 * 10) / 10, tempo: '2-1-1-0', restSeconds: 15, technique: 'lengthened_partials' },
+      ];
       if (!e.comment || !e.comment.includes('Lengthened')) {
         e.comment = (e.comment || '') + (e.comment ? ' · ' : '') + '🧩 Lengthened partials: мини-сет 8 частичных в растянутой позиции';
       }
@@ -467,10 +486,11 @@ function applyIntensityTechniqueToExercise(
     }
     case 'rest_pause_cluster': {
       // Кластерный rest-pause (Haff): 2+2+2 повтора с 15с отдыха — сила + качество техники.
-      for (let i = 0; i < 2; i++) {
-        e.workSets.push({ reps: 2, rir: lastSet.rir, weight: baseWeight, tempo: '2-0-1-0', restSeconds: 15, technique: 'rest_pause_cluster' } as any);
-      }
       lastSet.technique = 'rest_pause_cluster';
+      (lastSet as any).miniSets = [
+        { reps: 2, rir: lastSet.rir, weight: baseWeight, tempo: '2-0-1-0', restSeconds: 15, technique: 'rest_pause_cluster' },
+        { reps: 2, rir: lastSet.rir, weight: baseWeight, tempo: '2-0-1-0', restSeconds: 15, technique: 'rest_pause_cluster' },
+      ];
       if (!e.comment || !e.comment.includes('Кластер')) {
         e.comment = (e.comment || '') + (e.comment ? ' · ' : '') + '🎯 Кластерный rest-pause: 2+2+2 с 15с отдыха';
       }
@@ -869,24 +889,35 @@ export function applyPostPhaseProcessing(input: PostPhaseInput): BBPlan {
           };
           e.workSets = e.workSets.slice(0, e.sets);
           while (e.workSets.length < e.sets) e.workSets.push({ ...template });
+          const targetLo = deloadProtocol.repRange?.[0];
+          const targetHi = deloadProtocol.repRange?.[1];
+          const midRep = Number.isFinite(targetLo) && Number.isFinite(targetHi)
+            ? Math.round((targetLo + targetHi) / 2)
+            : null;
+          if (!deloadProtocol.keepOriginalReps && Number.isFinite(targetLo) && Number.isFinite(targetHi)) {
+            e.repsRange = [targetLo, targetHi];
+          }
+          if (Number.isFinite(deloadProtocol.restSeconds)) {
+            e.restSeconds = deloadProtocol.restSeconds;
+          }
           for (const ws of e.workSets) {
-            // Дополнительное снижение веса (если протокол требует интенсивность < фаза)
             const protocolMult = deloadProtocol.intensityMultiplier / cfg.intensityMultiplier;
-            if (protocolMult < 1) {
-              ws.weight = Math.round(ws.weight * protocolMult * 10) / 10;
+            if (ws.weight > 0 && protocolMult !== 1) {
+              ws.weight = Math.max(2.5, Math.round(ws.weight * protocolMult * 10) / 10);
             }
-            // Сокращённый отдых по протоколу
-            if (ws.restSeconds != null && deloadProtocol.restSeconds < ws.restSeconds) {
+            if (!deloadProtocol.keepOriginalReps && midRep != null) {
+              ws.reps = midRep;
+            }
+            if (Number.isFinite(deloadProtocol.restSeconds)) {
               ws.restSeconds = deloadProtocol.restSeconds;
             }
-            // RIR протокола как минимум (разгрузка не уходит в отказ)
             if (Number.isFinite(deloadProtocol.rirTarget) && ws.rir < deloadProtocol.rirTarget) ws.rir = deloadProtocol.rirTarget;
           }
           if (Number.isFinite(deloadProtocol.rirTarget) && e.rir < deloadProtocol.rirTarget) e.rir = deloadProtocol.rirTarget;
           rebuildComment(e, deloadProtocol.type !== 'pump' ? `${cfg.label} · ${deloadProtocol.description}` : cfg.label);
         }
       }
-    } else if (loadStrategy && ph !== 'deload') {
+    } else if (loadStrategy && ph !== 'deload' && !((input as any).skipDoubleProgressionApplied && loadStrategy === 'double_progression' && w.week > 1)) {
       // P1: стратегия прогрессии нагрузки (если выбрана) — модифицирует ВЕС относительно
       // базового из buildSession. reps/rir/tempo НЕ трогаем (они уже фазо-корректные).
       // P3: RPE-based стратегия теперь реально работает (targetRPE-корректировка).
@@ -921,9 +952,23 @@ export function applyPostPhaseProcessing(input: PostPhaseInput): BBPlan {
     // Техника может быть в середине сессии, если методика требует (pre_exhaust), но отображается корректно.
     // BUG-FIX (audit 2026-08): интенсив-техники — проф-методика, новичку не нужны
     // (отказные протоколы повышают RPE без роста процентов и истощают восстановление).
-    const techniqueChoice = (input.level === 'beginner' || (plan as any).level === 'beginner') ? 'none' : (input as any).intensityTechnique;
-    const technique = techniqueChoice || DEFAULT_TECHNIQUE_BY_PHASE[ph] || 'none';
-    if (technique !== 'none') {
+    const lv = String(input.level || (plan as any).level || 'intermediate');
+    const techAlias: Record<string, IntensityTechnique | ExtendedTechnique> = {
+      dropset: 'drop_set', myo_rep: 'myo_reps',
+    };
+    const rawTech = lv === 'beginner' || (w as any).phase === 'deload' || (w as any).deload || (w as any).taper
+      ? 'none'
+      : (input as any).intensityTechnique;
+    let technique = (techAlias[String(rawTech || '')] || rawTech) as IntensityTechnique | ExtendedTechnique | undefined;
+    if (!technique) {
+      const def = DEFAULT_TECHNIQUE_BY_PHASE[ph] || 'none';
+      // P0-1/P0-5: rest_pause по умолчанию — только advanced/enhanced (intermediate — drop_set).
+      technique = def === 'rest_pause' && lv === 'intermediate' ? 'drop_set' : def;
+    }
+    if (lv === 'intermediate' && (technique === 'rest_pause' || technique === 'myo_reps')) {
+      technique = 'drop_set';
+    }
+    if (technique && technique !== 'none') {
       const meta = INTENSITY_TECHNIQUES[technique as IntensityTechnique];
       if (!meta || meta.phases.includes(ph)) {
         for (const s of w.sessions) {
@@ -934,34 +979,23 @@ export function applyPostPhaseProcessing(input: PostPhaseInput): BBPlan {
             list.push(e);
             byMuscle.set(e.muscle, list);
           }
-          for (const [muscle, list] of byMuscle) {
+          for (const [_muscle, list] of byMuscle) {
             let target: any = null;
-            if (technique === 'drop_set' || technique === 'myo_reps' || technique === 'twenty_ones') {
+            if (technique === 'drop_set' || technique === 'myo_reps' || technique === 'twenty_ones' || technique === 'lengthened_partials') {
               // Последняя изоляция группы
-              const isolations = list.filter((e:any) => e.role === 'accessory' && !e.warmupActivator && /isolation|accessory/i.test(e.role) || /curl|fly|raise|extension|pushdown|crunch|шраг/i.test(e.name || ''));
-              // Fallback: последняя accessory
-              target = isolations.length ? isolations[isolations.length - 1] : list.filter((e:any)=>e.role==='accessory').pop();
-              // BUG-FIX (audit 2026-08): 21s — методика бицепса; если в группе
-              // нет accessory-изоляции (все primary), берём последнее упражнение
-              // группы — applyIntensityTechniqueToExercise сам гейтит по muscle.
-              if (!target && technique === 'twenty_ones') target = list.filter((e:any)=>!e.warmupActivator).pop();
-            } else if (technique === 'rest_pause') {
-              target = list.find((e:any)=> e.role==='primary' && !e.warmupActivator);
+              const isolations = list.filter((e: any) => !e.warmupActivator && e.role === 'accessory' && (/isolation|accessory/i.test(e.role) || /curl|fly|raise|extension|pushdown|crunch|шраг|сгибан|разгибан|мах|сведен|отведен/i.test(e.name || '')));
+              target = isolations.length ? isolations[isolations.length - 1] : list.filter((e: any) => !e.warmupActivator && e.role === 'accessory').pop();
+              if (!target && technique === 'twenty_ones') target = list.filter((e: any) => !e.warmupActivator).pop();
+            } else if (technique === 'rest_pause' || technique === 'rest_pause_cluster') {
+              target = list.find((e: any) => e.role === 'primary' && !e.warmupActivator);
             } else {
               // pause_rep, mechanical_drop, negative — primary compound
-              target = list.find((e:any)=> e.role==='primary' && !e.warmupActivator);
-              if (!target) target = list[0];
+              target = list.find((e: any) => e.role === 'primary' && !e.warmupActivator);
+              if (!target) target = list.find((e: any) => !e.warmupActivator);
             }
             if (!target || target.warmupActivator) continue;
-            // Проверка appliesTo
             if (meta) {
-              const isIso = /curl|fly|raise|extension|pushdown|crunch|шраг|разгибан|сгибан|мах/i.test(target.name || '');
-              const appliesTo = meta.appliesTo || [];
-              const targetType = isIso ? 'isolation' : 'compound';
-              const roleOk = appliesTo.includes(target.role as any) || appliesTo.includes(targetType as any) || appliesTo.includes('accessory' as any);
-              // Для drop_set/myo: требуем изоляцию, для rest_pause — compound
-              if (technique === 'drop_set' && target.role !== 'accessory') continue;
-              if (technique === 'myo_reps' && target.role !== 'accessory') continue;
+              if ((technique === 'drop_set' || technique === 'myo_reps') && target.role !== 'accessory') continue;
             }
             applyIntensityTechniqueToExercise(target, technique, ph);
           }
@@ -1146,25 +1180,21 @@ export function taperWindowOf(plan: BBPlan): { start: number; end: number } | nu
  * Применяется к последним 2-3 неделям плана ПЕРЕД финальным deload (или вместо
  * deload если план заканчивается peaking без deload).
  */
-export function applyTaperToFinalWeeks(plan: BBPlan, _totalWeeks: number): BBPlan {
+export function applyTaperToFinalWeeks(plan: BBPlan, _totalWeeks: number, opts?: { goal?: string }): BBPlan {
   if (!plan || plan.weeks.length < 4) return plan; // taper только для планов ≥4 нед
 
-  // Окно taper — одно правило с `taperWindowOf` (его же спрашивает auto-MEV-фидер,
-  // чтобы не добавлять объём в недели, которые тайпер потом урежет).
   const win = taperWindowOf(plan);
   if (!win) return plan;
   const weeks = plan.weeks;
   const taperStart = win.start;
   const taperEnd = win.end;
   const taperLen = taperEnd - taperStart;
-  // Смещение профиля: короткое окно (2 нед) → [0.75, 0.50] (с конца), полное → [1.0, 0.75, 0.50].
   const profileShift = Math.max(0, 3 - taperLen);
 
-  // Taper-профиль: volume ↓, RIR ↑ (восстановление), tempo → deload-style (4-2-2-0).
-  // Bosquet 2005: объём −30-50%, интенсивность сохранена. Helms 2022: RIR +2-3.
+  const isStrengthGoal = opts?.goal === 'strength_mass' || opts?.goal === 'strength' || (plan as any).goal === 'strength_mass';
   const TAPER_VOLUME = [1.0, 0.75, 0.50];
   const TAPER_RIR_SHIFT = [0, 1, 2];
-  const TAPER_TEMPO = ['3-1-1-0', '4-1-2-0', '4-2-2-0']; // прогрессия к deload-tempo
+  const TAPER_TEMPO = isStrengthGoal ? ['2-0-1-0', '2-1-1-0', '2-0-1-0'] : ['3-1-1-0', '4-1-2-0', '4-2-2-0'];
 
   const newWeeks = weeks.map((w, idx) => {
     if (idx < taperStart || idx >= taperEnd) return w; // не taper-неделя

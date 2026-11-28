@@ -66,16 +66,18 @@ describe('M1: каждая настройка реально влияет на �
     expect(workSets(p).some((x: any) => /4-/.test(String(x.tempo || ''))) || /негатив/i.test(comments(p))).toBe(true);
   });
 
-  it('volumeScheme gvt даёт ~10 повторов на сет', () => {
-    const p = build({ volumeScheme: 'gvt' });
-    expect(sig(p)).not.toBe(sig(BASE));
+  it('volumeScheme gvt даёт ~10 повторов на сет (advanced+)', () => {
+    const baseAdv = build({ level: 'advanced', volumeScheme: 'standard' } as any);
+    const p = build({ level: 'advanced', volumeScheme: 'gvt' } as any);
+    expect(sig(p)).not.toBe(sig(baseAdv));
     expect(workSets(p).some((x: any) => x.reps === 10)).toBe(true);
     expect(workSets(p).some((x: any) => (x as any).reps === 10 && comments(p).length > 0)).toBe(true);
   });
 
-  it('volumeScheme gironda даёт 8 повторов на сет', () => {
-    const p = build({ volumeScheme: 'gironda' });
-    expect(sig(p)).not.toBe(sig(BASE));
+  it('volumeScheme gironda даёт 8 повторов на сет (advanced+)', () => {
+    const baseAdv = build({ level: 'advanced', volumeScheme: 'standard' } as any);
+    const p = build({ level: 'advanced', volumeScheme: 'gironda' } as any);
+    expect(sig(p)).not.toBe(sig(baseAdv));
     expect(workSets(p).some((x: any) => x.reps === 8)).toBe(true);
   });
 

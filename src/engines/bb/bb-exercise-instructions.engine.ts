@@ -41,6 +41,8 @@ const EXERCISE_ID_ALIASES: Record<string, string> = {
   pull_down_wide: 'pulldown_wide',
   lat_pulldown_wide: 'pulldown_wide',
   incline_bench: 'incline_bar',
+  lunge_curtsy: 'curtsy_lunge',
+  db_pullover_cross_bench: 'dumbbell_pullover',
 };
 
 const PATTERN_RU: Record<string, string> = {

@@ -52,39 +52,45 @@ describe('Волна-3.4 — единые схемы объёма: GVT = ров�
       week: 1, phase: 'accumulation',
       sessions: [{
         character: 'памп',
-        exercises: [1, 2].map(i => ({
+        exercises: [1, 2].map(i => i === 1 ? {
+          muscle: 'chest', name: 'Жим штанги лёжа', role: 'primary', character: 'тяж',
+          type: 'compound', exerciseType: 'compound',
+          sets: 3, repsRange: [8, 12], rir: 2,
+          workSets: [{ reps: 10, rir: 2, weight: 80 }, { reps: 10, rir: 2, weight: 80 }, { reps: 10, rir: 2, weight: 80 }],
+        } : {
           muscle: 'chest', name: `Сведение в кроссовере ${i}`, role: 'accessory', character: 'памп',
           sets: 3, repsRange: [12, 15], rir: 3,
           workSets: [{ reps: 15, rir: 3, weight: 20 }, { reps: 15, rir: 3, weight: 20 }, { reps: 15, rir: 3, weight: 20 }],
-        })),
+        }),
       }],
     }],
   });
 
-  it('GVT: все сеты 10 повторов (было 12), 5+5, отдых 75с', () => {
+  it('GVT: классический 10×10 на 1 главное движение мышцы, 10 повторов, отдых 75с', () => {
     const plan = mkPlan();
     applyVolumeScheme(plan as any, 'gvt');
     const exs = plan.weeks[0].sessions[0].exercises;
     const marked = exs.filter((e: any) => String(e.comment).includes('GVT'));
-    expect(marked.length).toBe(2);
+    expect(marked.length).toBe(1);
     for (const e of marked) {
-      expect(e.sets).toBe(5);
+      expect(e.sets).toBe(10);
       expect(e.workSets.every((ws: any) => ws.reps === 10), `${e.name}`).toBe(true);
       expect(e.workSets.every((ws: any) => ws.restSeconds === 75)).toBe(true);
       expect(e.repsRange).toEqual([10, 10]);
     }
   });
 
-  it('Gironda: 8×8 (было 10 повторов)', () => {
+  it('Gironda: классический 8×8 на 1 главное движение (8 сетов, 8 повторов, отдых 45с)', () => {
     const plan = mkPlan();
     applyVolumeScheme(plan as any, 'gironda');
     const marked = plan.weeks[0].sessions[0].exercises.filter((e: any) => String(e.comment).includes('8×8'));
-    expect(marked.length).toBeGreaterThan(0);
+    expect(marked.length).toBe(1);
+    expect(marked[0].sets).toBe(8);
     for (const e of marked) expect(e.workSets.every((ws: any) => ws.reps === 8)).toBe(true);
   });
 
-  it('полный план с volumeScheme gvt: помеченные сеты ровно 10', () => {
-    const plan = buildBBPlan({ patternId: 'upper_lower_4', level: 'intermediate', trainingYears: 3, goal: 'mass', weeks: 4, workMax: WM, volumeScheme: 'gvt' } as any);
+  it('полный план с volumeScheme gvt (advanced+): помеченные сеты ровно 10', () => {
+    const plan = buildBBPlan({ patternId: 'upper_lower_4', level: 'advanced', trainingYears: 5, goal: 'mass', weeks: 4, workMax: WM, volumeScheme: 'gvt' } as any);
     let checked = 0;
     for (const w of plan.weeks as any[]) for (const s of w.sessions) for (const e of s.exercises) {
       if (!/GVT/.test(String((e as any).comment || ''))) continue;

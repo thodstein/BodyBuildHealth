@@ -56,7 +56,7 @@ describe('Проф-методики ББ (Библиотека → Методи�
   });
 
   describe('Схемы объёма памп-дней', () => {
-    it('GVT: памп-изоляции получают 5×10 (2 упражнения = 10 сетов на мышцу), cap 5', () => {
+    it('GVT: классический 10×10 на одно главное движение (10 сетов, reps 10, отдых 75с)', () => {
       const plan: any = {
         weeks: [{ phase: 'accumulation', sessions: [
           { day: 1, exercises: [
@@ -68,12 +68,12 @@ describe('Проф-методики ББ (Библиотека → Методи�
       applyVolumeScheme(plan, 'gvt');
       const exs = plan.weeks[0].sessions[0].exercises;
       const quads = exs.filter((e: any) => e.muscle === 'quads');
-      expect(quads[0].sets).toBe(5);
-      expect(quads[1].sets).toBe(5);
-      expect(quads[0].repsRange[0]).toBe(10);
-      expect(quads[0].restSeconds).toBe(75);
-      expect(quads[0].comment).toContain('GVT 10×10');
-      for (const e of exs) expect(e.sets).toBeLessThanOrEqual(5);
+      const mainQ = quads.find((e: any) => (e.comment || '').includes('GVT 10×10'));
+      expect(mainQ).toBeTruthy();
+      expect(mainQ.sets).toBe(10);
+      expect(mainQ.repsRange[0]).toBe(10);
+      expect(mainQ.restSeconds).toBe(75);
+      expect(quads.filter((e: any) => (e.comment || '').includes('GVT 10×10'))).toHaveLength(1);
     });
 
     it('FST-7: 7 сетов ОДНИМ финишером (Rambod), отдых 40с — только с fst7Seven', () => {
@@ -104,7 +104,7 @@ describe('Проф-методики ББ (Библиотека → Методи�
       for (const e of exs) expect(e.sets).toBeLessThanOrEqual(5);
     });
 
-    it('Gironda 8×8: 8 сетов суммарно, reps 8, отдых 45с (канон REP_SCHEMES)', () => {
+    it('Gironda 8×8: классический 8×8 на 1 главное движение, reps 8, отдых 45с (канон REP_SCHEMES)', () => {
       const plan: any = {
         weeks: [{ phase: 'accumulation', sessions: [
           { day: 1, exercises: [mkEx('triceps', 'Разгибания на блоке'), mkEx('triceps', 'Французский')] },
@@ -112,20 +112,29 @@ describe('Проф-методики ББ (Библиотека → Методи�
       };
       applyVolumeScheme(plan, 'gironda');
       const exs = plan.weeks[0].sessions[0].exercises;
-      expect(exs.reduce((s: number, e: any) => s + e.sets, 0)).toBe(8);
-      expect(exs[0].repsRange[0]).toBe(8);
-      expect(exs[0].restSeconds).toBe(45);
+      const marked = exs.filter((e: any) => String(e.comment || '').includes('8×8'));
+      expect(marked).toHaveLength(1);
+      expect(marked[0].sets).toBe(8);
+      expect(marked[0].repsRange[0]).toBe(8);
+      expect(marked[0].restSeconds).toBe(45);
     });
 
-    it('primary/тяж упражнения не меняются', () => {
-      const plan: any = {
+    it('FST-7 не трогает primary/тяж; классический GVT ставит 10×10 на главное компаунд-движение', () => {
+      const fstPlan: any = {
         weeks: [{ phase: 'accumulation', sessions: [
           { day: 1, exercises: [mkEx('quads', 'Присед', 'primary', 'тяж')] },
         ] }],
       };
-      applyVolumeScheme(plan, 'gvt');
-      const ex = plan.weeks[0].sessions[0].exercises[0];
-      expect(ex.sets).toBe(3);
+      applyVolumeScheme(fstPlan, 'fst7');
+      expect(fstPlan.weeks[0].sessions[0].exercises[0].sets).toBe(3);
+
+      const gvtPlan: any = {
+        weeks: [{ phase: 'accumulation', sessions: [
+          { day: 1, exercises: [mkEx('quads', 'Присед', 'primary', 'тяж')] },
+        ] }],
+      };
+      applyVolumeScheme(gvtPlan, 'gvt');
+      expect(gvtPlan.weeks[0].sessions[0].exercises[0].sets).toBe(10);
     });
   });
 
@@ -171,7 +180,7 @@ describe('Проф-методики ББ (Библиотека → Методи�
       expect(pairs.length).toBe(0);
     });
 
-    it('volumeScheme=gvt: памп-изоляции получают 5×10 и кап 5 соблюдён', () => {
+    it('volumeScheme=gvt: классический 10×10 для advanced/enhanced, обычные упражнения ≤5', () => {
       const plan = buildBBPlan({
         patternId: 'ppl_6', level: 'enhanced', trainingYears: 6, goal: 'mass', weeks: 1,
         workMax: WM, volumeScheme: 'gvt',
@@ -180,14 +189,15 @@ describe('Проф-методики ББ (Библиотека → Методи�
         .filter((e: any) => (e.comment || '').includes('GVT 10×10'));
       expect(gvtComments.length).toBeGreaterThan(0);
       for (const e of gvtComments) {
-        // GVT ставит 5 сетов; post-hoc cap-adjust (MRV) может срезать до 4.
         expect(e.sets).toBeGreaterThanOrEqual(4);
-        expect(e.sets).toBeLessThanOrEqual(5);
+        expect(e.sets).toBeLessThanOrEqual(10);
         expect(e.repsRange[0]).toBe(10);
         expect(e.restSeconds).toBe(75);
       }
-      const allSets = plan.weeks.flatMap(w => w.sessions).flatMap(s => s.exercises).map((e: any) => e.sets);
-      expect(Math.max(...allSets)).toBeLessThanOrEqual(5);
+      const nonSchemeSets = plan.weeks.flatMap(w => w.sessions).flatMap(s => s.exercises)
+        .filter((e: any) => !(Number(e.schemeAssignedSets) > 0))
+        .map((e: any) => e.sets);
+      expect(Math.max(...nonSchemeSets)).toBeLessThanOrEqual(5);
     });
 
     it('стандартная схема (по умолчанию) не меняет объём', () => {

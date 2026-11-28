@@ -200,7 +200,7 @@ function validateSession(session: BBSession, week: number, sessionIndex: number,
         || options.methodology === 'mountain_dog'
         || options.methodology === 'fst7'
         || options.methodology === 'hyperemia';
-      if (!allowAccessoryBeforePrimary && exercises.slice(0, primaryIndex).some(exercise => exercise.role !== 'primary')) {
+      if (!allowAccessoryBeforePrimary && exercises.slice(0, primaryIndex).some(exercise => !(exercise as any).warmupActivator && exercise.role !== 'primary')) {
         issues.push({ level: 'warning', code: 'order_primary_after_accessory', message: `Primary упражнение ${primary.name} стоит после accessory в сессии.`, week, session: sessionIndex, exercise: primary.name });
       }
     }

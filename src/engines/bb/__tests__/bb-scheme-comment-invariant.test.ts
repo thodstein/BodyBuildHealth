@@ -72,7 +72,7 @@ describe('G: цифра в комментарии схемы объёма = фа
     let trims = 0;
     for (const scheme of SCHEMES) {
       const plan: any = buildBBPlan({
-        patternId: 'upper_lower_4', level: 'intermediate', trainingYears: 3, goal: 'mass',
+        patternId: 'upper_lower_4', level: 'advanced', trainingYears: 5, goal: 'mass',
         sex: 'male', weeks: 8, workMax: WM, volumeScheme: scheme,
       } as any);
       const joined = plan.weeks.flatMap((w: any) => w.sessions).flatMap((s: any) => s.exercises)

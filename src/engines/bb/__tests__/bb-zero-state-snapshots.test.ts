@@ -112,8 +112,10 @@ describe('BB zero-state snapshots (baseline Этапа 10)', () => {
     // Re-baseline 14 (аудит 2026-11, P0-17): lateCap финализатора больше не режет
     // enhanced onCourse 6+ (60/16) до натуральных 40 сетов → устраняется прежний
     // недобор спины (back 31→42, ≥36 по бюджету), грудь 15→23, трицепс 4→6, rear 2→3.
+    // Stage A-C + Bucket A перекалибровка: без MRV-раздутия без стажа/курса,
+    // единый tier/perExerciseCap (6 для главных мышц на курсе) и сбалансированные пучки дельт.
     expect(directVolume(plan)).toEqual({
-      abs: 10, back: 42, biceps: 4, calves: 9, chest: 23, delt_front: 2, delt_mid: 2, delt_rear: 3, forearms: 6, glutes: 10, hamstrings: 22, quads: 16, shoulders: 0, traps: 6, triceps: 6,
+      abs: 10, back: 44, biceps: 6, calves: 9, chest: 33, delt_mid: 2, delt_rear: 5, forearms: 2, glutes: 11, hamstrings: 27, quads: 16, shoulders: 0, traps: 6, triceps: 5,
     });
   });
 
@@ -166,8 +168,10 @@ describe('BB zero-state snapshots (baseline Этапа 10)', () => {
     // «безымянная» добивка группы исчезла (shoulders 3→0). Итог по прямым сетам
     // плеч 24→23: −1 сет — это и есть снятое второе (безымянное) упражнение
     // дублирующей добивки; валидатор зелёный, сессии в лимитах.
+    // Stage A-C + Bucket A перекалибровка: ppl_6 промежуточного уровня распределяет
+    // среднюю/заднюю дельту нативно (delt_mid 9) и снижает дубль-пресс в Push (abs 4).
     expect(directVolume(plan)).toEqual({
-      abs: 8, back: 18, biceps: 16, calves: 18, chest: 18, delt_front: 6, delt_mid: 5, delt_rear: 12, forearms: 7, glutes: 11, hamstrings: 12, quads: 18, shoulders: 0, traps: 10, triceps: 16,
+      abs: 4, back: 17, biceps: 16, calves: 18, chest: 18, delt_front: 4, delt_mid: 9, delt_rear: 12, forearms: 7, glutes: 13, hamstrings: 12, quads: 18, shoulders: 0, traps: 10, triceps: 16,
     });
   });
 
@@ -235,7 +239,7 @@ describe('BB zero-state snapshots (baseline Этапа 10)', () => {
         expect(working.length).toBeGreaterThan(0);
         for (const e of working) {
           expect(e.sets).toBeGreaterThanOrEqual(2);
-          expect(e.sets).toBeLessThanOrEqual(5);
+          expect(e.sets).toBeLessThanOrEqual(6);
         }
       }
     }

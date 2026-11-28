@@ -279,47 +279,36 @@ export function sessionLimitsFor(
   // Сохранённые по-сессионные капы (исходный тернарник 24/40/60 и 10/14/18) + high-объём +15-20%
   let maxWorkingSets: number; let maxExercises: number;
   if (onCourse && years >= 3) { // про НА ПЕД: без ПЕД — тир advanced (пропорционально ниже)
-    // Реализм сессии (аудит 2026-09): 65/20 и 60/18 давали Upper-дни по 18-20
-    // упражнений («18 упражнений нереально даже для топ-уровня»). Потолок
-    // пересобран под практику про-тренировок, ОТ БАЗЫ «про на курсе» вниз
-    // пропорционально (как weeklyCapFor): PPL Pull = 9 упражнений на спину
-    // (~30 прямых сетов) + руки/трапы/задняя дельта — это 60-75 минут, то есть
-    // нормальный PPL Pull. При 44 сетах рецепт спины 60/нед был физически
-    // недостижим, и объём молча ужимался.
     maxWorkingSets = years >= 6 ? 60 : 52;
     maxExercises = years >= 6 ? 16 : 15;
   }
-  else if (onCourse && years >= 1) { maxWorkingSets = 34; maxExercises = 13; }
+  else if (onCourse && years >= 1) {
+    maxWorkingSets = (level === 'advanced' || level === 'enhanced') ? 44 : 36;
+    maxExercises = 14;
+  }
   else if (level === 'enhanced' || level === 'advanced') { maxWorkingSets = 40; maxExercises = 15; }
+  else if (level === 'beginner') { maxWorkingSets = 18; maxExercises = 8; }
   else { maxWorkingSets = 24; maxExercises = 10; }
-  // PPL: сессия качает 4–5 групп (Pull: спина/задняя/трапы/бицепс/предплечья) —
-  // в 24/10 не влезает даже на минимумах пользовательских требований
-  // (bb-ppl-invariant: rear 5–8 + shrug 5 + biceps 8–10 + back + forearms).
-  // Плюс пики intensification и низкочастотный ppl_3 (вся неделя спины в одной
-  // сессии):observed max 35 сетов — кап 36/11 для натуралов (enhanced и так
-  // выше); валидатор и лимитер читают этот же источник — рассинхрона нет.
-  // patternId часто передают в input (тесты/валидатор вызывают без split) —
-  // поддерживаем оба варианта, иначе PPL-ветка молча не срабатывает.
   const splitId = split?.id || (input as any).patternId || (input as any).splitId || '';
   const isPPL = /ppl/i.test(splitId);
-  if (isPPL && maxWorkingSets < 36 && maxExercises < 11) {
-    maxWorkingSets = 36;
-    maxExercises = 11;
+  if (isPPL) {
+    if (level === 'beginner') {
+      if (maxWorkingSets < 24) maxWorkingSets = 24;
+      if (maxExercises < 9) maxExercises = 9;
+    } else if (maxWorkingSets < 36 && maxExercises < 11) {
+      maxWorkingSets = 36;
+      maxExercises = 11;
+    }
   }
-  // FullBody: сессия качает 8-10 групп (против 4-5 у PPL) — в 10 упражнений
-  // не влезает даже по одному движению на мышцу + руки (bb-focus-phase:
-  // biceps 1×/нед — arm-guarantee добавлял, лимитер отрезал). Кап 12 для
-  // натуралов (сеты держит maxWorkingSets + fitBBSessionToBudget + cap-adjust,
-  // присутствие мышц сохраняется); валидатор и лимитер читают этот же источник.
-  // Сеты 24→28: 12 мышц × пол 2 = 24 — минимум присутствия; двенадцатая мышца
-  // или один 3-сетовик (25) иначе невозможны без синглов (count-benchmark).
-  // PPL-прецедент: 24/10 → 36/11 по той же причине (плотные сессии).
   const isFB = /fullbody/i.test(splitId);
-  if (isFB && maxExercises < 12) {
-    maxExercises = 12;
-  }
-  if (isFB && maxWorkingSets < 28) {
-    maxWorkingSets = 28;
+  if (isFB) {
+    if (level === 'beginner') {
+      if (maxExercises < 10) maxExercises = 10;
+      if (maxWorkingSets < 22) maxWorkingSets = 22;
+    } else {
+      if (maxExercises < 12) maxExercises = 12;
+      if (maxWorkingSets < 28) maxWorkingSets = 28;
+    }
   }
   if (input.trainingVolumeMode === 'high') {
     const isMaxExp = input.level === 'enhanced' && (input.trainingYears ?? 0) >= 6;
@@ -371,14 +360,15 @@ export function computeBBRecoveryMultiplier(input: {
  *  Сигнатура обратно совместима. */
 export function perExerciseCap(level?: string, muscle?: string, trainingYears?: number, onCourse?: boolean): number {
   const m = (muscle || '').toLowerCase();
-  const years = Number.isFinite(trainingYears) ? (trainingYears as number) : 0;
-  // BIG-ветка только при явном onCourse===true (PED). Без флага — legacy,
-  // чтобы не ломать существующие тесты (enhanced biceps 6 → 5).
+  const lvl = (level || '').toLowerCase();
   if (onCourse === true) {
     const isMain = ['back', 'chest', 'quads', 'hamstrings', 'legs', 'glutes', 'shoulders'].includes(m);
     return isMain ? 6 : 5;
   }
-  if (level === 'enhanced' && years >= 3 && ['back', 'chest', 'quads', 'hamstrings', 'legs'].includes(m)) return 8;
+  if (lvl === 'beginner') {
+    const isMain = ['back', 'chest', 'quads', 'hamstrings', 'legs', 'glutes'].includes(m);
+    return isMain ? 4 : 3;
+  }
   return 5;
 }
 
@@ -722,10 +712,10 @@ export function resolveMrvCap(input: {
   }
   if (input.armBoost === 'main') {
     const effYears = input.trainingYears ?? (input.level === 'beginner' ? 1 : input.level === 'intermediate' ? 3 : input.level === 'advanced' ? 5 : 6);
-    if (effYears >= 3) cap = Math.round(cap * (effYears >= 8 ? 1.8 : effYears >= 6 ? 1.6 : input.isPPL ? 1.6 : 1.3));
+    if (effYears >= 3) cap = Math.round(cap * (effYears >= 6 ? 1.35 : input.isPPL ? 1.6 : 1.25));
   } else if (input.armBoost === 'pro') {
     const years = input.trainingYears;
-    if (years !== undefined && years >= 3) cap = Math.round(cap * (years >= 8 ? 1.8 : years >= 6 ? 1.6 : 1.3));
+    if (years !== undefined && years >= 3) cap = Math.round(cap * (years >= 6 ? 1.35 : 1.25));
   }
   if (input.specFactor && input.specFactor !== 1) cap = Math.round(cap * input.specFactor);
   if (input.blast) cap = Math.round(cap * 1.15);
@@ -868,7 +858,9 @@ export function weeklyCapFor(input: {
   // Дозо-зависимая формула для полного стека даёт 49–57 и молча ужимала спину
   // ниже канона (43/нед вместо 60). Якоря НОГ остаются потолками (32/30/18),
   // спина — ФЛОР. perSessionMuscleCap('back') = 60/2 = 30/сессию (требование).
-  if (m === 'back' && input.onCourse && anchor > 0) cap = Math.max(cap, anchor);
+  const lvl = String(input.level || '').toLowerCase();
+  const strongCourse = !!input.onCourse && lvl !== 'beginner' && ((input.doseAwareMrv ?? 1) >= 1.25 || (lvl === 'enhanced' && (input.trainingYears ?? 0) >= 3));
+  if (m === 'back' && strongCourse && anchor > 0) cap = Math.max(cap, anchor);
   return Math.max(3, cap);
 }
 

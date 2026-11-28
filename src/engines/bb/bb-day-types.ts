@@ -42,7 +42,7 @@ export const TAG_MUSCLES: Record<string, string[]> = {
   Shoulders: ['delt_front', 'delt_mid', 'delt_rear', 'traps'],
   Arms: ['biceps', 'triceps', 'forearms'],
   ChestBack: ['chest', 'back', 'delt_front', 'delt_rear', 'traps', 'forearms'],
-  ShouldersArms: ['delt_front', 'delt_mid', 'delt_rear', 'biceps', 'triceps', 'traps', 'forearms'],
+  ShouldersArms: ['shoulders', 'delt_mid', 'delt_rear', 'biceps', 'triceps', 'traps', 'forearms'],
   Torso: ['chest', 'back', 'shoulders', 'traps', 'abs'],
   Limbs: ['quads', 'hamstrings', 'glutes', 'biceps', 'triceps', 'calves', 'forearms'],
   UpperPower: ['chest', 'back', 'shoulders', 'biceps', 'triceps', 'traps'],

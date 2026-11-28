@@ -33,7 +33,7 @@ export function classifyBackExercise(name: string): { pattern: BackPattern; subg
   // Руки в верхнем блоке — тоже не вертикальная тяга (см. NOT_BACK_CABLE).
   if (NOT_BACK_CABLE.test(n)) return { pattern: 'other', subgroup: 'upper_back' };
   if (/подтяг|pull.?up|chin|верхн.*блок|lat.?pull|пуллдаун|vertical/i.test(n)) return { pattern: 'vertical_pull', subgroup: 'back_width' };
-  if (/пуловер|прям.*рук|straight.?arm/i.test(n)) return { pattern: 'lat_isolation', subgroup: 'back_width' };
+  if (/пуловер|pullover|прям.*рук|straight.?arm/i.test(n)) return { pattern: 'lat_isolation', subgroup: 'back_width' };
   if (/тяга.*одной|one.?arm|single.?arm|одноруч|гантел.*наклон/i.test(n)) return { pattern: 'unilateral_row', subgroup: 'back_thickness' };
   if (/тяга.*груд.*упор|chest.?supported|seal|тяга.*тренаж|machine.*row|гребн/i.test(n)) return { pattern: 'supported_row', subgroup: 'back_thickness' };
   if (/тяга.*лиц|face.?pull|задн.*дельт|rear.?delt|обратн.*бабоч/i.test(n)) return { pattern: 'rear_delt', subgroup: 'rear_delts' };
@@ -88,7 +88,7 @@ export function classifyArmExercise(name: string): { pattern: ArmPattern; subgro
   if (/проповед|preacher|концентр|concentration|спайдер|spider/i.test(n)) return { pattern: 'biceps_shortened', subgroup: 'biceps' };
   if (/сгибан|curl|подъём.*бицепс|подъем.*бицепс|сгибан.*рук/i.test(n)) return { pattern: 'biceps_shortened', subgroup: 'biceps' };
   if (/разгибан.*из.?за|overhead.*tricep|француз|french/i.test(n)) return { pattern: 'triceps_overhead', subgroup: 'triceps' };
-  if (/жим.*узк|close.?grip|жим.*узким/i.test(n)) return { pattern: 'triceps_compound', subgroup: 'triceps' };
+  if (/жим.*узк|close.?grip|jm.?жим|jm.?press/i.test(n)) return { pattern: 'triceps_compound', subgroup: 'triceps' };
   if (/отжим.*брус|dip|брусь/i.test(n) && /трицепс|triceps/i.test(n)) return { pattern: 'triceps_compound', subgroup: 'triceps' };
   if (/разгибан.*блок|pushdown|трицепс.*блок|канат.*рукоят/i.test(n)) return { pattern: 'triceps_pushdown', subgroup: 'triceps' };
   if (/разгибан.*рук|разгибан.*трицепс|tricep/i.test(n)) return { pattern: 'triceps_pushdown', subgroup: 'triceps' };

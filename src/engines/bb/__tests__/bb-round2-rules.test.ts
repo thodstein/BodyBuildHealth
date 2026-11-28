@@ -27,11 +27,13 @@ describe('BB round-2 rules', () => {
     expect(d2Quads.every((e: any) => (e.repsRange?.[0] ?? 0) >= 12)).toBe(true);
   });
 
-  it('cap 5: ни одно рабочее упражнение не имеет >5 сетов', () => {
+  it('cap 5 (натурал) / 6 (onCourse main): рабочее упражнение не превышает perExerciseCap', () => {
     const plan = buildBBPlan({ patternId: 'upper_lower_4', level: 'enhanced', trainingYears: 6, goal: 'mass', weeks: 1, workMax: WM, pedDoses: { AAS: 500 }, courseIntensity: 'moderate' });
+    const isMain = (m: string) => ['back', 'chest', 'quads', 'hamstrings', 'legs', 'glutes', 'shoulders'].includes(m);
     for (const w of plan.weeks) for (const s of w.sessions) {
       for (const e of s.exercises.filter((x: any) => !(x as any).warmupActivator)) {
-        expect(e.sets, `${e.name}: ${e.sets}`).toBeLessThanOrEqual(5);
+        const cap = isMain(e.muscle) ? 6 : 5;
+        expect(e.sets, `${e.name}: ${e.sets}`).toBeLessThanOrEqual(cap);
         expect(e.sets, `${e.name}: ${e.sets}`).toBeGreaterThanOrEqual(2);
       }
     }

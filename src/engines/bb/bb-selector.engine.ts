@@ -357,7 +357,7 @@ export function rankBBSplits(input: BBSelectorInput): BBRankedPattern[] {
       // дни, и день ног; FullBody 4 проигрывает по реалистичности сессии.
       const eff4 = p.sessionsPerRotation * 7 / p.rotationDays;
       if (p.id === 'push_pull_legs_4' && Math.abs(eff4 - 4) <= 0.5) {
-        score += 12;
+        score += 22;
         rationale.push('high-объём 4 дн.: PPL 4 — короткие дни + полноценный день ног');
       }
     }

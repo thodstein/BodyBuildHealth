@@ -212,7 +212,7 @@ describe('цикл: обещание схемы объёма = фактичес�
       let marked = 0;
       for (const cycle of bbCycles.slice(0, 3)) {
         const plan: any = convertCycleToBBPlan({
-          cycle, workMax, level: 'intermediate', trainingYears: 3,
+          cycle, workMax, level: 'advanced', trainingYears: 3,
           mode: 'adapt', sex: 'male', goal: 'mass', volumeScheme: scheme,
         } as any);
         const marker = scheme === 'gvt' ? /GVT/ : /Gironda/;

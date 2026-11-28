@@ -28,8 +28,9 @@ function assertPlanValid(plan: any, tag: string) {
         // Ф3.1: выведенные делоды (inferCycleDeloadWeeks) — floor сета 1
         // легитимен на deload-неделе (normalizeWeekMrv floor=1).
         const minSets = (w.phase === 'deload' || w.deload === true) ? 1 : 2;
+        const maxSetsCap = Number((e as any).schemeAssignedSets) > 0 ? 10 : 6;
         expect(e.sets, `${tag} w${w.week} ${e.name} sets`).toBeGreaterThanOrEqual(minSets);
-        expect(e.sets, `${tag} w${w.week} ${e.name} sets cap`).toBeLessThanOrEqual(5);
+        expect(e.sets, `${tag} w${w.week} ${e.name} sets cap`).toBeLessThanOrEqual(maxSetsCap);
         expect(e.workSets?.length ?? e.sets, `${tag} workSets`).toBe(e.sets);
       }
       // supersetWith не должен указывать на удалённую мышцу (dangling) — проверяем только не-taper недели
