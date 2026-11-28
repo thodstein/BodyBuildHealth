@@ -456,20 +456,22 @@ export const ContestPrepConfigEditor: React.FC<ContestPrepConfigEditorProps> = (
               accent="#38bdf8"
               onChange={v => patch({ heightCm: v > 120 ? v : undefined })}
             />
-            <Stepper
-              label="День цикла (female 1-35)"
-              icon="🌸"
-              value={draft.cycleDay ?? 0}
-              min={0}
-              max={35}
-              suffix=""
-              accent="#ec4899"
-              onChange={v => patch({ cycleDay: v > 0 ? v : undefined })}
-            />
+            {draft.sex === 'female' && (
+              <Stepper
+                label="День цикла (female 1-35)"
+                icon="🌸"
+                value={draft.cycleDay ?? 0}
+                min={0}
+                max={35}
+                suffix=""
+                accent="#ec4899"
+                onChange={v => patch({ cycleDay: v > 0 ? v : undefined })}
+              />
+            )}
           </div>
           <DateCard label="Дата шоу" value={draft.showDate} onChange={v => patch({ showDate: v })} />
-          <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
-            <ToggleChip label="Trial peak за 21-28д (разблокирует high)" icon="🧪" value={!!draft.hasTrialPeak} onChange={v => patch({ hasTrialPeak: v || undefined })} />
+          <div style={{ fontSize: 10, padding: '6px 10px', borderRadius: 10, background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.08)', color: 'rgba(255,255,255,0.75)' }}>
+            🧪 Trial peak: {draft.hasTrialPeak ? 'подтверждён в тесте пик-недели (high вода доступна)' : 'пройдите тест пик-недели в конструкторе (без ручного байпаса high воды)'}
           </div>
           <SegGroup
             label="Уровень"
@@ -531,6 +533,7 @@ export const ContestPrepConfigEditor: React.FC<ContestPrepConfigEditorProps> = (
               { id: 'back', label: 'Back 15/30/55', desc: 'Поздняя — для spill-склонных, кондиция должна быть высокой.' },
               { id: 'undulating', label: 'Undulating 30/20/50', desc: 'Волна — для непредсказуемых (проверьте trial).' },
               { id: 'linear', label: 'Linear 33/33/34', desc: 'Ровно — простой, стабильный.' },
+              { id: 'direct', label: 'Direct 30/28/24/18', desc: 'Прямая 4-дневная загрузка без деплеции (для опытных, Homer 2024).' },
             ]}
             onChange={v => patch({ carbLoadStrategy: v as any })}
           />
@@ -799,45 +802,36 @@ export const ContestPrepConfigEditor: React.FC<ContestPrepConfigEditorProps> = (
 
       <GlassCard title="Безопасность" icon="🛡" color="#60a5fa">
         <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
-          <ToggleChip
-            danger
-            label="Почки"
-            icon="🫘"
-            value={(draft.contraindications || []).includes('kidney')}
-            onChange={v =>
-              patch({
-                contraindications: v
-                  ? [...(draft.contraindications || []), 'kidney']
-                  : (draft.contraindications || []).filter(c => c !== 'kidney'),
-              })
-            }
-          />
-          <ToggleChip
-            danger
-            label="Сердце"
-            icon="❤️"
-            value={(draft.contraindications || []).includes('heart')}
-            onChange={v =>
-              patch({
-                contraindications: v
-                  ? [...(draft.contraindications || []), 'heart']
-                  : (draft.contraindications || []).filter(c => c !== 'heart'),
-              })
-            }
-          />
-          <ToggleChip
-            danger
-            label="Гипертония"
-            icon="🩸"
-            value={(draft.contraindications || []).includes('hypertension')}
-            onChange={v =>
-              patch({
-                contraindications: v
-                  ? [...(draft.contraindications || []), 'hypertension']
-                  : (draft.contraindications || []).filter(c => c !== 'hypertension'),
-              })
-            }
-          />
+          {(
+            [
+              ['kidney', 'Почки (ХПН)', '🫘'],
+              ['heart', 'Сердце / аритмия', '❤️'],
+              ['hypertension', 'Гипертония', '🩸'],
+              ['diabetes', 'Диабет / инсулин', '🍬'],
+              ['eating_disorder', 'РПП (анамнез)', '⚠️'],
+              ['pregnancy', 'Беременность / ГВ', '🤱'],
+              ['thyroid', 'Щитовидка', '🦋'],
+              ['liver', 'Печень', '🧪'],
+              ['gi_disease', 'ЖКТ (СРК/ВЗК)', '🌿'],
+              ['electrolyte_disorder', 'Электролиты', '⚡'],
+              ['diuretic_use', 'Диуретики', '💊'],
+            ] as const
+          ).map(([id, label, icon]) => (
+            <ToggleChip
+              key={id}
+              danger
+              label={label}
+              icon={icon}
+              value={(draft.contraindications || []).includes(id)}
+              onChange={v =>
+                patch({
+                  contraindications: v
+                    ? [...new Set([...(draft.contraindications || []), id])]
+                    : (draft.contraindications || []).filter(c => c !== id),
+                })
+              }
+            />
+          ))}
         </div>
         {validation.warnings.length > 0 && (
           <div style={{ marginTop: 8, display: 'flex', flexDirection: 'column', gap: 3 }}>

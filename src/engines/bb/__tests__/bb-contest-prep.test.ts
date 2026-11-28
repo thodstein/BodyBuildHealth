@@ -385,7 +385,9 @@ describe('buildShowTimeline', () => {
   it('время отсчитывается от времени сцены', () => {
     const t = buildShowTimeline(baseConfig({ schedule: { wake: '08:00', stage: '14:00' } }));
     expect(t[t.length - 1].time).toBe('14:00');
-    expect(t[0].time).toBe('11:30');
+    // Wave 5: явный wake ('08:00' ≤ stage - 150 мин = '11:30') сохраняется, а остальные шаги отсчитываются от stage.
+    expect(t[0].time).toBe('08:00');
+    expect(t[1].time).toBe('12:00');
   });
 
   it('дефолты wake 07:00 / stage 12:00', () => {

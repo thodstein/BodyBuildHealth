@@ -123,7 +123,7 @@ export const BbPrepCycleStep: React.FC<BbPrepCycleStepProps> = ({
       <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginBottom: 10, alignItems: 'center' }}>
         <span style={{ fontSize: 13, fontWeight: 800, color: '#ec4899' }}>🏁 Prep-цикл</span>
         <span style={{ fontSize: 10, color: '#fff' }}>Отдельный режим подготовки к соревнованиям (не трогает обычную сборку)</span>
-        <button style={{ ...BTN_GHOST, marginLeft: 'auto', color: '#fb7185', borderColor: 'rgba(244,63,94,0.3)' }} onClick={() => { setPrepMode(false); setPrepResult(null); }}>✕ Выйти из prep</button>
+        <button style={{ ...BTN_GHOST, marginLeft: 'auto', color: '#fb7185', borderColor: 'rgba(244,63,94,0.3)' }} onClick={() => { setPrepMode(false); setPrepResult(null); setPrepStep('params'); }}>✕ Выйти из prep</button>
       </div>
 
       {/* Шаги */}

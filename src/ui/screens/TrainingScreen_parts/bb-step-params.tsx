@@ -166,6 +166,8 @@ export interface BbParamsStepProps {
   setUsePreviousPlan: React.Dispatch<React.SetStateAction<boolean>>;
   flash: (m: string) => void;
   setStep: React.Dispatch<React.SetStateAction<Step>>;
+  /** Wave 6: быстрый старт — собрать план в 1 клик по профилю. */
+  onQuickBuild?: () => void;
 }
 
 const GRID2: React.CSSProperties = { display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 };
@@ -193,8 +195,18 @@ export const BbParamsStep: React.FC<BbParamsStepProps> = ({
   cycleDay, setCycleDay, targetBodyFat, setTargetBodyFat,
   wearableData, setWearableTick, injuries, setInjuries, rehabMuscles, setRehabMuscles,
   mobilityRestrictions, setMobilityRestrictions, autoDeload, setAutoDeload,
-  savedPlans, usePreviousPlan, setUsePreviousPlan, flash, setStep,
+  savedPlans, usePreviousPlan, setUsePreviousPlan, flash, setStep, onQuickBuild,
 }) => {
+  const [paramsDepth, setParamsDepth] = React.useState<'basic' | 'pro'>(() => {
+    try {
+      const v = typeof localStorage !== 'undefined' ? localStorage.getItem('he_bb_params_depth') : null;
+      return v === 'basic' ? 'basic' : 'pro';
+    } catch { return 'pro'; }
+  });
+  const toggleParamsDepth = (mode: 'basic' | 'pro') => {
+    setParamsDepth(mode);
+    try { localStorage.setItem('he_bb_params_depth', mode); } catch { /* ignore */ }
+  };
   const isPrograms = planMode === 'programs';
   const isGeneric = planMode === 'generic_split';
   const limitText = (() => {
@@ -216,7 +228,27 @@ export const BbParamsStep: React.FC<BbParamsStepProps> = ({
 
   return (
     <div>
-      <div style={H}>📋 Шаг 1: Базовые параметры</div>
+      <div style={{ ...H, display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8, flexWrap: 'wrap' }}>
+        <span>📋 Шаг 1: Базовые параметры</span>
+        <div role="group" aria-label="Режим настроек" style={{ display: 'inline-flex', gap: 4, padding: 2, borderRadius: 10, background: 'var(--surface-subtle, rgba(255,255,255,0.05))', border: '1px solid var(--border, rgba(255,255,255,0.1))' }}>
+          <button type="button" data-bb="params-mode-basic" onClick={() => toggleParamsDepth('basic')} style={{ minHeight: 34, padding: '4px 10px', borderRadius: 8, fontSize: 11, fontWeight: 700, cursor: 'pointer', border: 'none', background: paramsDepth === 'basic' ? 'var(--accent, #00e68a)' : 'transparent', color: paramsDepth === 'basic' ? 'var(--accent-contrast, #06281c)' : 'var(--text, #fff)' }}>Базовый</button>
+          <button type="button" data-bb="params-mode-pro" onClick={() => toggleParamsDepth('pro')} style={{ minHeight: 34, padding: '4px 10px', borderRadius: 8, fontSize: 11, fontWeight: 700, cursor: 'pointer', border: 'none', background: paramsDepth === 'pro' ? 'var(--accent, #00e68a)' : 'transparent', color: paramsDepth === 'pro' ? 'var(--accent-contrast, #06281c)' : 'var(--text, #fff)' }}>PRO</button>
+        </div>
+      </div>
+
+      {onQuickBuild && (
+        <div className="bb-auto-card" data-bb="quick-start-banner" style={{ marginBottom: 10, padding: '10px 12px', borderRadius: 14, background: 'linear-gradient(135deg, rgba(0,230,138,0.12), rgba(56,189,248,0.08))', border: '1px solid var(--accent-line, rgba(0,230,138,0.35))', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 10, flexWrap: 'wrap' }}>
+          <div style={{ minWidth: 0, flex: '1 1 200px' }}>
+            <div style={{ fontSize: 12, fontWeight: 800, color: 'var(--accent, #00e68a)' }}>⚡ Быстрый старт по профилю</div>
+            <div style={{ fontSize: 10.5, color: 'var(--text-dim, rgba(255,255,255,0.82))', marginTop: 2 }}>
+              {bbDays} дн/нед · {bbWeeks} нед · цель «{bbGoal}» · уровень «{bbLevel}» — собрать оптимальный сплит сразу в 1 клик.
+            </div>
+          </div>
+          <button type="button" data-bb="quick-start-btn" onClick={onQuickBuild} style={{ ...BTN, padding: '10px 14px', fontSize: 12, whiteSpace: 'nowrap' }}>
+            ⚡ Собрать в 1 клик
+          </button>
+        </div>
+      )}
 
       {/* 1. Источник программы: генерик-сплит или готовый цикл/программа */}
       <BbCard
@@ -387,7 +419,7 @@ export const BbParamsStep: React.FC<BbParamsStepProps> = ({
           </div>
           <div style={GRID2}>
             <PopupSelect label="Уровень" value={bbLevel} onChange={setBbLevel} options={[['beginner', 'Новичок'], ['intermediate', 'Средний'], ['advanced', 'Опытный'], ['enhanced', 'Enhanced (PED)']].map(([id, label]) => ({ id, label }))} />
-            <PopupNumber label="Стаж" value={bbTrainingYears} min={0} max={50} step={0.5} suffix=" лет" onChange={v => { setBbTrainingYears(v); syncProf({ trainingYears: v }); }} />
+            <PopupNumber label="Стаж" value={bbTrainingYears} min={0} max={50} step={0.5} suffix=" лет" zeroIsValue={true} onChange={v => { setBbTrainingYears(v); syncProf({ trainingYears: v }); }} />
             <PopupSelect label="Цель" value={bbGoal} onChange={setBbGoal} options={[['mass', 'Мышечная масса'], ['cut', 'Сушка'], ['recomp', 'Рекомпозиция'], ['maintenance', 'Поддержание'], ['strength_mass', 'Сила + Масса']].map(([id, label]) => ({ id, label }))} />
             <PopupNumber label="Дней/нед" value={bbDays} min={2} max={7} onChange={v => setBbDays(v)} />
             <PopupNumber label="Недель мезо" value={bbWeeks} min={4} max={24} suffix=" нед" onChange={v => setBbWeeks(v)} />
@@ -400,6 +432,8 @@ export const BbParamsStep: React.FC<BbParamsStepProps> = ({
         </BbCard>
       )}
 
+      {/* 4. Объём и 5. Методики (в базовом режиме скрыты за переключателем PRO) */}
+      <div style={{ display: paramsDepth === 'basic' ? 'none' : undefined }}>
       {/* 4. Объём — один пульт: цель объёма + режим + схема памп-дней */}
       <BbCard icon="📦" accent="#3b82f6" title="Объём тренировки"
         desc="Три рычага: цель объёма (MEV/MAV/MRV), режим (обычный/объёмный) и схема памп-дней. Режим «Объёмный» перебивает цель на MRV и добавляет объём — см. разбор ниже."
@@ -512,7 +546,7 @@ export const BbParamsStep: React.FC<BbParamsStepProps> = ({
             { id: '1.1', label: '1.1 — +10%', desc: 'Медленнее опускание, умеренный рост стимула.' },
             { id: '1.2', label: '1.2 — +20%', desc: 'Выраженный акцент на негативе, требует техники и восстановления.' },
           ]} />
-          <PopupNumber label="🍽️ Профицит калорий (ккал/день)" value={calorieSurplus} onChange={v => setCalorieSurplus(Math.round(v))} step={50} min={-500} max={1000} hint="Профицит >100 → +5% MRV, >300 → +10% MRV. Дефицит <-200 → -20% MRV. 0 = нейтрально (Helms 2022)." />
+          <PopupNumber label="🍽️ Профицит калорий (ккал/день)" value={calorieSurplus} zeroIsValue={true} onChange={v => setCalorieSurplus(Math.round(v))} step={50} min={-500} max={1000} hint="Профицит >100 → +5% MRV, >300 → +10% MRV. Дефицит <-200 → -20% MRV. 0 = нейтрально (Helms 2022)." />
           <PopupSelect label="🔄 Вариативность упражнений" value={rotationMode} onChange={v => setRotationMode(v as any)} hint="Как часто менять упражнения — в коде rotationMode: forbid / strict / variety." options={[
             { id: 'forbid', label: '🚫 Запрет — одни и те же', desc: 'Стабильная прогрессия по весам весь мезоцикл.' },
             { id: 'strict', label: '📅 Строгий — смена раз в 4 недели', desc: 'Смена на границе фаз — баланс стабильности и разнообразия.' },
@@ -692,11 +726,41 @@ export const BbParamsStep: React.FC<BbParamsStepProps> = ({
         <div style={{ padding: '8px 10px', borderRadius: 10, background: 'rgba(96,165,250,0.04)', border: '1px solid rgba(96,165,250,0.14)', marginBottom: 8 }}>
           <div style={{ fontSize: 11, fontWeight: 700, color: '#93c5fd', marginBottom: 4 }}>📱 Восстановление (носимое / ручной)</div>
           <div style={{ ...NOTE, opacity: 0.9, marginBottom: 6 }}>Утренний HRV и сон перекрывают профиль в recovery (пишется в he_wearable_daily).</div>
-          <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
-            <input type="number" placeholder="утр. HRV (мс)" onChange={e => { try { const v = Number(e.target.value); if (v > 0) { localStorage.setItem('he_wearable_daily', JSON.stringify({ ...wearableData, morningHRV: v })); setWearableTick(t => t + 1); } } catch { /* noop */ } }}
-              style={{ background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.15)', borderRadius: 6, color: '#fff', fontSize: 11, padding: '4px 8px', width: 110 }} />
-            <input type="number" step="0.5" placeholder="сон (ч)" onChange={e => { try { const v = Number(e.target.value); if (v > 0) { localStorage.setItem('he_wearable_daily', JSON.stringify({ ...wearableData, sleepHours: v })); setWearableTick(t => t + 1); } } catch { /* noop */ } }}
-              style={{ background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.15)', borderRadius: 6, color: '#fff', fontSize: 11, padding: '4px 8px', width: 90 }} />
+          <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', alignItems: 'center' }}>
+            <input type="number" min={10} max={200} placeholder="утр. HRV (мс)"
+              value={wearableData?.morningHRV ?? ''}
+              onChange={e => {
+                try {
+                  const raw = e.target.value.trim();
+                  const next = { ...(wearableData || {}) } as Record<string, any>;
+                  if (!raw) { delete next.morningHRV; }
+                  else { const v = Math.max(10, Math.min(200, Number(raw))); if (Number.isFinite(v)) next.morningHRV = v; }
+                  if (Object.keys(next).length === 0) localStorage.removeItem('he_wearable_daily');
+                  else localStorage.setItem('he_wearable_daily', JSON.stringify(next));
+                  setWearableTick(t => t + 1);
+                } catch { /* noop */ }
+              }}
+              style={{ background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.15)', borderRadius: 6, color: '#fff', fontSize: 11, padding: '6px 8px', width: 115, minHeight: 36 }} />
+            <input type="number" min={1} max={14} step="0.5" placeholder="сон (ч)"
+              value={wearableData?.sleepHours ?? ''}
+              onChange={e => {
+                try {
+                  const raw = e.target.value.trim();
+                  const next = { ...(wearableData || {}) } as Record<string, any>;
+                  if (!raw) { delete next.sleepHours; }
+                  else { const v = Math.max(1, Math.min(14, Number(raw))); if (Number.isFinite(v)) next.sleepHours = v; }
+                  if (Object.keys(next).length === 0) localStorage.removeItem('he_wearable_daily');
+                  else localStorage.setItem('he_wearable_daily', JSON.stringify(next));
+                  setWearableTick(t => t + 1);
+                } catch { /* noop */ }
+              }}
+              style={{ background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.15)', borderRadius: 6, color: '#fff', fontSize: 11, padding: '6px 8px', width: 95, minHeight: 36 }} />
+            {(wearableData?.morningHRV != null || wearableData?.sleepHours != null) && (
+              <button type="button" onClick={() => { try { localStorage.removeItem('he_wearable_daily'); setWearableTick(t => t + 1); } catch { /* noop */ } }}
+                style={{ padding: '6px 10px', borderRadius: 6, border: '1px solid rgba(239,68,68,0.35)', background: 'rgba(239,68,68,0.1)', color: '#f87171', fontSize: 11, cursor: 'pointer', minHeight: 36 }}>
+                ✕ Сбросить
+              </button>
+            )}
           </div>
         </div>
 
@@ -769,6 +833,13 @@ export const BbParamsStep: React.FC<BbParamsStepProps> = ({
           </div>
         </div>
       </BbCard>
+      </div>
+      {/* Базовый режим: быстрый доступ к травмам без PRO-настроек */}
+      {paramsDepth === 'basic' && (
+        <div style={{ marginTop: 8 }}>
+          <InjurySelectCard injuries={injuries} onChange={setInjuries} />
+        </div>
+      )}
 
       {savedPlans.length > 0 && (
         <BbRowSwitch checked={usePreviousPlan} onChange={setUsePreviousPlan} icon="🔗" accent="#00e68a"

@@ -17,6 +17,8 @@
  *   `bb-hub-zones.ts` — цвета зон; `bb-hub-export.ts` — единая PRO-мета для HTML/CSV/печати.
  */
 import React, { useMemo, useState, useEffect, useCallback, useRef } from 'react';
+import { isNativeApp } from '../../../core/app-platform';
+import { printHtmlApk } from '../../../core/apk-share';
 import { CARD } from './training-ui';
 import { BbScreeningTab } from './bb-hub-screening-tab';
 import { BbCheckCard, BbNum, bbNum } from './bb-hub-controls';
@@ -29,6 +31,9 @@ import { BbExerciseTab } from './bb-hub-exercise-tab';
 import { BbStimulusTab } from './bb-hub-stimulus-tab';
 import { BbSymmetryTab } from './bb-hub-symmetry-tab';
 import { applyToPlanner } from './planner-bridge';
+import { refreshBBPlanSnapshots } from '../../../engines/bb/bb-plan-snapshot.engine';
+import { notifyPlRuntimeSaved } from '../../../core/pl-runtime-events';
+import { muscleLabel } from './bb-labels';
 import { buildPro2Meta } from './bb-hub-export';
 import { localIsoDate } from './diary-shared';
 import { scoreColor as bbScoreColor, BB_VERIFICATION_LABEL_RU } from '../../../engines/bb/bb-scoring.engine';
@@ -346,8 +351,17 @@ export const BBDiagnosticsHub: React.FC = () => {
   };
 
   const applyToConstructor = () => {
-    if (report.weakMusclesCanonical.length === 0) {
-      setToast('Слабые зоны не выбраны — выберите 1-2 (или заполните дневник/замеры для авто)');
+    const hasActionableScreening =
+      painMon.verdict.level === 'red' ||
+      painMon.verdict.level === 'yellow' ||
+      !!state.returnStage ||
+      (Array.isArray(ohs.failed) && ohs.failed.length > 0) ||
+      !!(shoulderV && (shoulderV as any).tested && !(shoulderV as any).pass) ||
+      !!(hingeV && (hingeV as any).tested && !(hingeV as any).pass) ||
+      (Array.isArray(lrVerdicts) && lrVerdicts.some((v: any) => v && v.verdict && v.verdict !== 'ok')) ||
+      !!redFlags?.active;
+    if (report.weakMusclesCanonical.length === 0 && !hasActionableScreening) {
+      setToast('Слабые зоны не выбраны — выберите 1-2 (или заполните дневник/замеры/скрининг)');
       scheduleToastClear(2500);
       return;
     }
@@ -615,6 +629,12 @@ export const BBDiagnosticsHub: React.FC = () => {
    */
   const handleExportPrint = () => {
     const html = buildBBDiagnosticsHtml(report, { date: localIsoDate(), level, plan: bbPlan, weakHeads: exportHeads, weakCauses: weakCauses as any, specBlock: specBlock as any, ...pro2Meta } as any);
+    if (isNativeApp()) {
+      void printHtmlApk(html, `bb-diagnostics-${localIsoDate()}.html`);
+      setToast('🖨 HTML-отчёт сохранён для печати/отправки');
+      scheduleToastClear(2500);
+      return;
+    }
     try {
       const w = window.open('', '_blank');
       if (!w) {
@@ -1548,7 +1568,39 @@ export const BBDiagnosticsHub: React.FC = () => {
     } catch { /* noop */ }
     try {
       working.rationale = [...(working.rationale || []), `ББ-диагностика: вставка коррекций (${zones.map(weakRu).join(', ')})`];
+      try {
+        refreshBBPlanSnapshots(working as any, { refreshFrequency: true, refreshValidationRationale: true, refreshRotationRationale: false });
+      } catch { /* snapshot refresh best-effort */ }
       localStorage.setItem('he_bb_plan_saved', JSON.stringify({ plan: working, date: new Date().toISOString() }));
+      // P1-24: синхронизируем активный BB-runtime плеера, если он уже запущен
+      try {
+        const rawRt = localStorage.getItem('he_pl_runtime');
+        const rt = rawRt ? JSON.parse(rawRt) : null;
+        if (rt && rt.track === 'bb' && Array.isArray((working as any).weeks)) {
+          const days = (working as any).weeks.flatMap((w: any) => (w.sessions || []).map((s: any, si: number) => ({
+            label: 'Нед' + w.week + ' Д' + (si + 1),
+            weekNumber: Number(w.week) || 1,
+            exercises: (s.exercises || []).map((e: any) => ({
+              name: e.name,
+              muscle: e.muscle,
+              muscleGroup: muscleLabel(e.muscle) || e.muscle,
+              notes: e.comment || e.rationale || '',
+              warmupActivator: !!e.warmupActivator,
+              targetSets: (e.workSets || []).map((ws: any) => ({
+                weight: ws.weight || 0,
+                reps: ws.reps || 0,
+                rir: ws.rir ?? e.rir ?? 2,
+                technique: ws.technique,
+                tempo: ws.tempo || e.tempoSpec,
+                restSeconds: ws.restSeconds ?? e.restSeconds ?? 90,
+              })),
+              restSec: e.restSeconds ?? 90,
+            })),
+          })));
+          localStorage.setItem('he_pl_runtime', JSON.stringify({ ...rt, days }));
+          notifyPlRuntimeSaved();
+        }
+      } catch { /* runtime sync best-effort */ }
     } catch {
       setToast('Не влезло в хранилище — очисти старые планы');
       scheduleToastClear(2500);

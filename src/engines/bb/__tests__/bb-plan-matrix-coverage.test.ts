@@ -7,16 +7,10 @@ const WM = { chest: 100, back: 120, shoulders: 60, quads: 140, hamstrings: 100, 
 /** Остаток тестовой матрицы Этапа 11: недельный back-бюджет, arms indirect,
  *  малые группы во всех сплитах. */
 describe('BB test matrix coverage (Этап 11)', () => {
-  // ⚠️ Известный дефект, вскрытый Волной 0 (п. 0.4), НЕ исправлен молча.
-  // Тест был зелёным только потому, что weeklyVolume снимался ДО
-  // enforceSessionRealism и показывал 40 сетов спины вместо фактических 24.
-  // После честного пересчёта (finalizeBBPlan пересобирает weeklyVolume по
-  // финальным сетам) виден РЕАЛЬНЫЙ пробел: enhanced 6+ / upper_lower_4
-  // отдаёт 24 прямых сета спины при заявленном бюджете ≥ 36.
-  // Исправление = поднять недельный объём спины в плане, а это меняет
-  // пользовательские числа → требует отдельного решения владельца.
-  // it.fails: как только дефект исправят, тест упадёт сам (обратный сигнал).
-  it.fails('back budget 24 < 36 (KNOWN DEFECT, см. AGENTS): weeklyVolume больше не врёт, но план недотренгует спину', () => {
+  // P0-17 (Волна 3): lateCap теперь уважает onCourse/maxWorkingSets=60 и перестал
+  // урезать enhanced 6+ / upper_lower_4 до натуральных 40 сетов → дефект спины
+  // (24 < 36) устранён: фактический объём спины ≥ 36 при честном пересчёте weeklyVolume.
+  it('back budget >= 36 для enhanced 6+ / upper_lower_4 на курсе (исправлен бывший дефект 24 < 36)', () => {
     const plan = buildBBPlan({ patternId: 'upper_lower_4', level: 'enhanced', trainingYears: 6, goal: 'mass', weeks: 1, workMax: WM, pedDoses: { AAS: 500 }, courseIntensity: 'moderate' });
     const direct = plan.weeklyVolume?.[1]?.back?.directSets ?? 0;
     expect(direct).toBeGreaterThanOrEqual(36);

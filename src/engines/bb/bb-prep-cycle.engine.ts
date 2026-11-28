@@ -20,6 +20,7 @@ import { adaptForPEDs, type PED, type PEDAdaptation, type CourseIntensity } from
 import { buildSpecializationSchedule, normalizeSpecializationTargets, expandDonorMuscles, canonicalMuscle, type SpecializationBlock, type SpecializationSchedule } from './bb-specialization.engine';
 import type { Injury } from '../manual-plan-builder';
 import { computeBBNutritionMultiplier } from './bb-volume.engine';
+import { getAllVolumeLandmarks } from '../volume-landmarks.engine';
 import { autoAssignIntensityTechniques } from './bb-finalize.engine';
 import { reconcileSchemeCommentsIn } from './bb-scheme-comment-reconcile';
 import type { BBTrainingFocus } from './bb-goal-types';
@@ -352,8 +353,20 @@ export function buildPrepCycle(raw: PrepCycleConfig, opts: PrepCycleBuildOpts = 
 
   let pedAdapt: PEDAdaptation | undefined;
   if (cfg.enhanced) {
-    const peds: PED[] = ['AAS'];
-    pedAdapt = adaptForPEDs(peds, input.workMax ?? {}, cfg.pedDoses, cfg.courseIntensity ?? 'moderate');
+    const pedsSet = new Set<PED>();
+    const doses = cfg.pedDoses || {};
+    if ((doses.AAS ?? 0) > 0 || (cfg.pedContext?.trenMg ?? 0) > 0) pedsSet.add('AAS');
+    if ((doses.GH ?? 0) > 0 || (cfg.pedContext?.ghIU ?? 0) > 0) pedsSet.add('GH');
+    if ((doses.insulin ?? 0) > 0 || (cfg.pedContext?.insulinIU ?? 0) > 0) pedsSet.add('insulin');
+    if ((doses.MGF ?? 0) > 0) pedsSet.add('MGF');
+    if ((doses.IGF1 ?? 0) > 0) pedsSet.add('IGF1');
+    if (pedsSet.size === 0) pedsSet.add('AAS');
+    const peds: PED[] = Array.from(pedsSet);
+    const lm = getAllVolumeLandmarks(cfg.level);
+    const baseMrv: Record<string, number> = Object.fromEntries(
+      Object.entries(lm).map(([m, v]) => [m, v.mrv]),
+    );
+    pedAdapt = adaptForPEDs(peds, baseMrv, cfg.pedDoses, cfg.courseIntensity ?? 'moderate');
   }
   let bbPlan: BBPlan = buildBBPlan(input, pedAdapt);
   // DUP-периодизация (как в обычном ББ-авто) — поверх базового плана, до prep-overlay.
@@ -368,7 +381,7 @@ export function buildPrepCycle(raw: PrepCycleConfig, opts: PrepCycleBuildOpts = 
     heightCm: cfg.heightCm,
     cycleDay: cfg.cycleDay,
     bodyFatPct: cfg.bodyFatPct,
-    experienceLevel: cfg.experienceLevel,
+    experienceLevel: cfg.experienceLevel ?? (cfg.level === 'beginner' ? 'beginner' : cfg.level === 'intermediate' ? 'intermediate' : 'advanced'),
     enhanced: cfg.enhanced,
     prepCount: cfg.prepCount ?? 0,
     experience: cfg.experience,
@@ -685,7 +698,7 @@ export function buildPrepNutritionPlan(
       kcal = baseKcal;
       refeed = weekLastDay ? isPrepRefeedDay(weekLastDay, prepPlan) : i % 3 === 0; // календарь движка (брейки исключены)
       carbsG = Math.max(carbsMinG, Math.round((kcal - proteinG * 4 - fatFloorG * 9) / 4));
-      note = `Подготовка (нед ${i}): дефицит ~${Math.round(ratePct * 100 * 10) / 10}%/нед, уровень калорий держится по чек-инам (адаптация по весу),${refeed ? ' 1 рефид-день (карбс до ~поддержания),' : ''} вода/натрий стабильны.`;
+      note = `Подготовка (нед ${i}): дефицит ~${Math.round(ratePct * 100) / 100}%/нед, уровень калорий держится по чек-инам (адаптация по весу),${refeed ? ' 1 рефид-день (карбс до ~поддержания),' : ''} вода/натрий стабильны.`;
     }
     weeks.push({ week: i, phase: phaseKey, kcal, proteinG, fatG: fatFloorG, carbsG, refeed, note });
   }
@@ -739,7 +752,7 @@ export function buildPrepNutritionPlan(
     hydration: `Вода ~3 л/день (женщины ≥1.5-2 л, минимум 40 мл/кг), натрий 2800 мг стабильно.`,
     cardioKcalPerWeek,
     femaleNotes,
-    note: `План питания подготовки: белок ${proteinG} г (${proteinPerKg[0]}-${proteinPerKg[1]} г/кг), жиры ≥${fatFloorG} г, карбс на остаток (мин ${carbsMinG} г). Дефицит ${Math.round(ratePct * 1000) / 10}%/нед.`,
+    note: `План питания подготовки: белок ${proteinG} г (${proteinPerKg[0]}-${proteinPerKg[1]} г/кг), жиры ≥${fatFloorG} г, карбс на остаток (мин ${carbsMinG} г). Дефицит ${Math.round(ratePct * 100) / 100}%/нед.`,
   };
 }
 
@@ -807,7 +820,8 @@ export function buildPrepProgression(prepPlan: BBContestPrepPlan, cfg: PrepCycle
       });
     } else if (phase === 'taper') {
       const tw = i - prepWeeks; // 1..taperWeeks
-      const taperMult = 0.92 - 0.1 * (taperWeeks - tw); // последняя неделя тапера — ниже объём
+      // Bosquet 2007: нисходящее снижение объёма к сцене (75% → 65% → 55%)
+      const taperMult = clamp(0.75 - 0.1 * (tw - 1), 0.45, 0.85);
       weeks.push({
         week: i,
         phase,
@@ -840,22 +854,24 @@ export function buildPrepProgression(prepPlan: BBContestPrepPlan, cfg: PrepCycle
  *  снижение — только в финальном тапере (последние недели). Это НЕ режущий каскад с 1-й недели.
  *  Ориентир: 10–15 сетов/группу/нед × атлет-масштаб (Helms; Schoenfeld 2021; da Silveira 2025). */
 export function prepVolumePlan(cfg: PrepCycleConfig, prepWeeks: number): PrepVolumePlan {
+  const athleteMult = prepAthleteMult(cfg);
+  const recoveryMult = prepRecoveryMult(cfg);
+  const labMult = cfg.labMrvMultiplier != null && Number.isFinite(cfg.labMrvMultiplier)
+    ? clamp(cfg.labMrvMultiplier, 0.7, 1.0)
+    : 1.0;
   // Short cycle 4-6 нед → linear без final_preparation каскада (ISSA PRO: короткий цикл = без двойной резки)
   if (prepWeeks <= 3) {
     const deficitMult = prepDeficitMult(cfg);
-    const athleteMult = prepAthleteMult(cfg);
-    const recoveryMult = prepRecoveryMult(cfg);
-    const phases: PrepVolumePhase[] = [{ fromPct:0, toPct:1, volumeMult: clamp(deficitMult*athleteMult*recoveryMult,0.95,1.0), rir:[1,2] }];
-    return { phases, deficitMult, athleteMult, recoveryMult, targetSetsPerMusclePerWeek:[10,15] as [number,number], scaledTargetSetsPerMusclePerWeek:[Math.round(10*athleteMult),Math.round(15*athleteMult)] as [number,number], note:`shortCycle 4-6 нед: linear ×1.0 (без final каскада)` };
+    const floorMult = labMult < 1 ? 0.75 : 0.95;
+    const phases: PrepVolumePhase[] = [{ fromPct:0, toPct:1, volumeMult: clamp(deficitMult*athleteMult*recoveryMult*labMult,floorMult,1.0), rir:[1,2] }];
+    return { phases, deficitMult, athleteMult, recoveryMult, targetSetsPerMusclePerWeek:[10,15] as [number,number], scaledTargetSetsPerMusclePerWeek:[Math.round(10*athleteMult*labMult),Math.round(15*athleteMult*labMult)] as [number,number], note:`shortCycle 4-6 нед: linear ×1.0 (без final каскада)` };
   }
   const deficitMult = prepDeficitMult(cfg);
-  const athleteMult = prepAthleteMult(cfg);
-  const recoveryMult = prepRecoveryMult(cfg);
   // Стратегия пользователя влияет лишь на ФИНАЛЬНУЮ подготовку/переход к таперу (не на основную часть).
   const strategy = cfg.prepVolumeStrategy ?? 'balanced';
   const strategyMult = strategy === 'gentle' ? 1.02 : strategy === 'aggressive' ? 0.97 : 1.0;
-  // ВАЖНО: prep держит объём ~MAV (×1.0). Множители почти не режут (нижняя граница 0.92).
-  const global = clamp(deficitMult * athleteMult * recoveryMult * strategyMult, 0.92, 1.1);
+  // ВАЖНО: prep держит объём ~MAV (×1.0). Лабораторный множитель снижает объём при стрессе органов.
+  const global = clamp(deficitMult * athleteMult * recoveryMult * strategyMult * labMult, 0.7, 1.1);
   const base: Array<Omit<PrepVolumePhase, 'volumeMult'> & { base: number }> = [
     { fromPct: 0, toPct: 0.6, base: 1.0, rir: [1, 2] },     // основная подготовка — полный объём (MAV)
     { fromPct: 0.6, toPct: 0.9, base: 0.98, rir: [1, 2] },  // середина — минимальное снижение
@@ -864,17 +880,16 @@ export function prepVolumePlan(cfg: PrepCycleConfig, prepWeeks: number): PrepVol
   const phases: PrepVolumePhase[] = base.map(p => ({
     fromPct: p.fromPct,
     toPct: p.toPct,
-    volumeMult: clamp(p.base * global, 0.92, 1.0),
+    volumeMult: clamp(p.base * global, labMult < 1 ? 0.7 : 0.92, 1.0),
     rir: p.rir,
   }));
   const strategyLabel = strategy === 'gentle' ? 'сохранить массу' : strategy === 'aggressive' ? 'агрессивная сушка' : 'сбалансированная';
-  // Масштабированный целевой объём: база 10–15 (натурал/средний стаж) × атлет-множитель
-  // (PED/стаж/уровень). У продвинутого на курсе целевой объём на группу заметно выше.
+  // Масштабированный целевой объём: база 10–15 (натурал/средний стаж) × атлет-множитель × labMult.
   const scaledTargetSetsPerMusclePerWeek: [number, number] = [
-    Math.round(10 * athleteMult),
-    Math.round(15 * athleteMult),
+    Math.round(10 * athleteMult * labMult),
+    Math.round(15 * athleteMult * labMult),
   ];
-  const note = `объём ≈ обычного ББ-авто (MAV) · база 10–15 сетов/группу/нед → с учётом PED/стажа/уровня ×${athleteMult.toFixed(2)} = ~${scaledTargetSetsPerMusclePerWeek[0]}–${scaledTargetSetsPerMusclePerWeek[1]} · стратегия «${strategyLabel}» · дефицит ×${deficitMult.toFixed(2)} · восстановление ×${recoveryMult.toFixed(2)}${cfg.calorieSurplus != null && cfg.calorieSurplus < 0 ? ` · дефицит питания уже учтён в buildBBPlan (nutrition ×${computeBBNutritionMultiplier({ calorieSurplus: cfg.calorieSurplus, proteinPerKg: cfg.proteinPerKg }).toFixed(2)})` : ''}`;
+  const note = `объём ≈ обычного ББ-авто (MAV) · база 10–15 сетов/группу/нед → с учётом PED/стажа/уровня ×${athleteMult.toFixed(2)}${labMult < 1 ? ` × лаб ${labMult.toFixed(2)}` : ''} = ~${scaledTargetSetsPerMusclePerWeek[0]}–${scaledTargetSetsPerMusclePerWeek[1]} · стратегия «${strategyLabel}» · дефицит ×${deficitMult.toFixed(2)} · восстановление ×${recoveryMult.toFixed(2)}${cfg.calorieSurplus != null && cfg.calorieSurplus < 0 ? ` · дефицит питания уже учтён в buildBBPlan (nutrition ×${computeBBNutritionMultiplier({ calorieSurplus: cfg.calorieSurplus, proteinPerKg: cfg.proteinPerKg }).toFixed(2)})` : ''}`;
   return {
     phases,
     deficitMult,
@@ -991,8 +1006,8 @@ export function applyPrepVolumeCascade(
     const taperIdx = weeks.map((w, i) => [w, i] as const).filter(([w]) => w.contestPhase === 'taper').map(([, i]) => i);
     const n = taperIdx.length;
     taperIdx.forEach((idx, k) => {
-      // последняя тапер-неделя (перед пиком) — самая низкая
-      const factor = clamp(0.92 - 0.1 * (n - 1 - k), 0.55, 1.0);
+      // Bosquet 2007: последняя тапер-неделя (перед пиком) — самая низкая (75% → 65% → 55%)
+      const factor = clamp(0.75 - 0.1 * k, 0.45, 0.85);
       weeks[idx] = scaleWeekToTarget(weeks[idx], lateAvg * factor);
     });
   }
@@ -1352,16 +1367,25 @@ export function buildPrepSeason(cfg: PrepSeasonConfig, opts: PrepCycleBuildOpts 
   let prevDate: string | null = null;
   for (let i = 0; i < comps.length; i++) {
     const comp = comps[i];
-    // Подготовка не должна залезать на предыдущий старт.
+    // Подготовка не должна залезать на предыдущий старт и должна укладываться в валидный >=4 нед диапазон (validatePrepCycle).
     let prepWeeks = userWeeks;
+    let compTaperWeeks = taperWeeks;
     if (prevDate) {
       const gapWeeks = Math.floor(isoDiffDays(prevDate, comp.date!) / 7);
-      prepWeeks = Math.min(prepWeeks, Math.max(1, gapWeeks - taperWeeks - 1));
+      const maxTotal = Math.max(4, gapWeeks);
+      compTaperWeeks = Math.min(taperWeeks, Math.max(2, maxTotal - 2));
+      prepWeeks = Math.min(prepWeeks, Math.max(1, maxTotal - compTaperWeeks - 1));
+      if (prepWeeks + compTaperWeeks + 1 < 4) {
+        compTaperWeeks = Math.max(2, 4 - prepWeeks - 1);
+      }
+      if (gapWeeks < 4) {
+        warnings.push(`⚠ Между «${comp.name}» (${comp.date}) и предыдущим стартом < 4 нед (${Math.max(0, gapWeeks)} нед): использован минимальный мостовой тапер-цикл ${prepWeeks + compTaperWeeks + 1} нед.`);
+      }
     }
     if (prepWeeks < 3) {
-      warnings.push(`⚠ Старт «${comp.name}» (${comp.date}) идёт рано после предыдущего — подготовка усечена до ${prepWeeks} нед (только ${taperWeeks} нед тапера + пик).`);
+      warnings.push(`⚠ Старт «${comp.name}» (${comp.date}) идёт рано после предыдущего — подготовка усечена до ${prepWeeks} нед (только ${compTaperWeeks} нед тапера + пик).`);
     }
-    const totalWeeks = prepWeeks + taperWeeks + 1;
+    const totalWeeks = Math.max(4, prepWeeks + compTaperWeeks + 1);
     const cycleCfg: PrepCycleConfig = {
       category: cfg.category,
       sex: cfg.sex,
@@ -1370,7 +1394,7 @@ export function buildPrepSeason(cfg: PrepSeasonConfig, opts: PrepCycleBuildOpts 
       minimalMode: cfg.minimalMode,
       splitPatternId: cfg.splitPatternId,
       weeks: totalWeeks,
-      taperWeeks,
+      taperWeeks: compTaperWeeks,
       showDate: comp.date!,
       level: cfg.level,
       trainingYears: cfg.trainingYears,
@@ -1411,7 +1435,7 @@ export function buildPrepSeason(cfg: PrepSeasonConfig, opts: PrepCycleBuildOpts 
       heightCm: cfg.heightCm,
       cycleDay: cfg.cycleDay,
       bodyFatPct: cfg.bodyFatPct,
-      experienceLevel: cfg.experienceLevel,
+      experienceLevel: cfg.experienceLevel ?? (cfg.level === 'beginner' ? 'beginner' : cfg.level === 'intermediate' ? 'intermediate' : 'advanced'),
       prepCount: cfg.prepCount,
       prepVolumeMult: cfg.prepVolumeMult,
       prepVolumeStrategy: cfg.prepVolumeStrategy,
@@ -1436,7 +1460,7 @@ export function buildPrepSeason(cfg: PrepSeasonConfig, opts: PrepCycleBuildOpts 
       name: comp.name,
       priority: comp.priority,
       prepWeeks,
-      taperWeeks,
+      taperWeeks: compTaperWeeks,
       totalWeeks,
     });
     prevDate = comp.date!;

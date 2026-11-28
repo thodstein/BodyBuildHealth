@@ -242,9 +242,9 @@ export function schemeFor(input: SchemeForInput): RepSchemeId {
   const { focus, phase, pedProfile, character, level } = input;
   const isAdv = level === 'advanced' || level === 'enhanced';
 
-  // P0: GH+insulin pump window — приоритетно для памп-дней
-  if (pedProfile?.ghPlusInsulin && character === 'памп') return 'pump_15_20';
+  // P0/P1-8: GH+insulin pump window — приоритетно для памп-дней (в intensification — BFR)
   if (pedProfile?.ghPlusInsulin && phase === 'intensification' && character === 'памп') return 'bfr';
+  if (pedProfile?.ghPlusInsulin && character === 'памп') return 'pump_15_20';
 
   // MGF/IGF1 — фазировка (bb-ped-phasing.engine): MGF = пролиферация
   // сателлитов (myo-reps/lengthened + повреждение/стретч, Goldspink 2003),

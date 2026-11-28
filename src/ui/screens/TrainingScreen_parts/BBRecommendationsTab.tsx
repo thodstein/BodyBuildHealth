@@ -79,7 +79,7 @@ function loadNutritionAvg(): { avgKcal: number; avgProtein: number; avgCarbs: nu
     const diary = JSON.parse(raw);
     const cutoff = new Date(); cutoff.setDate(cutoff.getDate() - 7);
     const cutoffKey = localIsoDate(cutoff);
-    const dayKeys = Object.keys(diary || {}).filter(k => k >= cutoffKey).slice(0, 7);
+    const dayKeys = Object.keys(diary || {}).filter(k => k >= cutoffKey).sort().reverse().slice(0, 7);
     for (const k of dayKeys) {
       const meals = diary[k]?.meals || {};
       const items = Object.values(meals).flatMap((arr: any) => Array.isArray(arr) ? arr : []);
@@ -151,8 +151,8 @@ export const BBRecommendationsTab: React.FC<{ hub: DiaryHubCtx }> = ({ hub }) =>
   return (
     <div className="train-bbrec" style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
       <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
-        <button onClick={() => hub.setMode('record')} style={{ padding: '8px 14px', borderRadius: 8, fontSize: 11, fontWeight: 700, cursor: 'pointer', border: '1px solid rgba(255,255,255,0.1)', background: 'rgba(255,255,255,0.03)', color: '#fff' }}>← В запись</button>
-        <span style={{ fontSize: 10, color: '#fff' }}>Вернуться к записи тренировки</span>
+        <button onClick={() => hub.setMode('record')} style={{ padding: '8px 14px', borderRadius: 8, fontSize: 11, fontWeight: 700, cursor: 'pointer', border: '1px solid var(--border, rgba(255,255,255,0.1))', background: 'var(--surface-subtle, rgba(255,255,255,0.03))', color: 'var(--text, #fff)' }}>← В запись</button>
+        <span style={{ fontSize: 10, color: 'var(--text, #fff)' }}>Вернуться к записи тренировки</span>
       </div>
       <div style={{ padding: 12, borderRadius: 12, background: 'rgba(0,230,138,0.05)', border: '1px solid ' + (hasAlerts ? 'rgba(245,158,11,0.3)' : 'rgba(0,230,138,0.2)') }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>

@@ -74,23 +74,31 @@ export function applyDUPOverlay(plan: BBPlan, config: DUPConfig): BBPlan {
     ? new Set(config.muscles)
     : null;
 
-  // Глубокая копия плана — deep clone workSets объекты (fix P0: shallow copy мутировал оригинал)
+  // Глубокая копия плана — deep clone workSets и rationale (fix P0/P1-2: без мутации оригинала)
   const newPlan: BBPlan = {
     ...plan,
+    rationale: Array.isArray(plan.rationale) ? [...plan.rationale] : [],
     weeks: plan.weeks.map(w => ({
       ...w,
       sessions: w.sessions.map(s => ({ ...s, exercises: s.exercises.map(e => ({ ...e, workSets: e.workSets.map(ws => ({ ...ws })) })) })),
     })),
   };
 
-  let dupDayCounter = 0;
+  // P1-2: per-muscle счётчик (раньше глобальный счётчик на Upper/Lower делал Upper всегда тяжёлым,
+  // а Lower всегда лёгким — нулевая волна по мышце!).
+  const dupCounterByMuscle: Record<string, number> = {};
+  const workingWeeks = newPlan.weeks.filter(w => w.phase !== 'deload').length;
+  let workingWeekIdx = 0;
 
   for (const w of newPlan.weeks) {
     if (w.phase === 'deload') continue;
+    // Сохраняем недельную прогрессию RIR: к концу блока RIR плавно снижается (0 → -1).
+    const rirProgressShift = workingWeeks >= 4 && workingWeekIdx >= Math.floor(workingWeeks / 2) ? -1 : 0;
+    workingWeekIdx++;
 
     for (const s of w.sessions) {
-      const dupDay = preset[dupDayCounter % preset.length];
-      dupDayCounter++;
+      let sessionChar: DayCharacter | null = null;
+      const seenMusclesInSession = new Set<string>();
 
       // Применяем DUP только к primary упражнениям (accessory остаются как есть)
       for (const ex of s.exercises) {
@@ -98,41 +106,55 @@ export function applyDUPOverlay(plan: BBPlan, config: DUPConfig): BBPlan {
         // P2 E: per-muscle гейт — если заданы мышцы, применяем только к ним.
         if (dupMuscles && !dupMuscles.has(ex.muscle)) continue;
 
+        const mKey = String(ex.muscle || 'other');
+        const mIdx = dupCounterByMuscle[mKey] ?? 0;
+        const dupDay = preset[mIdx % preset.length];
+        if (!seenMusclesInSession.has(mKey)) {
+          dupCounterByMuscle[mKey] = mIdx + 1;
+          seenMusclesInSession.add(mKey);
+        }
+        if (!sessionChar) sessionChar = dupDay.character;
+
         // Изменяем character
         ex.character = dupDay.character;
 
-        // Изменяем reps для work sets
+        // Изменяем reps, RIR и ПЕРЕСЧИТЫВАЕМ вес по Brzycki/Epley e1RM (P1-2: иначе 100кг×6 превращались в 100кг×15)
         const [repMin, repMax] = dupDay.repTarget;
+        const targetRir = Math.max(0, Math.min(5, dupDay.rirTarget + rirProgressShift));
         for (const ws of ex.workSets) {
-          // Сохраняем прогрессию, но сдвигаем диапазон
-          ws.reps = Math.max(repMin, Math.min(repMax, ws.reps));
-          // Регулируем RIR
-          ws.rir = dupDay.rirTarget;
+          const oldReps = Math.max(1, Number(ws.reps) || 8);
+          const oldRir = Math.max(0, Math.min(5, Number(ws.rir ?? ex.rir ?? 2)));
+          const oldW = Number(ws.weight) || 0;
+          const newReps = Math.max(repMin, Math.min(repMax, oldReps));
+          if (oldW > 0 && (newReps !== oldReps || targetRir !== oldRir)) {
+            const est1rm = oldW * (1 + (oldReps + oldRir) / 30);
+            const scaled = est1rm / (1 + (newReps + targetRir) / 30);
+            ws.weight = Math.max(2.5, Math.round(scaled * 10) / 10);
+          }
+          ws.reps = newReps;
+          ws.rir = targetRir;
+          if (dupDay.character === 'тяж' && (ws.restSeconds ?? 90) < 120) ws.restSeconds = 150;
+          else if (dupDay.character === 'памп' && (ws.restSeconds ?? 90) > 120) ws.restSeconds = 75;
         }
 
-        // Обновляем repsRange
+        // Обновляем repsRange и RIR упражнения
         ex.repsRange = [repMin, repMax];
+        ex.rir = targetRir;
 
-        // Обновляем RIR упражнения
-        ex.rir = dupDay.rirTarget;
-
-        // Добавляем DUP-метку в комментарий
+        // Добавляем DUP-метку в комментарий (идемпотентно, заменяя прежнюю)
         const dupLabel = `[DUP: ${dupDay.label}]`;
-        if (!ex.comment?.includes(dupLabel)) {
-          ex.comment = `${dupLabel} ${ex.comment || ''}`.trim();
-        }
+        const cleaned = String(ex.comment || '').replace(/\[DUP:[^\]]*\]\s*/g, '').trim();
+        ex.comment = `${dupLabel} ${cleaned}`.trim();
       }
 
-      // Обновляем character сессии — только если DUP ко ВСЕМ primary (не per-muscle),
-      // иначе характер дня задаёт смесь DUP и block-фаз по мышцам.
-      if (!dupMuscles) {
-        s.character = dupDay.character;
+      if (!dupMuscles && sessionChar) {
+        s.character = sessionChar;
       }
     }
   }
 
-  // Добавляем DUP rationale
-  if (!newPlan.rationale.includes(`DUP: ${config.mode}`)) {
+  // Добавляем DUP rationale (идемпотентно: startsWith вместо exact includes)
+  if (!newPlan.rationale.some(r => String(r).startsWith(`DUP: ${config.mode}`))) {
     newPlan.rationale.push(`DUP: ${config.mode} (cycle ${config.cycleDays}дн) — чередование тяж/лёг для каждой мышцы (Schoenfeld 2017).`);
   }
 

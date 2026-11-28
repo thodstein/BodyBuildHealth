@@ -3,18 +3,23 @@
  * Единый стиль: тёмная карточка-кнопка + открывающийся попап с зелёным акцентом.
  * Экспортирует: PopupNumber, PopupSelect, ExpandableCard, MetricCard, SaveButton.
  */
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import ReactDOM from 'react-dom';
 import { bbCardChrome, bbCardTitle, bbIconTile } from '../TrainingScreen_parts/training-ui';
 
-const ACCENT = '#00e68a';
+const ACCENT = 'var(--accent, #00e68a)';
 
 /** Portal-обёртка для overlay — рендерит в document.body, обходит containing-block bug
- *  (предок с backdrop-filter/transform ломает position:fixed). */
+ *  (предок с backdrop-filter/transform ломает position:fixed). Поддерживает Escape и a11y dialog. */
 const PortalOverlay: React.FC<{ onClose: () => void; children: React.ReactNode }> = ({ onClose, children }) => {
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') onClose(); };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [onClose]);
   if (typeof document === 'undefined') return null;
   return ReactDOM.createPortal(
-    <div className="pl-popupoverlay" style={overlay} onClick={onClose}>{children}</div>,
+    <div className="pl-popupoverlay" role="dialog" aria-modal="true" style={overlay} onClick={onClose}>{children}</div>,
     document.body,
   );
 };
@@ -22,10 +27,12 @@ const PortalOverlay: React.FC<{ onClose: () => void; children: React.ReactNode }
 const overlay: React.CSSProperties = {
   position: 'fixed', inset: 0, zIndex: 250, display: 'flex',
   alignItems: 'center', justifyContent: 'center', background: 'rgba(0,0,0,0.85)',
+  paddingBottom: 'env(safe-area-inset-bottom, 0px)',
 };
 const sheet = (maxW = 360): React.CSSProperties => ({
   width: '88%', maxWidth: maxW, maxHeight: '78vh', borderRadius: 16,
-  background: '#18181b', border: '1px solid rgba(255,255,255,0.1)', overflow: 'hidden',
+  background: 'var(--card-bg, #18181b)', color: 'var(--text, #fff)',
+  border: '1px solid var(--border, rgba(255,255,255,0.1))', overflow: 'hidden',
 });
 const topBar: React.CSSProperties = { height: 3, background: 'linear-gradient(90deg,#00e68a,#00c853)' };
 const sheetBody: React.CSSProperties = { padding: '14px 16px', maxHeight: 'calc(78vh - 3px)', overflowY: 'auto' };
@@ -385,7 +392,10 @@ export const PopupExerciseList: React.FC<{
   const [q, setQ] = useState('');
   const isFilled = ids.length > 0;
   const nameOf = (id: string): string => {
-    const e = (EXERCISE_CATALOG as any)[id] || (EXERCISE_CATALOG as any)[id.toUpperCase()];
+    const idLow = String(id || '').toLowerCase();
+    const e = Array.isArray(EXERCISE_CATALOG)
+      ? EXERCISE_CATALOG.find(x => String(x.id || '').toLowerCase() === idLow || String(x.name || '').toLowerCase() === idLow)
+      : ((EXERCISE_CATALOG as any)[id] || (EXERCISE_CATALOG as any)[id.toUpperCase()]);
     return e?.name || id;
   };
   const results = (() => {

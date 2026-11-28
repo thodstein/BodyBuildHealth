@@ -3,8 +3,9 @@
  * god-component `BbAutoConstructor.tsx` (§4.3, этап 3). Перенос 1-в-1:
  * логика/тексты/стили не менялись, все state-ссылки переданы явными props.
  */
-import React from 'react';
+import React, { useMemo } from 'react';
 import { collectPlanExercises, recalibratePlanWeights, groupWeightEntries, type PlanWeightEntry } from '../../../engines/bb/bb-weight-calibration.engine';
+import { loadSessions } from '../../../engines/workout-logger.engine';
 import { ruCount, RU_OCCURRENCES } from '../../../engines/ru-plural';
 import type { BBPlan } from '../../../engines/bb/bb-builder.engine';
 import { getProfile, updateProfile } from '../../../core/profile-manager';
@@ -32,6 +33,39 @@ export const BbWeightsStep: React.FC<BbWeightsStepProps> = ({
 }) => {
   if (!builtPlan) return null;
   const entries = weightEntries.length ? weightEntries : collectPlanExercises(builtPlan);
+  // P1-23: собираем фактические топ-веса по упражнениям из дневника тренировок для авто-подстановки
+  const diaryTopWeights = useMemo(() => {
+    const map: Record<string, number> = {};
+    try {
+      const sessions = loadSessions();
+      for (const s of (sessions || []).slice(-30)) {
+        for (const ex of s?.exercises || []) {
+          const key = String(ex?.exerciseName || '').toLowerCase().trim();
+          if (!key) continue;
+          for (const st of ex?.sets || []) {
+            const w = Number(st?.weightKg ?? 0);
+            if (w > 0 && w > (map[key] || 0)) map[key] = Math.round(w * 2) / 2;
+          }
+        }
+      }
+    } catch { /* ignore */ }
+    return map;
+  }, [builtPlan]);
+  const diaryMatchesCount = entries.filter(e => {
+    const k = String(e.name || '').toLowerCase().trim();
+    return diaryTopWeights[k] > 0 && (e.actualWeight == null || e.actualWeight <= 0);
+  }).length;
+  const seedFromDiary = () => {
+    const next = entries.map(e => {
+      const k = String(e.name || '').toLowerCase().trim();
+      const dw = diaryTopWeights[k];
+      if (dw > 0 && (e.actualWeight == null || e.actualWeight <= 0)) {
+        return { ...e, actualWeight: dw };
+      }
+      return e;
+    });
+    setWeightEntries(next);
+  };
   const filled = entries.filter(e => e.actualWeight != null && e.actualWeight > 0).length;
   // Фаза 0: группировка по группам мышц (порядок — по появлению в плане).
   const groups = groupWeightEntries(entries);
@@ -74,8 +108,11 @@ export const BbWeightsStep: React.FC<BbWeightsStepProps> = ({
         <button style={{ ...BTN, flex: 1 }} onClick={apply} disabled={filled === 0}>
           {weightsApplied > 0 ? `✓ Применено к ${ruCount(weightsApplied, RU_OCCURRENCES)}` : '⚖️ Применить реальные веса'}
         </button>
+        {diaryMatchesCount > 0 && (
+          <button style={BTN_GHOST} onClick={seedFromDiary}>⚡ Из дневника ({diaryMatchesCount})</button>
+        )}
         <button style={BTN_GHOST} onClick={() => { setWeightEntries(collectPlanExercises(builtPlan)); setWeightsApplied(0); }}>⟲ Сбросить</button>
-        <button style={BTN_GHOST} onClick={() => { const allOpen = Object.values(weightsCollapsed).every(Boolean); const next: Record<string, boolean> = {}; for (const g of groups) next[g.muscle] = !allOpen; setWeightsCollapsed(next); }}>{(Object.values(weightsCollapsed).filter(Boolean).length === 0 ? 'Свернуть все' : 'Развернуть все')}</button>
+        <button style={BTN_GHOST} onClick={() => { const anyCollapsed = groups.some(g => !!weightsCollapsed[g.muscle]); const next: Record<string, boolean> = {}; for (const g of groups) next[g.muscle] = !anyCollapsed; setWeightsCollapsed(next); }}>{groups.some(g => !!weightsCollapsed[g.muscle]) ? 'Развернуть все' : 'Свернуть все'}</button>
       </div>
       {filled === 0 && <div style={{ fontSize: 11, color: '#fbbf24', marginBottom: 8 }}>Введите хотя бы один фактический вес, чтобы пересчитать нагрузку.</div>}
       {entries.length === 0

@@ -258,20 +258,30 @@ export function calculatePlanSafetyScore(
     issues.push(`${volumeViolations} превышений MRV — риск перетренированности.`);
   }
 
-  // Frequency
-  const frequencyCounts: Record<string, Set<number>> = {};
-  for (const week of planWeeks) {
-    for (const session of (Array.isArray(week?.sessions) ? week.sessions : [])) {
+  // Frequency: считаем по каждой рабочей неделе отдельно, чтобы 6 недель × 1р/нед не маскировались под 6р/нед
+  const workingWeeks = planWeeks.filter(w => !(w as any).deload && String((w as any).phase || '').toLowerCase() !== 'deload');
+  const freqWeeks = workingWeeks.length > 0 ? workingWeeks : planWeeks;
+  const perWeekCounts: Record<string, number[]> = {};
+  for (let wi = 0; wi < freqWeeks.length; wi++) {
+    const week = freqWeeks[wi];
+    const weekMuscles: Record<string, Set<number>> = {};
+    const sessions = Array.isArray(week?.sessions) ? week.sessions : [];
+    sessions.forEach((session: any, si: number) => {
       const sessionExercises = Array.isArray(session?.exercises) ? session.exercises : [];
-      for (const muscle of new Set<string>(sessionExercises.map((exercise: any) => String(exercise?.muscle || '')).filter(Boolean))) {
-        (frequencyCounts[muscle] ||= new Set()).add(session.day);
+      const dayKey = Number.isFinite(Number(session?.day)) ? Number(session.day) : si + 1;
+      for (const muscle of new Set<string>(sessionExercises.filter((e: any) => !e?.warmupActivator).map((e: any) => String(e?.muscle || '')).filter(Boolean))) {
+        (weekMuscles[muscle] ||= new Set()).add(dayKey);
       }
+    });
+    for (const [m, ds] of Object.entries(weekMuscles)) {
+      (perWeekCounts[m] ||= []).push(ds.size);
     }
   }
-  const frequencyDetails: SafetyDetails['frequencyDetails'] = Object.entries(frequencyCounts).map(([muscle, days]) => {
+  const frequencyDetails: SafetyDetails['frequencyDetails'] = Object.entries(perWeekCounts).map(([muscle, counts]) => {
     const small = new Set(['biceps', 'triceps', 'forearms', 'calves', 'abs']).has(muscle);
     const required = small ? 2 : 1;
-    return { muscle, days: days.size, required, violation: days.size < required };
+    const avgDays = counts.length ? Math.round((counts.reduce((a, b) => a + b, 0) / counts.length) * 10) / 10 : 0;
+    return { muscle, days: Math.round(avgDays), required, violation: avgDays < required };
   });
   const frequencyIssues = frequencyDetails.filter(f => f.violation);
   let frequencyScore = SCORE_WEIGHTS.frequencyCompliance;

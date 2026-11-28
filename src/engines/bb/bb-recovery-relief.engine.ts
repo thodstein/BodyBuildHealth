@@ -102,15 +102,16 @@ export function applyRecoveryRelief(
           if (ex?.warmupActivator) return ex;
           if (scoped && !targeted.includes(String(ex.muscle || ''))) return ex;
           const cur = ex.sets || 0;
-          if (cur <= 2) return ex;
+          // P2: на красной боли 2-сетовые упражнения тоже защищаются (снижение веса −15% + RIR+2, без пропуска)
+          if (cur <= 2 && level !== 'red') return ex;
           const raw = cur * factor + debt;
-          let next = Math.max(2, Math.round(raw));
-          // Накопленный долг ≥0.5 сета — снимаем один сет принудительно, иначе
-          // слабый множитель так и останется неApplied.
-          if (next >= cur && debt <= -0.5) next = Math.max(2, cur - 1);
+          const floor = level === 'red' ? 1 : 2;
+          let next = Math.max(floor, Math.round(raw));
+          if (next >= cur && debt <= -0.5) next = Math.max(floor, cur - 1);
           debt = raw - next;
           const rir = Math.min(5, (ex.rir ?? 2) + painRir);
-          if (next >= cur && rir === (ex.rir ?? 2)) return ex;
+          const weightFreezeFactor = level === 'red' ? 0.85 : 1;
+          if (next >= cur && rir === (ex.rir ?? 2) && weightFreezeFactor === 1) return ex;
           adjusted++;
           const why = hasPain
             ? `боль ${level === 'red' ? 'красный' : 'жёлтый'}${scoped ? ` (${input.painLocation})` : ''}`
@@ -118,9 +119,15 @@ export function applyRecoveryRelief(
           return {
             ...ex,
             sets: next,
-            workSets: (ex.workSets || []).slice(0, next).map((ws: any) => ({ ...ws, rir })),
+            workSets: (ex.workSets || []).slice(0, next).map((ws: any) => ({
+              ...ws,
+              weight: weightFreezeFactor < 1 && Number(ws.weight) > 0
+                ? Math.round(Number(ws.weight) * weightFreezeFactor * 2) / 2
+                : ws.weight,
+              rir,
+            })),
             rir,
-            comment: `${ex.comment || ''} | ${MARK}: ${why} — объём ×${factor.toFixed(2)}${painRir ? `, RIR +${painRir}` : ''} (Silbernagel: нагрузка в пределах восстановления, не «терпеть»).`,
+            comment: `${ex.comment || ''} | ${MARK}: ${why} — объём ×${factor.toFixed(2)}${weightFreezeFactor < 1 ? ', вес −15%' : ''}${painRir ? `, RIR +${painRir}` : ''} (Silbernagel: нагрузка в пределах восстановления, не «терпеть»).`,
           };
         }),
       })),
@@ -129,8 +136,11 @@ export function applyRecoveryRelief(
 
   if (!adjusted) return { plan, changes: [], adjusted: 0 };
   const scope = scoped ? ` [${input.painLocation}: ${targeted.join(', ')}]` : ' (локация не указана — весь план)';
+  const reasonLabel = hasPain
+    ? `боль ${level === 'red' ? 'красная' : 'жёлтая'}`
+    : `крепатура ${sore}/10`;
   const changes = [
-    `🩹 Разгрузка по восстановлению: боль ${level}${scope} — объём ×${factor.toFixed(2)}${painRir ? `, RIR +${painRir}` : ''} (${adjusted} упр.). Правило Silbernagel: работа в пределах боли, вес не прогрессирует.`,
+    `🩹 Разгрузка по восстановлению: ${reasonLabel}${scope} — объём ×${factor.toFixed(2)}${painRir ? `, RIR +${painRir}` : ''} (${adjusted} упр.). Правило Silbernagel: работа в пределах боли, вес не прогрессирует.`,
   ];
   return { plan: { ...plan, weeks: newWeeks }, changes, adjusted };
 }

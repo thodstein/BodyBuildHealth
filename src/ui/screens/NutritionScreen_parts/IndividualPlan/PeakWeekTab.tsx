@@ -14,13 +14,11 @@
 import React, { useMemo, useState } from 'react';
 import {
   buildBBContestPrep, validateBBContestPrepConfig, isoToday, isoAddDays, isoDiffDays,
-  CONTEST_CATEGORY_LABELS, resolveMainCompetition,
+  CONTEST_CATEGORY_LABELS,
   type BBContestPrepConfig, type BBContestCategory,
-  type ContestSpecialization, type ContestEventEntry,
 } from '../../../../engines/bb/bb-contest-prep.engine';
 import { ContestPeakWeekCard } from '../../../../ui/components/contest-prep/ContestPeakWeekCard';
 import { PeakWeekMonitorCard, ShowDayEmergencyCard, PrepLabsCard, ShowSeriesCard, ShowCoachCard } from '../../../../ui/components/contest-prep/PeakWeekProCard';
-import { GlassCard } from './ui';
 import { shareOrCopyText } from './planner-day-print';
 import { usePlanCtx } from './IndividualPlanContext';
 import { getProfile } from '../../../../core/profile-manager';
@@ -49,12 +47,6 @@ const CARD_TITLE: React.CSSProperties = { fontSize: 12, fontWeight: 800, color: 
 const MALE_CATS: BBContestCategory[] = ['mens_physique', 'classic_physique', 'mens_bb', 'bb_212'];
 const FEMALE_CATS: BBContestCategory[] = ['bikini', 'figure', 'wellness', 'womens_physique', 'womens_bb'];
 
-const WATER_HINTS: Record<string, string> = {
-  classic: 'Load 6–10 л → ступенчатый cut → глотки. Только опытные, здоровые почки.',
-  moderate: 'Мягкий cut: обычная вода + снижение в последние 2 дня.',
-  minimal: 'Обычный питьевой режим. Для новичков и первых пиков.',
-};
-
 function defaultConfig(sex: 'male' | 'female', weightKg: number, bbCategory: string): BBContestPrepConfig {
   const fallback: BBContestCategory = sex === 'female' ? 'bikini' : 'mens_physique';
   const known = (sex === 'female' ? FEMALE_CATS : MALE_CATS).find(c => c === bbCategory) ?? fallback;
@@ -78,161 +70,6 @@ function defaultConfig(sex: 'male' | 'female', weightKg: number, bbCategory: str
 const chip: React.CSSProperties = {
   display: 'inline-flex', alignItems: 'center', gap: 4, padding: '3px 8px', borderRadius: 999,
   fontSize: 9, fontWeight: 700,
-};
-
-/** Тумблер-чип (современная замена checkbox). */
-const ToggleChip: React.FC<{ label: string; icon?: string; value: boolean; onChange: (v: boolean) => void; danger?: boolean }> = ({ label, icon, value, onChange, danger }) => {
-  const color = danger ? '#f87171' : '#f59e0b';
-  return (
-    <button
-      type="button"
-      onClick={() => onChange(!value)}
-      aria-pressed={value}
-      className="peak-toggle"
-      style={{
-        display: 'flex', alignItems: 'center', gap: 6, padding: '8px 12px', borderRadius: 12, cursor: 'pointer',
-        minHeight: 44, fontSize: 10, fontWeight: value ? 800 : 600,
-        background: value ? (danger ? 'linear-gradient(135deg, rgba(239,68,68,0.18), rgba(239,68,68,0.08))' : 'linear-gradient(135deg, rgba(245,158,11,0.18), rgba(245,158,11,0.08))') : 'rgba(255,255,255,0.04)',
-        border: value ? `1px solid ${color}55` : '1px solid rgba(255,255,255,0.1)',
-        color: value ? color : '#fff',
-        boxShadow: value ? `0 2px 12px ${color}22` : 'none',
-        transition: 'all 0.18s ease',
-      }}
-    >
-      <span style={{
-        width: 16, height: 16, borderRadius: 6, flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'center',
-        fontSize: 9, background: value ? color : 'rgba(255,255,255,0.08)', color: value ? '#000' : 'transparent',
-        transition: 'all 0.18s ease',
-      }}>
-        {value ? '✓' : ''}
-      </span>
-      {icon && <span>{icon}</span>}
-      {label}
-    </button>
-  );
-};
-
-/** Дата-карточка: нативный date-picker в современной обёртке. */
-const DateCard: React.FC<{ label: string; value: string; onChange: (v: string) => void }> = ({ label, value, onChange }) => (
-  <div className="peak-date" style={{
-    width: '100%', minHeight: 58, borderRadius: 12, padding: '8px 12px', boxSizing: 'border-box',
-    background: 'linear-gradient(180deg, rgba(255,255,255,0.05), rgba(255,255,255,0.015))',
-    border: '1px solid rgba(255,255,255,0.09)', display: 'flex', flexDirection: 'column', justifyContent: 'center', gap: 2,
-    boxShadow: '0 1px 8px rgba(0,0,0,0.22)', position: 'relative',
-  }}>
-    <span style={{ fontSize: 8.5, color: '#fff', textTransform: 'uppercase', letterSpacing: 0.4 }}>{label}</span>
-    <input
-      type="date"
-      value={value}
-      onChange={e => onChange(e.target.value)}
-      style={{
-        width: '100%', border: 'none', background: 'transparent', color: '#fbbf24', fontSize: 12.5,
-        fontWeight: 700, outline: 'none', fontFamily: 'inherit', padding: 0,
-      }}
-    />
-  </div>
-);
-
-/** Сегментированные чипы — надёжная замена попап-выбора (нативные кнопки). */
-const SegGroup: React.FC<{
-  label: string;
-  icon?: string;
-  value: string;
-  options: { id: string; label: string; desc?: string }[];
-  onChange: (v: string) => void;
-  accent?: string;
-}> = ({ label, icon, value, options, onChange, accent = '#00e68a' }) => {
-  const sel = options.find(o => o.id === value);
-  return (
-    <div>
-      <div style={{ fontSize: 8.5, color: DIM, textTransform: 'uppercase', letterSpacing: 0.4, marginBottom: 5 }}>
-        {icon && <span style={{ marginRight: 4 }}>{icon}</span>}{label}
-      </div>
-      <div className="peak-seg" style={{ display: 'flex', flexWrap: 'wrap', gap: 5 }}>
-        {options.map(o => {
-          const active = o.id === value;
-          return (
-            <button
-              key={o.id}
-              type="button"
-              onClick={() => onChange(o.id)}
-              aria-pressed={active}
-              style={{
-                padding: '7px 11px', borderRadius: 999, cursor: 'pointer', minHeight: 44, fontSize: 10,
-                fontWeight: active ? 800 : 600, border: active ? '1px solid transparent' : '1px solid rgba(255,255,255,0.1)',
-                background: active
-                  ? `linear-gradient(135deg, ${accent}, ${accent}cc)`
-                  : 'linear-gradient(180deg, rgba(255,255,255,0.05), rgba(255,255,255,0.015))',
-                color: active ? '#000' : 'rgba(255,255,255,0.7)',
-                boxShadow: active ? `0 3px 12px ${accent}44` : '0 1px 6px rgba(0,0,0,0.22)',
-                transition: 'all 0.16s ease',
-              }}
-            >
-              {o.label}
-            </button>
-          );
-        })}
-      </div>
-      {sel?.desc && <div style={{ fontSize: 9, color: DIM, marginTop: 4, lineHeight: 1.4 }}>{sel.desc}</div>}
-    </div>
-  );
-};
-
-/** Степпер (−/+) — надёжная замена числового попапа. */
-const Stepper: React.FC<{
-  label: string;
-  icon?: string;
-  value: number;
-  min: number;
-  max: number;
-  step?: number;
-  suffix?: string;
-  onChange: (v: number) => void;
-  accent?: string;
-}> = ({ label, icon, value, min, max, step = 1, suffix = '', onChange, accent = '#00e68a' }) => {
-  const set = (v: number) => onChange(Math.max(min, Math.min(max, Math.round(v * 100) / 100)));
-  return (
-    <div className="peak-step" style={{
-      display: 'flex', alignItems: 'center', gap: 8, padding: '7px 8px', borderRadius: 12,
-      background: 'linear-gradient(180deg, rgba(255,255,255,0.05), rgba(255,255,255,0.015))',
-      border: '1px solid rgba(255,255,255,0.09)', boxShadow: '0 1px 8px rgba(0,0,0,0.22)',
-    }}>
-      <div style={{ flex: 1, minWidth: 0 }}>
-        <div style={{ fontSize: 8.5, color: DIM, textTransform: 'uppercase', letterSpacing: 0.4, marginBottom: 1 }}>
-          {icon && <span style={{ marginRight: 4 }}>{icon}</span>}{label}
-        </div>
-        <div style={{ fontSize: 14, fontWeight: 800, color: accent, fontVariantNumeric:'tabular-nums' }}>{value}{suffix ? ` ${suffix}` : ''}</div>
-      </div>
-      <button
-        type="button"
-        onClick={() => set(value - step)}
-        disabled={value <= min}
-        aria-label={`${label} минус`}
-        style={{
-          width: 44, height: 44, borderRadius: 10, cursor: value <= min ? 'default' : 'pointer',
-          fontSize: 16, fontWeight: 800, border: '1px solid rgba(255,255,255,0.12)',
-          background: 'rgba(255,255,255,0.04)', color: value <= min ? 'rgba(255,255,255,0.25)' : '#fff',
-          opacity: value <= min ? 0.5 : 1,
-        }}
-      >
-        −
-      </button>
-      <button
-        type="button"
-        onClick={() => set(value + step)}
-        disabled={value >= max}
-        aria-label={`${label} плюс`}
-        style={{
-          width: 44, height: 44, borderRadius: 10, cursor: value >= max ? 'default' : 'pointer',
-          fontSize: 16, fontWeight: 800, border: '1px solid transparent',
-          background: `linear-gradient(135deg, ${accent}, ${accent}cc)`, color: '#000',
-          opacity: value >= max ? 0.5 : 1,
-        }}
-      >
-        +
-      </button>
-    </div>
-  );
 };
 
 export const PeakWeekTab: React.FC = () => {
@@ -350,21 +187,6 @@ export const PeakWeekTab: React.FC = () => {
       else fallbackCopy(text);
     });
   };
-
-  const catsFor = draft.sex === 'female' ? FEMALE_CATS : MALE_CATS;
-
-  const SPECIALIZATIONS: ContestSpecialization[] = ['none', 'chest', 'back', 'shoulders', 'arms', 'biceps', 'triceps', 'quads', 'hamstrings', 'glutes', 'calves', 'abs', 'traps'];
-  const competitions = draft.competitions ?? [];
-  const patchCompetition = (id: string, p: Partial<ContestEventEntry>) =>
-    patch({ competitions: (draft.competitions || []).map(c => (c.id === id ? { ...c, ...p } : c)) });
-  const addCompetition = () =>
-    patch({ competitions: [...(draft.competitions || []), { id: `comp_${Date.now().toString(36)}`, name: `Старт ${(draft.competitions?.length ?? 0) + 1}`, priority: 'B' }] });
-  const removeCompetition = (id: string) =>
-    patch({
-      competitions: (draft.competitions || []).filter(c => c.id !== id),
-      mainCompetitionId: draft.mainCompetitionId === id ? undefined : draft.mainCompetitionId,
-    });
-  const resolveMainId = (c: BBContestPrepConfig): string | undefined => resolveMainCompetition(c)?.id;
 
   const readinessColor = !result ? '#60a5fa' : result.readiness.verdict === 'behind' ? '#f87171' : result.readiness.verdict === 'ahead' ? '#4ade80' : '#60a5fa';
   const countdownChip = daysToShow == null ? null : daysToShow < 0

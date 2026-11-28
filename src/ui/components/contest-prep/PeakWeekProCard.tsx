@@ -70,7 +70,8 @@ export const PeakWeekMonitorCard: React.FC<{
   planId: string;
   peakDays: PeakWeekDayPlan[];
   plan?: BBContestPrepPlan | null;
-}> = ({ planId, peakDays, plan }) => {
+  onVisualSync?: (visual: 'flat' | 'spill' | 'full', deltaCarbsG: number) => void;
+}> = ({ planId, peakDays, plan, onVisualSync }) => {
   const [tick, setTick] = useState(0);
   const today = isoToday();
   const todayDay = (peakDays || []).find(d => d.date === today) ?? null;
@@ -194,6 +195,16 @@ export const PeakWeekMonitorCard: React.FC<{
           {trend.status === 'flat' ? '🫧 Тренд: плоский' : trend.status === 'spill' ? '💧 Тренд: расплывает' : trend.status === 'weight_drop' ? '📉 Тренд: просадка веса' : trend.status === 'on_track' ? '✅ Тренд: в коридоре' : '📓 Нет данных'}
         </div>
         {trend.advice.map((a, i) => <div key={i} style={HINT}>• {a}</div>)}
+        {(trend.status === 'flat' || trend.status === 'spill') && onVisualSync && (
+          <button
+            type="button"
+            data-bb="pm-apply-visual"
+            onClick={() => onVisualSync(trend.status === 'flat' ? 'flat' : 'spill', trend.status === 'flat' ? 75 : -100)}
+            style={{ ...BTN, marginTop: 6, borderColor: trendColor, color: trendColor, background: `${trendColor}1a` }}
+          >
+            {trend.status === 'flat' ? '⚡ Применить коррекцию: +75 г углей в план/питание' : '⚡ Применить коррекцию: −100 г углей в план/питание'}
+          </button>
+        )}
       </div>
 
       {/* Адгеренс */}
@@ -313,9 +324,32 @@ const LAB_STATUS_RU: Record<string, string> = {
   done: 'сдано', soon: 'скоро', overdue: 'просрочено', planned: 'план', no_data: 'нет данных',
 };
 
+function detectLatestProfileLabDate(): string {
+  try {
+    const raw = localStorage.getItem('he_profile_v2');
+    if (raw) {
+      const p = JSON.parse(raw);
+      const d = p?.settings?.labs?.lastLabDate || p?.settings?.labs?.date || p?.settings?.labs?.updatedAt;
+      if (typeof d === 'string' && /^\d{4}-\d{2}-\d{2}/.test(d)) return d.slice(0, 10);
+    }
+    const labsRaw = localStorage.getItem('he_labs_v1') || localStorage.getItem('he_lab_results');
+    if (labsRaw) {
+      const arr = JSON.parse(labsRaw);
+      if (Array.isArray(arr)) {
+        const dates = arr
+          .map((r: any) => String(r?.date || r?.testDate || r?.createdAt || '').slice(0, 10))
+          .filter((s: string) => /^\d{4}-\d{2}-\d{2}$/.test(s))
+          .sort();
+        if (dates.length > 0) return dates[dates.length - 1];
+      }
+    }
+  } catch { /* ignore */ }
+  return '';
+}
+
 export const PrepLabsCard: React.FC<{ planId: string; showDate: string }> = ({ planId, showDate }) => {
-  const [date, setDate] = useState(() => (planId ? loadPrepLabsDate(planId) ?? '' : ''));
-  useEffect(() => { setDate(planId ? loadPrepLabsDate(planId) ?? '' : ''); }, [planId]);
+  const [date, setDate] = useState(() => (planId ? (loadPrepLabsDate(planId) || detectLatestProfileLabDate()) : ''));
+  useEffect(() => { setDate(planId ? (loadPrepLabsDate(planId) || detectLatestProfileLabDate()) : ''); }, [planId]);
   const res = useMemo(() => prepLabCheckpoint(showDate, date || null), [showDate, date]);
   if (!planId || !showDate) return null;
   return (
@@ -401,7 +435,10 @@ export const ShowCoachCard: React.FC<{
   plan: BBContestPrepPlan | null;
   onApply?: (patch: Partial<BBContestPrepConfig>) => void;
 }> = ({ plan, onApply }) => {
-  const verdict = useMemo(() => (plan ? scoreBBShowPrep({ plan }) : null), [plan]);
+  const verdict = useMemo(
+    () => (plan ? scoreBBShowPrep({ plan, currentBodyFatPct: plan.config?.bodyFatPct }) : null),
+    [plan],
+  );
   const patch = useMemo(() => (plan ? recommendBBShowConfig(plan) : null), [plan]);
   if (!plan || !verdict) return null;
   const color = verdict.score >= 85 ? '#4ade80' : verdict.score >= 65 ? '#fbbf24' : verdict.score >= 40 ? '#f59e0b' : '#f87171';

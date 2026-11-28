@@ -22,7 +22,15 @@ import { buildBBPlan } from './bb-builder.engine';
 import { refreshBBPlanSnapshots } from './bb-plan-snapshot.engine';
 import { stampBBPlanFinalizeSignature } from './bb-finalize.engine';
 import { SPLIT_PATTERNS } from './bb-split-patterns';
+import { normalizeBBMuscle } from './bb-volume.engine';
 import type { WorkoutSession } from '../workout-logger.engine';
+
+function addDaysIsoLocal(iso: string, days: number): string {
+  const m = /^(\d{4})-(\d{2})-(\d{2})/.exec(String(iso || ''));
+  if (!m) return iso;
+  const d = new Date(Number(m[1]), Number(m[2]) - 1, Number(m[3]) + days, 12, 0, 0);
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+}
 
 export interface ReplanBBResult {
   plan: BBPlan;
@@ -57,7 +65,7 @@ function isRestWeek(w: any): boolean {
  */
 export function replanBBMesoFromFact(
   plan: BBPlan | null | undefined,
-  _sessions: WorkoutSession[],
+  sessions: WorkoutSession[],
   opts: ReplanBBOptions,
 ): ReplanBBResult | null {
   if (!plan || !Array.isArray(plan.weeks) || plan.weeks.length === 0) return null;
@@ -81,6 +89,72 @@ export function replanBBMesoFromFact(
 
   const frozen = plan.weeks.slice(0, current - 1);
   const previousPlan: BBPlan = { ...plan, weeks: frozen };
+  // P0-16: реальный анализ факта дневника (sessions) за прожитые недели:
+  // пересчитываем e1RM → workMax, adherence и RIR-отклонение → адаптивный recoveryMultOverride.
+  const baseStartIso = opts.planStartWeek || snap.planStartWeek;
+  const frozenEndIso = baseStartIso ? addDaysIsoLocal(baseStartIso, (current - 1) * 7 - 1) : undefined;
+  const relevantSessions = (Array.isArray(sessions) ? sessions : []).filter(s => {
+    if (!s || !Array.isArray(s.exercises)) return false;
+    if (!baseStartIso || !frozenEndIso) return true;
+    const d = String(s.date || '').slice(0, 10);
+    return !d || (d >= baseStartIso && d <= frozenEndIso);
+  });
+  const baseWorkMax: Record<string, number> = { ...(((plan as any).workMax || {}) as Record<string, number>) };
+  const factE1rmByMuscle: Record<string, number> = {};
+  let loggedSets = 0;
+  let actualRirSum = 0;
+  let actualRirCount = 0;
+  for (const sess of relevantSessions) {
+    for (const ex of sess.exercises || []) {
+      const m = normalizeBBMuscle((ex as any).muscle || ex.muscleGroup || '');
+      for (const st of ex.sets || []) {
+        loggedSets += 1;
+        const w = Number(st?.weightKg ?? (st as any)?.weight ?? 0);
+        const r = Number(st?.reps ?? 0);
+        if (m && w > 0 && r > 0) {
+          const e1rm = Math.round(w * (1 + r / 30) * 10) / 10;
+          if (e1rm > (factE1rmByMuscle[m] || 0)) factE1rmByMuscle[m] = e1rm;
+        }
+        const rirVal = Number(st?.rir);
+        if (Number.isFinite(rirVal) && rirVal >= 0 && rirVal <= 6) {
+          actualRirSum += rirVal;
+          actualRirCount += 1;
+        }
+      }
+    }
+  }
+  const factChanges: string[] = [];
+  let updatedMaxCount = 0;
+  for (const [m, e1rm] of Object.entries(factE1rmByMuscle)) {
+    const prevWm = Number(baseWorkMax[m]) || 0;
+    if (e1rm > prevWm * 1.02 || (prevWm > 0 && e1rm < prevWm * 0.90)) {
+      baseWorkMax[m] = Math.round(e1rm * 10) / 10;
+      updatedMaxCount += 1;
+    }
+  }
+  const plannedFrozenSets = frozen.reduce(
+    (sum, wk) => sum + (wk.sessions || []).reduce(
+      (s2, sess) => s2 + (sess.exercises || []).filter((e: any) => !e.warmupActivator).reduce((s3, e) => s3 + (e.sets || 0), 0),
+      0,
+    ),
+    0,
+  );
+  const adherence = plannedFrozenSets > 0 && relevantSessions.length > 0 ? loggedSets / plannedFrozenSets : null;
+  let factRecoveryMult: number | undefined = Number.isFinite(snap.recoveryMultOverride) ? snap.recoveryMultOverride : undefined;
+  if (adherence != null && adherence < 0.70) {
+    factRecoveryMult = Math.max(0.75, Math.round(((factRecoveryMult ?? 1) * 0.9) * 100) / 100);
+    factChanges.push(`📉 Факт adherence ${Math.round(adherence * 100)}% (<70%) — объём остатка смягчён (×${factRecoveryMult}).`);
+  }
+  if (actualRirCount >= 6) {
+    const avgActualRir = actualRirSum / actualRirCount;
+    if (avgActualRir < 1.0) {
+      factRecoveryMult = Math.max(0.75, Math.round(((factRecoveryMult ?? 1) * 0.92) * 100) / 100);
+      factChanges.push(`🔥 Фактический средний RIR ${avgActualRir.toFixed(1)} (высокая усталость) — добавлен запас восстановления.`);
+    }
+  }
+  if (updatedMaxCount > 0) {
+    factChanges.push(`🏋️ Обновлён рабочий максимум по факту дневника (${updatedMaxCount} мышц).`);
+  }
   // Fallback для планов, собранных до расширения снапшота: buildContext/plan
   // хранят пол, PED-адаптацию и капы, без которых реплан стартовал «натуралом».
   const ctx: any = (plan as any).buildContext || {};
@@ -90,15 +164,17 @@ export function replanBBMesoFromFact(
       ? { ...(plan as any).pedAdaptation.pedDoses }
       : undefined;
 
+  const tailStartWeek = baseStartIso ? addDaysIsoLocal(baseStartIso, (current - 1) * 7) : undefined;
   const input: BBBuilderInput = {
     patternId,
     level: String(snap.level || (plan as any).level || 'intermediate'),
     goal: (snap.goal || 'mass') as BBBuilderInput['goal'],
     weeks: remaining,
-    workMax: ((plan as any).workMax || {}) as Record<string, number>,
+    workMax: baseWorkMax,
     weakPoints: Array.isArray(snap.weakPoints) ? snap.weakPoints : [],
     focusGroup: snap.focusGroup || undefined,
     specialization: snap.specialization,
+    specializationSchedule: Array.isArray(snap.specializationSchedule) ? snap.specializationSchedule : undefined,
     equipment: Array.isArray(snap.equipment) ? snap.equipment : [],
     volumeGoal: (snap.volumeGoal || 'mav') as BBBuilderInput['volumeGoal'],
     trainingFocus: snap.trainingFocus,
@@ -111,13 +187,17 @@ export function replanBBMesoFromFact(
     trainingYears: Number.isFinite(snap.trainingYears) ? snap.trainingYears : undefined,
     courseIntensity: snap.courseIntensity as BBBuilderInput['courseIntensity'],
     fewerCompound: snap.fewerCompound,
+    allowStrengthLifts: snap.allowStrengthLifts,
     rotationMode: snap.rotationMode,
+    abPatternRotation: snap.abPatternRotation,
+    packingV2: snap.packingV2,
     intensityLevel: snap.intensityLevel,
     avoidAxialLoad: snap.avoidAxialLoad,
     injuries: Array.isArray(snap.injuries) ? snap.injuries : [],
     mobilityRestrictions: Array.isArray(snap.mobilityRestrictions) ? snap.mobilityRestrictions : [],
     favoriteExercises: Array.isArray(snap.favoriteExercises) ? snap.favoriteExercises : [],
     excludedExercises: Array.isArray(snap.excludedExercises) ? snap.excludedExercises : [],
+    bannedPatterns: Array.isArray(snap.bannedPatterns) ? snap.bannedPatterns : undefined,
     autoDeload: snap.autoDeload,
     deloadType: snap.deloadType,
     loadStrategy: snap.loadStrategy,
@@ -125,14 +205,25 @@ export function replanBBMesoFromFact(
     calorieSurplus: snap.calorieSurplus,
     proteinPerKg: snap.proteinPerKg,
     labMrvMultiplier: snap.labMrvMultiplier,
+    labWarnings: Array.isArray(snap.labWarnings) ? snap.labWarnings : undefined,
+    labIntensityNote: snap.labIntensityNote,
     bodyFat: snap.bodyFat,
+    targetBodyFat: snap.targetBodyFat,
     leanMass: snap.leanMass,
     hrvMs: snap.hrvMs,
     hrvBaseline: snap.hrvBaseline,
     hrvBaselineZ: snap.hrvBaselineZ,
     sleepHours: snap.sleepHours,
     stressLevel: snap.stressLevel,
+    recoveryMultOverride: factRecoveryMult,
+    wearable: snap.wearable,
+    vbt: snap.vbt,
+    deloadReadiness: snap.deloadReadiness,
+    mevCalibration: snap.mevCalibration,
+    cooldownHistory: Array.isArray(snap.cooldownHistory) ? snap.cooldownHistory : undefined,
     bfrMode: snap.bfrMode,
+    dcMode: snap.dcMode,
+    pedPhaseOverride: snap.pedPhaseOverride,
     blastCruiseEnabled: snap.blastCruiseEnabled,
     blastWeeks: snap.blastWeeks,
     cruiseWeeks: snap.cruiseWeeks,
@@ -161,10 +252,10 @@ export function replanBBMesoFromFact(
     rehabWeekStart: Number.isFinite(snap.rehabWeekStart) ? snap.rehabWeekStart : undefined,
     bodyweightCapability: snap.bodyweightCapability,
     availablePlates: Array.isArray(snap.availablePlates) ? snap.availablePlates : undefined,
-    // Продолжение от фактического пика прожитых недель.
+    // Продолжение от фактического пика прожитых недель (без загрязнения невыполненным хвостом).
     previousPlan,
-    previousPlans: [plan],
-    planStartWeek: opts.planStartWeek || snap.planStartWeek,
+    previousPlans: [previousPlan],
+    planStartWeek: tailStartWeek,
   } as BBBuilderInput;
 
   let rebuilt: BBPlan;
@@ -194,7 +285,7 @@ export function replanBBMesoFromFact(
     // дорепланных капов.
     mrvByMuscle: rebuilt.mrvByMuscle || (plan as any).mrvByMuscle,
     volumeTargets: rebuilt.volumeTargets || (plan as any).volumeTargets,
-    workMax: (rebuilt as any).workMax || (plan as any).workMax,
+    workMax: (rebuilt as any).workMax || input.workMax || (plan as any).workMax,
     validation: (rebuilt as any).validation || (plan as any).validation,
     rationale: [
       ...((plan as any).rationale || []),
@@ -203,6 +294,7 @@ export function replanBBMesoFromFact(
     inputSnapshot: {
       ...(snap as Record<string, unknown>),
       ...((rebuilt as any).inputSnapshot || {}),
+      workMax: input.workMax,
     },
   } as BBPlan;
 
@@ -237,6 +329,7 @@ export function replanBBMesoFromFact(
     plan: out,
     changes: [
       `🔁 Остаток мезоцикла пересобран: недели ${frozen.length + 1}–${total} (${tail.length} нед) от фактического пика прожитых недель.`,
+      ...factChanges,
     ],
     frozenWeeks: frozen.length,
     rebuiltWeeks: tail.length,

@@ -96,6 +96,35 @@ export const BbSplitStep: React.FC<BbSplitStepProps> = ({
         </div>
       </div>
     )}
+    {ranked.length >= 2 && (
+      <div data-bb="split-compare-top3" style={{ marginBottom: 10, padding: '10px 12px', borderRadius: 12, background: 'var(--card-bg, rgba(255,255,255,0.03))', border: '1px solid var(--border, rgba(255,255,255,0.1))' }}>
+        <div style={{ fontSize: 11.5, fontWeight: 800, color: 'var(--text, #fff)', marginBottom: 6 }}>⚖ Быстрое сравнение топ-{Math.min(3, ranked.length)} сплитов</div>
+        <div className="bb-split-compare-grid" style={{ display: 'grid', gridTemplateColumns: `repeat(${Math.min(3, ranked.length)}, minmax(0, 1fr))`, gap: 6 }}>
+          {ranked.slice(0, 3).map((r, idx) => {
+            const active = selectedSplitId === r.pattern.id;
+            const freq2 = getMuscleFrequencies(r.pattern).filter(f => f.freq >= 2).length;
+            return (
+              <button
+                key={r.pattern.id}
+                type="button"
+                onClick={() => onSelectSplit(r.pattern.id)}
+                className="bb-auto-num"
+                style={{
+                  textAlign: 'left', padding: '8px 10px', borderRadius: 10, cursor: 'pointer', minHeight: 44,
+                  background: active ? 'var(--accent-soft, rgba(0,230,138,0.14))' : 'var(--surface-subtle, rgba(255,255,255,0.03))',
+                  border: active ? '1.5px solid var(--accent, #00e68a)' : '1px solid var(--border, rgba(255,255,255,0.08))',
+                  color: 'var(--text, #fff)',
+                }}
+              >
+                <div style={{ fontSize: 10.5, fontWeight: 800, color: active ? 'var(--accent, #00e68a)' : 'var(--text, #fff)' }}>#{idx + 1} {r.pattern.name}</div>
+                <div style={{ fontSize: 10, opacity: 0.85, marginTop: 3 }}>Скор: <b>{r.score}</b> · 2×/нед: <b>{freq2}</b></div>
+                {r.sessionBudget && <div style={{ fontSize: 9.5, opacity: 0.75, marginTop: 1 }}>≈{r.sessionBudget.maxExercises} упр / ≤{r.sessionBudget.maxWorkingSets} сет</div>}
+              </button>
+            );
+          })}
+        </div>
+      </div>
+    )}
     <div style={{ display:'flex', flexDirection:'column', gap:6, marginTop:8 }}>
       {ranked.map(r => {
         const sel = selectedSplitId === r.pattern.id;

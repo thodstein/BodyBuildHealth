@@ -471,7 +471,9 @@ describe('PRO-GAP1: пост-делодный скачок объёма устр
   });
 
   it('blast/cruise сохраняет свою волну (rate-limiter не трогает множитель режима)', () => {
+    // Wave 5: Blast/Cruise разрешён только на курсе (не для натуралов).
     const plan: any = buildBBPlan(base({
+      level: 'enhanced', peds: ['AAS'], pedDoses: { AAS: 500 }, onCourse: true,
       weeks: 12, deloadFreq: 8, blastCruiseEnabled: true, blastWeeks: 8, cruiseWeeks: 4,
     }));
     expect(plan.rationale.join(' ')).toMatch(/blast|cruise|Blast/i);

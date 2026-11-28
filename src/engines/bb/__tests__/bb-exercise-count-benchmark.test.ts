@@ -41,11 +41,11 @@ describe('BB exercise-count benchmark', () => {
     const maxExercises = Math.max(...plan.weeks.flatMap(w => w.sessions.map(s => working(s).length)));
     expect(maxSets).toBeGreaterThan(24);
     expect(maxExercises).toBeGreaterThan(10);
-    // Re-baseline (аудит 2026-09, реализм сессии): было ≥36/≤64, 18 упражнений.
-    // Сессия experienced enhanced теперь 32-40 сетов / ≤16 упражнений
-    // (sessionLimitsFor 44/16 + per-muscle session realism cap).
+    // Re-baseline (аудит 2026-11, P0-17): lateCap больше не режет onCourse (60/16)
+    // до натуральных 40 сетов; сессия experienced enhanced 6+ укладывается в
+    // канонический про-лимит sessionLimitsFor (≤ 60 сетов, ≤ 16 упражнений).
     expect(maxSets).toBeGreaterThanOrEqual(30);
-    expect(maxSets).toBeLessThanOrEqual(48);
+    expect(maxSets).toBeLessThanOrEqual(60);
     expect(maxExercises).toBeLessThanOrEqual(16);
   }, 30000);
 

@@ -5,6 +5,7 @@
  */
 import React from 'react';
 import { EXERCISE_CATALOG } from '../../../core/exercise-catalog';
+import { catalogByMuscle } from '../../../engines/bb/bb-catalog-index';
 import { strictGroupMembersOf } from '../../../engines/bb/bb-exercise-selection.engine';
 import type { BBPlan } from '../../../engines/bb/bb-builder.engine';
 
@@ -30,9 +31,10 @@ export const BbExSwapModal: React.FC<BbExSwapModalProps> = ({
   const curCat = EXERCISE_CATALOG.find(e => e.name === exSwapModal.currentName);
   const strict = strictGroupMembersOf({ id: curCat?.id, name: curCat?.name || exSwapModal.currentName }, exSwapModal.muscle);
   const strictIds = new Set(strict.map(s => s.id));
+  const byMusclePool = catalogByMuscle(exSwapModal.muscle);
   const basePool = strictIds.size > 0
     ? strict
-    : EXERCISE_CATALOG.filter(e => (e.group || '') === exSwapModal.muscle);
+    : (byMusclePool.length > 0 ? byMusclePool : EXERCISE_CATALOG.filter(e => (e.group || '') === exSwapModal.muscle));
   const filtered = basePool
     .filter(e => e.name.toLowerCase().includes(exSwapSearch.toLowerCase()));
   return (

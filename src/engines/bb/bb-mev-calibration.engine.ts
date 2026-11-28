@@ -159,13 +159,15 @@ export function personalLandmarksFor(
   const mev = Math.max(2, Math.round(userMev as number));
   const mav = Math.max(mev + 1, Math.round(table.mav * ratio));
   const mrv = Math.max(mav + 1, Math.round(table.mrv * ratio));
-  // Потолок: не выше +30% популяционного MRV (защита капов).
+  // Потолок: не выше +30% популяционного MRV (защита капов), сохраняем инвариант mev <= mav <= mrv.
   const cap = Math.round(table.mrv * 1.3);
   const mrvFinal = Math.min(cap, mrv);
-  const out: MuscleVolumeLandmarks = { mev, mav, mrv: mrvFinal };
+  const mavFinal = Math.min(mav, mrvFinal);
+  const mevFinal = Math.min(mev, mavFinal);
+  const out: MuscleVolumeLandmarks = { mev: mevFinal, mav: mavFinal, mrv: mrvFinal };
   if (!rotationDays || rotationDays === 7) return out;
   const f = rotationDays / 7;
-  return { mev: Math.round(mev * f), mav: Math.round(mav * f), mrv: Math.round(mrvFinal * f) };
+  return { mev: Math.round(mevFinal * f), mav: Math.round(mavFinal * f), mrv: Math.round(mrvFinal * f) };
 }
 
 /** Один калиброванный landmark: personal если есть, иначе популяционный. */

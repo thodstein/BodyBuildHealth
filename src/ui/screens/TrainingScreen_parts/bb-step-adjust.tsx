@@ -7,6 +7,7 @@
  */
 import React from 'react';
 import { getExercisesByGroup } from '../../../core/exercise-catalog';
+import { catalogByMuscle } from '../../../engines/bb/bb-catalog-index';
 import type { BBPlan } from '../../../engines/bb/bb-builder.engine';
 import type { BBPlanMetrics } from '../../../engines/bb/bb-metrics.engine';
 import { isCompoundEx } from '../../../engines/bb/bb-session-order.engine';
@@ -88,14 +89,19 @@ export interface BbAdjustStepProps {
   handlePrintMesocycleTable: (weekNo?: number) => void;
   handleExportQualityReport: () => void;
   handleExportCSV: () => void;
+  handleExportPlanJson?: () => void;
+  handleImportPlanJson?: (rawText: string) => void;
   handleLoadVariant: (v: SavedBBPlan) => void;
   handleDeleteVariant: (id: string) => void;
+  handleRenameVariant?: (id: string, currentName: string) => void;
   handleMoveExercise: (si: number, ei: number, dir: -1 | 1) => void;
+  handleAddExercise?: (si: number, muscleHint?: string) => void;
+  handleRemoveExercise?: (si: number, ei: number) => void;
   applyPeakWeekToCurrentPlan: (category: BBContestCategory, spec?: ContestSpecialization) => void;
   applyEditsToPlan: (plan: BBPlan) => BBPlan;
 }
 
-export const BbAdjustStep: React.FC<BbAdjustStepProps> = ({
+export const BbAdjustStep: React.FC<BbAdjustStepProps> = React.memo(({
   builtPlan, metrics, setBuiltPlan, bbWorkMax, loadStrategy,
   exerciseEdits, setExerciseEdits, editsRef, commitEdits, editsHistory, redosHistory, undoEdits, redoEdits,
   bulkModal, setBulkModal, bulkField, setBulkField, bulkMode, setBulkMode, bulkValue, setBulkValue,
@@ -106,9 +112,29 @@ export const BbAdjustStep: React.FC<BbAdjustStepProps> = ({
   adjustVolume, adjustWeight,
   handleSavePlan, handleSaveToMyPlans, handleSaveAsUserProgram, handleSaveVariant,
   handleSendToNutrition, handleSendToExecution, handlePrintPlan, handleExportIcs,
-  handlePrintMesocycleTable, handleExportQualityReport, handleExportCSV,
-  handleLoadVariant, handleDeleteVariant, handleMoveExercise, applyPeakWeekToCurrentPlan, applyEditsToPlan,
+  handlePrintMesocycleTable, handleExportQualityReport, handleExportCSV, handleExportPlanJson, handleImportPlanJson,
+  handleLoadVariant, handleDeleteVariant, handleRenameVariant, handleMoveExercise, handleAddExercise, handleRemoveExercise, applyPeakWeekToCurrentPlan, applyEditsToPlan,
 }) => {
+  const jsonFileInputRef = React.useRef<HTMLInputElement | null>(null);
+  const appliedPlan = React.useMemo(
+    () => (builtPlan ? applyEditsToPlan(builtPlan) : null),
+    [builtPlan, exerciseEdits, applyEditsToPlan],
+  );
+  const visualBundle = React.useMemo(() => {
+    if (!appliedPlan) return null;
+    const hm = buildBBMuscleHeatmap(appliedPlan);
+    const hmWeeks = [...new Set(hm.map(h => h.week))].sort((a, b) => a - b);
+    const hmMuscles = [...new Set(hm.map(h => h.muscle))];
+    const taper = buildBBTaperCurve(appliedPlan);
+    const mesoTable = buildBBMesocycleTable(appliedPlan);
+    const ffSeries = buildBBFitnessFatigue(appliedPlan, { startDate: startDateInput || undefined });
+    return { hm, hmWeeks, hmMuscles, taper, mesoTable, ffSeries };
+  }, [appliedPlan, startDateInput]);
+  const factData = React.useMemo(() => {
+    if (!appliedPlan) return null;
+    const diary = (() => { try { return loadSessions(); } catch { return []; } })();
+    return buildBBPlanFact(appliedPlan as any, diary as any, startDateInput || undefined);
+  }, [appliedPlan, startDateInput]);
   if (!builtPlan || !metrics) return null;
   const W = builtPlan.weeks;
   const wk = W[Math.min(bbWeekSel, W.length) - 1] || W[0];
@@ -121,7 +147,7 @@ export const BbAdjustStep: React.FC<BbAdjustStepProps> = ({
         return fb.reasons.length > 0 && fb.avgRpe > 0 ? (
           <CollapsibleCard title="📊 Фидбэк план → выполнение" defaultOpen={true} headerStyle={{ background: 'linear-gradient(135deg, rgba(139,92,246,0.14), rgba(139,92,246,0.05))', color: '#a78bfa' }} badge={fb.deloadRecommended ? 'разгрузка' : undefined}>
             {fb.deloadRecommended && <div style={{ padding:'4px 8px', borderRadius:8, background:'rgba(239,68,68,0.12)', color:'#ef4444', fontSize:11, fontWeight:700, marginBottom:6 }}>⛔ РЕКОМЕНДОВАНА РАЗГРУЗКА</div>}
-            {fb.reasons.map((r,i) => <div key={i} style={{ fontSize:11, color:'#fff', marginBottom:3, padding:'3px 0' }}>{r}</div>)}
+            {fb.reasons.map((r,i) => <div key={i} style={{ fontSize:11, color: 'var(--text, #fff)', marginBottom:3, padding:'3px 0' }}>{r}</div>)}
             <div style={{ display:'flex', gap:8, marginTop:6 }}>
               {fb.weightMultiplier !== 1 && <span style={{ padding:'2px 6px', borderRadius:4, fontSize:11, background:'rgba(96,165,250,0.1)', color:'#60a5fa' }}>Вес ×{fb.weightMultiplier}</span>}
               {fb.rirShift !== 0 && <span style={{ padding:'2px 6px', borderRadius:4, fontSize:11, background:'rgba(245,158,11,0.1)', color:'#f59e0b' }}>RIR {fb.rirShift > 0 ? '+':''}{fb.rirShift}</span>}
@@ -132,15 +158,11 @@ export const BbAdjustStep: React.FC<BbAdjustStepProps> = ({
       })()}
       <PlanFeedbackCard plan={builtPlan} workMax={bbWorkMax} strategy={loadStrategy} onApply={setBuiltPlan} />
       <CollapsibleCard title="📊 Наглядность (heatmap · taper-кривая · объём)" defaultOpen={false} headerStyle={{ background: 'linear-gradient(135deg, rgba(139,92,246,0.12), rgba(139,92,246,0.04))', color: '#a78bfa' }} badge="мышца×неделя · тапер">
-        {(() => {
-          const plan = applyEditsToPlan(builtPlan);
-          const hm = buildBBMuscleHeatmap(plan);
-          const hmWeeks = [...new Set(hm.map(h => h.week))].sort((a, b) => a - b);
-          const hmMuscles = [...new Set(hm.map(h => h.muscle))];
+        {visualBundle && (() => {
+          const { hm, hmWeeks, hmMuscles, taper, mesoTable, ffSeries } = visualBundle;
           const hmColor: Record<string, string> = { below_mev: '#f87171', mev_mav: '#22c55e', above_mav: '#f59e0b', over_mrv: '#ef4444', none: '#e5e7eb' };
-          const taper = buildBBTaperCurve(plan);
           return <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-            <div style={{ fontSize: 11, color: '#fff' }}>🧬 Heatmap «мышца × неделя» (объём по MEV/MAV/MRV):</div>
+            <div style={{ fontSize: 11, color: 'var(--text, #fff)' }}>🧬 Heatmap «мышца × неделя» (объём по MEV/MAV/MRV):</div>
             <div style={{ overflowX: 'auto', scrollbarWidth: 'none' }}>
               <table style={{ borderCollapse: 'collapse', fontSize: 10, minWidth: 300 }}>
                 <thead><tr><th style={{ border: '1px solid rgba(255,255,255,0.1)', padding: '3px 6px', textAlign: 'left' }}>Мышца</th>{hmWeeks.map(w => <th key={w} style={{ border: '1px solid rgba(255,255,255,0.1)', padding: '3px 6px' }}>Нед {w}</th>)}</tr></thead>
@@ -153,7 +175,7 @@ export const BbAdjustStep: React.FC<BbAdjustStepProps> = ({
               <span><span style={{ color: '#f59e0b' }}>■</span> {'>'} MAV</span>
               <span><span style={{ color: '#ef4444' }}>■</span> {'>'} MRV</span>
             </div>
-            {taper.length > 0 && <div style={{ fontSize: 11, color: '#fff' }}>
+            {taper.length > 0 && <div style={{ fontSize: 11, color: 'var(--text, #fff)' }}>
               📉 Кривая тапера (финальные недели): <span style={{ color: '#e11d48' }}>объём ↓</span>, интенсивность сохраняется, RIR 2-4.
               <div style={{ display: 'flex', gap: 6, marginTop: 6, alignItems: 'flex-end' }}>
                 {taper.map(t => (
@@ -165,32 +187,31 @@ export const BbAdjustStep: React.FC<BbAdjustStepProps> = ({
                 ))}
               </div>
             </div>}
-            <div style={{ fontSize: 11, color: '#fff' }}>📋 Вся таблица мезоцикла (неделя × день × упражнение):</div>
+            <div style={{ fontSize: 11, color: 'var(--text, #fff)' }}>📋 Вся таблица мезоцикла (неделя × день × упражнение):</div>
             <div style={{ overflowX: 'auto', scrollbarWidth: 'none', maxHeight: 320, overflowY: 'auto' }}>
               <table style={{ borderCollapse: 'collapse', fontSize: 10, minWidth: 520 }}>
                 <thead><tr style={{ position: 'static', top: 0, background: '#18181b' }}>
                   <th style={{ border: '1px solid rgba(255,255,255,0.1)', padding: '3px 6px' }}>Нед</th><th style={{ border: '1px solid rgba(255,255,255,0.1)', padding: '3px 6px' }}>Фаза</th><th style={{ border: '1px solid rgba(255,255,255,0.1)', padding: '3px 6px' }}>День</th><th style={{ border: '1px solid rgba(255,255,255,0.1)', padding: '3px 6px' }}>Упражнение</th><th style={{ border: '1px solid rgba(255,255,255,0.1)', padding: '3px 6px' }}>Мышца</th><th style={{ border: '1px solid rgba(255,255,255,0.1)', padding: '3px 6px' }}>Сеты</th><th style={{ border: '1px solid rgba(255,255,255,0.1)', padding: '3px 6px' }}>Повт</th><th style={{ border: '1px solid rgba(255,255,255,0.1)', padding: '3px 6px' }}>Вес</th><th style={{ border: '1px solid rgba(255,255,255,0.1)', padding: '3px 6px' }}>RIR</th></tr></thead>
-                <tbody>{buildBBMesocycleTable(plan).map((r, ri) => r.exercises.map((ex, xi) => (
+                <tbody>{mesoTable.map((r, ri) => r.exercises.map((ex, xi) => (
                   <tr key={`${ri}-${xi}`}><td style={{ border: '1px solid rgba(255,255,255,0.05)', padding: '2px 6px', color: BB_PHASE_COLOR[r.phase] || '#fff' }}>{r.week}</td><td style={{ border: '1px solid rgba(255,255,255,0.05)', padding: '2px 6px' }}>{BB_PHASE_LABEL_RU[r.phase] || r.phase}</td><td style={{ border: '1px solid rgba(255,255,255,0.05)', padding: '2px 6px' }}>{r.day}</td><td style={{ border: '1px solid rgba(255,255,255,0.05)', padding: '2px 6px' }}>{ex.name}</td><td style={{ border: '1px solid rgba(255,255,255,0.05)', padding: '2px 6px' }}>{ex.muscle}</td><td style={{ border: '1px solid rgba(255,255,255,0.05)', padding: '2px 6px', textAlign: 'center' }}>{ex.sets}</td><td style={{ border: '1px solid rgba(255,255,255,0.05)', padding: '2px 6px', textAlign: 'center' }}>{ex.reps}</td><td style={{ border: '1px solid rgba(255,255,255,0.05)', padding: '2px 6px', textAlign: 'center' }}>{ex.weight}</td><td style={{ border: '1px solid rgba(255,255,255,0.05)', padding: '2px 6px', textAlign: 'center' }}>{ex.rir}</td></tr>
                 )))}</tbody>
               </table>
             </div>
-            <div style={{ fontSize: 11, color: '#fff' }}>⚡ Прогноз утомления fitness–fatigue (Banister):</div>
-            <FFChart series={buildBBFitnessFatigue(plan, { startDate: startDateInput || undefined })} />
+            <div style={{ fontSize: 11, color: 'var(--text, #fff)' }}>⚡ Прогноз утомления fitness–fatigue (Banister):</div>
+            <FFChart series={ffSeries} />
           </div>;
         })()}
       </CollapsibleCard>
       <CollapsibleCard title="📊 План vs факт (по дневнику)" defaultOpen={true} headerStyle={{ background: 'linear-gradient(135deg, rgba(0,230,138,0.10), rgba(0,230,138,0.03))', color: '#00e68a' }} badge="сеты · тоннаж · RIR">
-        {(() => {
-          const diary = (() => { try { return loadSessions(); } catch { return []; } })();
-          const fact = buildBBPlanFact(applyEditsToPlan(builtPlan) as any, diary as any, startDateInput || undefined);
+        {factData && (() => {
+          const fact = factData;
           if (!fact.weeks.length) return <div style={{ fontSize: 11, opacity: 0.7 }}>Нет плана для сравнения.</div>;
           return (
             <div>
               <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap', marginBottom: 8 }}>
-                <span style={{ fontSize: 11, color: '#fff' }}>{bbPlanFactSummary(fact)}</span>
+                <span style={{ fontSize: 11, color: 'var(--text, #fff)' }}>{bbPlanFactSummary(fact)}</span>
                 <span style={{ fontSize: 10, fontWeight: 700, padding: '2px 8px', borderRadius: 16, background: 'rgba(0,230,138,0.12)', color: fact.overallAdherence >= 0.9 ? '#00e68a' : fact.overallAdherence >= 0.6 ? '#fbbf24' : '#f87171', border: '1px solid rgba(0,230,138,0.3)' }}>
-                  общая adherence {Math.round(fact.overallAdherence * 100)}%
+                  выполнение плана {Math.round(fact.overallAdherence * 100)}%
                 </span>
               </div>
               <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
@@ -200,7 +221,7 @@ export const BbAdjustStep: React.FC<BbAdjustStepProps> = ({
                     <div key={w.weekNumber} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '6px 8px', borderRadius: 8, background: 'rgba(0,0,0,0.15)', border: '1px solid rgba(255,255,255,0.06)' }}>
                       <span style={{ fontSize: 10, fontWeight: 800, color: '#00e68a', width: 62 }}>нед {w.weekNumber}</span>
                       <span style={{ fontSize: 9, color: 'rgba(255,255,255,0.55)', width: 108 }}>{w.startDate?.slice(5)}–{w.endDate?.slice(5)}</span>
-                      <span style={{ flex: 1, fontSize: 10, color: '#fff' }}>
+                      <span style={{ flex: 1, fontSize: 10, color: 'var(--text, #fff)' }}>
                         план {w.planned.sets} с. · {Math.round(w.planned.tonnage)} кг
                         {w.actual.sessions > 0 ? ` → факт ${w.actual.sets} с. · ${Math.round(w.actual.tonnage)} кг · RIR ${w.actual.avgRir.toFixed(1)}` : ''}
                       </span>
@@ -221,6 +242,37 @@ export const BbAdjustStep: React.FC<BbAdjustStepProps> = ({
                   </div>
                 </div>
               )}
+              {fact.strength && Object.keys(fact.strength.byMuscle).length > 0 && (
+                <div data-bb="plan-fact-strength" style={{ marginTop: 8 }}>
+                  <div style={{ fontSize: 10, fontWeight: 700, color: 'rgba(255,255,255,0.75)', marginBottom: 4 }}>
+                    🏋️ Сила (плановый vs фактический e1RM{fact.strength.overallDeltaPct != null ? `: ${fact.strength.overallDeltaPct > 0 ? '+' : ''}${fact.strength.overallDeltaPct.toFixed(1)}%` : ''}):
+                  </div>
+                  <div style={{ overflowX: 'auto', scrollbarWidth: 'none' }}>
+                    <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 9.5, fontVariantNumeric: 'tabular-nums' }}>
+                      <thead>
+                        <tr style={{ color: 'rgba(255,255,255,0.6)', textAlign: 'left' }}>
+                          <th style={{ padding: '2px 6px', borderBottom: '1px solid rgba(255,255,255,0.08)' }}>Мышца</th>
+                          <th style={{ padding: '2px 6px', borderBottom: '1px solid rgba(255,255,255,0.08)', textAlign: 'right' }}>План e1RM</th>
+                          <th style={{ padding: '2px 6px', borderBottom: '1px solid rgba(255,255,255,0.08)', textAlign: 'right' }}>Факт e1RM</th>
+                          <th style={{ padding: '2px 6px', borderBottom: '1px solid rgba(255,255,255,0.08)', textAlign: 'right' }}>Дельта</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {Object.values(fact.strength.byMuscle).map(row => (
+                          <tr key={row.muscle} style={{ color: 'var(--text, #fff)' }}>
+                            <td style={{ padding: '2px 6px', borderBottom: '1px solid rgba(255,255,255,0.04)' }}>{MUSCLE_LABEL_RU[row.muscle] || row.muscle}</td>
+                            <td style={{ padding: '2px 6px', borderBottom: '1px solid rgba(255,255,255,0.04)', textAlign: 'right' }}>{Math.round(row.plannedE1rm)} кг</td>
+                            <td style={{ padding: '2px 6px', borderBottom: '1px solid rgba(255,255,255,0.04)', textAlign: 'right' }}>{row.actualE1rm != null ? `${Math.round(row.actualE1rm)} кг` : '—'}</td>
+                            <td style={{ padding: '2px 6px', borderBottom: '1px solid rgba(255,255,255,0.04)', textAlign: 'right', color: row.deltaPct == null ? 'rgba(255,255,255,0.45)' : row.deltaPct >= 0 ? '#00e68a' : '#f87171', fontWeight: 700 }}>
+                              {row.deltaPct != null ? `${row.deltaPct > 0 ? '+' : ''}${row.deltaPct.toFixed(1)}%` : '—'}
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+              )}
               {fact.unmatchedSessions.length > 0 && (
                 <div style={{ marginTop: 6, fontSize: 9, color: 'rgba(255,255,255,0.5)' }}>
                   {ruCount(fact.unmatchedSessions.length, RU_SESSIONS)} вне диапазона плана (даты не совпадают с неделями мезо).
@@ -230,36 +282,95 @@ export const BbAdjustStep: React.FC<BbAdjustStepProps> = ({
           );
         })()}
       </CollapsibleCard>
-      <CollapsibleCard title="🔧 Инструменты коррекции" defaultOpen={true} headerStyle={{ background: 'linear-gradient(135deg, rgba(96,165,250,0.12), rgba(96,165,250,0.04))', color: '#60a5fa' }} badge="объём · вес · пик · сравнение">
-          <div style={{ display:'flex', gap:6, flexWrap:'wrap', alignItems:'center' }}>
-            {/* Фаза 4.23: дата старта мезоцикла + «📍 текущая неделя» */}
-            <label style={{ fontSize:11, color:'rgba(255,255,255,0.7)', display:'inline-flex', alignItems:'center', gap:4 }}>
-              📅 Старт:
-              <input type="date" value={startDateInput || ''} onChange={e => setStartDateInput(e.target.value)} style={{ background:'rgba(255,255,255,0.06)', border:'1px solid rgba(255,255,255,0.15)', borderRadius:6, color:'#fff', fontSize:11, padding:'3px 6px' }} />
-            </label>
-            {currentWeek ? <span style={{ fontSize:11, color:'#38bdf8', fontWeight:700, background:'rgba(56,189,248,0.12)', padding:'3px 8px', borderRadius:16, border:'1px solid rgba(56,189,248,0.25)' }}>📍 Текущая неделя: {currentWeek.week} ({currentWeek.start})</span> : null}
-            {builtPlan.validation && !builtPlan.validation.valid && <div style={{ width:'100%', fontSize:11, color:'#f59e0b' }}>⚠ Есть предупреждения валидации — сохранение доступно, но проверьте замечания.</div>}
-           <button style={BTN_GHOST} onClick={() => adjustVolume(0.8)}>📦 Объём -20%</button>
-           <button style={BTN_GHOST} onClick={() => adjustVolume(1.1)}>📦 Объём +10%</button>
-           <button style={BTN_GHOST} onClick={() => adjustWeight(1.05)}>⚖ Вес +5%</button>
-           <button style={BTN_GHOST} onClick={() => adjustWeight(0.95)}>⚖ Вес -5%</button>
-            <button style={BTN_GHOST} onClick={() => { setExerciseEdits({}); setStep(planMode === 'programs' ? 'ped' : 'split'); }}>🔄 Перестроить план</button>
-            <button style={BTN_GHOST} onClick={handleSavePlan}>💾 Сохранить план</button>
-            <button style={{ ...BTN_GHOST, borderColor:'#60a5fa', color:'#60a5fa' }} onClick={handleSaveToMyPlans}>💾 В Мои тренировки</button>
-            <button style={{ ...BTN_GHOST, borderColor:'#a78bfa', color:'#a78bfa' }} onClick={handleSaveAsUserProgram}>📂 В Мои программы</button>
-            <button style={{ ...BTN_GHOST, borderColor:'#22c55e', color:'#22c55e' }} onClick={handleSaveVariant}>💾 Вариант ({savedPlans.length})</button>
-            <button style={{ ...BTN_GHOST, borderColor:'#f59e0b', color:'#f59e0b' }} onClick={() => setShowCompare(s => !s)}>⚖ Сравнить</button>
-            <button style={{ ...BTN_GHOST, borderColor:'#22c55e', color:'#22c55e' }} onClick={handleSendToNutrition}>🍽 В планировщик питания</button>
-             <button style={{ ...BTN_GHOST, borderColor:'#a855f7', color:'#a855f7' }} onClick={handleSendToExecution}>▶ К выполнению</button>
-            <button style={{ ...BTN_GHOST, borderColor:'#ec4899', color:'#ec4899' }} onClick={() => applyPeakWeekToCurrentPlan(peakWeekCategory)}>🎭 Peak week</button>
-            <button style={{ ...BTN_GHOST, borderColor:'#f472b6', color:'#f472b6' }} onClick={() => setStep('contest')}>🏁 Contest prep</button>
-            <button style={{ ...BTN_GHOST, borderColor:'#38bdf8', color:'#38bdf8' }} aria-label="Открыть ББ-диагностику" onClick={() => { try { window.dispatchEvent(new CustomEvent('training-open-tab', { detail: 'bb_diagnostics_hub' })); } catch {} }}>🎯 ББ-диагностика</button>
-           <button style={BTN_GHOST} onClick={handlePrintPlan}>🖨 PDF</button>
-            <button style={BTN_GHOST} onClick={handleExportIcs}>📅 .ics</button>
-            <button style={BTN_GHOST} onClick={() => handlePrintMesocycleTable()}>📋 Вся таблица</button>
-            <button style={BTN_GHOST} onClick={() => handlePrintMesocycleTable(bbWeekSel)} title="Печать только текущей недели — лист на страницу для зала">🖨 Неделя</button>
-           <button style={BTN_GHOST} onClick={handleExportQualityReport}>📄 Отчёт (txt)</button>
-           <button style={BTN_GHOST} onClick={handleExportCSV}>📥 CSV</button>
+      <CollapsibleCard title="🔧 Инструменты коррекции" defaultOpen={true} headerStyle={{ background: 'linear-gradient(135deg, rgba(96,165,250,0.12), rgba(96,165,250,0.04))', color: '#60a5fa' }} badge="3 группы действий">
+          {builtPlan.validation && !builtPlan.validation.valid && <div style={{ width:'100%', fontSize:11, color:'#f59e0b', marginBottom:8 }}>⚠ Есть предупреждения валидации — сохранение доступно, но проверьте замечания.</div>}
+          {Object.keys(exerciseEdits).length > 0 && (
+            <div data-bb="adjust-edits-diff" style={{ marginBottom:8, padding:'8px 10px', borderRadius:10, background:'rgba(245,158,11,0.08)', border:'1px solid rgba(245,158,11,0.28)', display:'flex', alignItems:'center', justifyContent:'space-between', gap:8, flexWrap:'wrap', fontSize:11, color:'var(--text, #fff)' }}>
+              <span>📝 Ручных правок: <b>{Object.keys(exerciseEdits).length}</b> (поверх сгенерированного плана)</span>
+              <div style={{ display:'flex', gap:6 }}>
+                {editsHistory.length > 0 && <button type="button" style={{ ...BTN_GHOST, padding:'4px 10px', fontSize:11 }} onClick={undoEdits}>↩ Шаг назад</button>}
+                <button type="button" style={{ ...BTN_GHOST, borderColor:'#f87171', color:'#f87171', padding:'4px 10px', fontSize:11 }} onClick={() => { commitEdits({}); flash('↩ Все ручные правки сброшены'); }}>✕ Откатить все</button>
+              </div>
+            </div>
+          )}
+          <div className="bb-auto-action-group" data-bb="adjust-group-load" style={{ marginBottom:8 }}>
+            <div style={{ fontSize:11, fontWeight:800, color:'#60a5fa', marginBottom:6 }}>⚡ Нагрузка и расписание</div>
+            <div style={{ display:'flex', gap:6, flexWrap:'wrap', alignItems:'center' }}>
+              <label style={{ fontSize:11, color:'var(--text-dim, rgba(255,255,255,0.8))', display:'inline-flex', alignItems:'center', gap:4 }}>
+                📅 Старт:
+                <input type="date" value={startDateInput || ''} onChange={e => setStartDateInput(e.target.value)} style={{ background:'var(--input-bg, rgba(255,255,255,0.06))', border:'1px solid var(--border, rgba(255,255,255,0.15))', borderRadius:6, color:'var(--text, #fff)', fontSize:11, padding:'4px 6px', minHeight:34 }} />
+              </label>
+              {(() => {
+                const shiftStart = (days: number) => {
+                  setStartDateInput(prev => {
+                    const m = String(prev || startDateInput).match(/^(\d{4})-(\d{2})-(\d{2})/);
+                    const dt = m ? new Date(Number(m[1]), Number(m[2]) - 1, Number(m[3])) : new Date();
+                    if (Number.isNaN(dt.getTime())) return prev;
+                    dt.setDate(dt.getDate() + days);
+                    return `${dt.getFullYear()}-${String(dt.getMonth() + 1).padStart(2, '0')}-${String(dt.getDate()).padStart(2, '0')}`;
+                  });
+                };
+                return (
+                  <>
+                    <button type="button" style={{ ...BTN_GHOST, padding:'4px 8px', fontSize:10.5 }} onClick={() => shiftStart(-1)}>−1д</button>
+                    <button type="button" style={{ ...BTN_GHOST, padding:'4px 8px', fontSize:10.5 }} onClick={() => shiftStart(1)}>+1д</button>
+                    <button type="button" style={{ ...BTN_GHOST, padding:'4px 8px', fontSize:10.5 }} onClick={() => shiftStart(7)}>+1н</button>
+                  </>
+                );
+              })()}
+              {currentWeek ? <span style={{ fontSize:11, color:'#38bdf8', fontWeight:700, background:'rgba(56,189,248,0.12)', padding:'3px 8px', borderRadius:16, border:'1px solid rgba(56,189,248,0.25)' }}>📍 Текущая неделя: {currentWeek.week} ({currentWeek.start})</span> : null}
+              <button style={BTN_GHOST} onClick={() => adjustVolume(0.8)}>📦 Объём -20%</button>
+              <button style={BTN_GHOST} onClick={() => adjustVolume(1.1)}>📦 Объём +10%</button>
+              <button style={BTN_GHOST} onClick={() => adjustWeight(1.05)}>⚖ Вес +5%</button>
+              <button style={BTN_GHOST} onClick={() => adjustWeight(0.95)}>⚖ Вес -5%</button>
+              <button style={BTN_GHOST} onClick={() => { setExerciseEdits({}); setStep(planMode === 'programs' ? 'ped' : 'split'); }}>🔄 Перестроить план</button>
+            </div>
+          </div>
+          <div className="bb-auto-action-group" data-bb="adjust-group-save" style={{ marginBottom:8 }}>
+            <div style={{ fontSize:11, fontWeight:800, color:'#22c55e', marginBottom:6 }}>💾 Сохранить и отправить</div>
+            <div style={{ display:'flex', gap:6, flexWrap:'wrap', alignItems:'center' }}>
+              <button style={{ ...BTN, padding:'8px 14px' }} onClick={handleSendToExecution}>▶ К выполнению</button>
+              <button style={BTN_GHOST} onClick={handleSavePlan}>💾 Сохранить план</button>
+              <button style={{ ...BTN_GHOST, borderColor:'#60a5fa', color:'#60a5fa' }} onClick={handleSaveToMyPlans}>💾 В Мои тренировки</button>
+              <button style={{ ...BTN_GHOST, borderColor:'#a78bfa', color:'#a78bfa' }} onClick={handleSaveAsUserProgram}>📂 В Мои программы</button>
+              <button style={{ ...BTN_GHOST, borderColor:'#22c55e', color:'#22c55e' }} onClick={handleSaveVariant}>💾 Вариант ({savedPlans.length})</button>
+              <button style={{ ...BTN_GHOST, borderColor:'#f59e0b', color:'#f59e0b' }} onClick={() => setShowCompare(s => !s)}>⚖ Сравнить</button>
+              <button style={{ ...BTN_GHOST, borderColor:'#22c55e', color:'#22c55e' }} onClick={handleSendToNutrition}>🍽 В планировщик питания</button>
+              <button style={{ ...BTN_GHOST, borderColor:'#ec4899', color:'#ec4899' }} onClick={() => applyPeakWeekToCurrentPlan(peakWeekCategory)}>🎭 Peak week</button>
+              <button style={{ ...BTN_GHOST, borderColor:'#f472b6', color:'#f472b6' }} onClick={() => setStep('contest')}>🏁 Contest prep</button>
+              <button style={{ ...BTN_GHOST, borderColor:'#38bdf8', color:'#38bdf8' }} aria-label="Открыть ББ-диагностику" onClick={() => { try { window.dispatchEvent(new CustomEvent('training-open-tab', { detail: 'bb_diagnostics_hub' })); } catch {} }}>🎯 ББ-диагностика</button>
+            </div>
+          </div>
+          <div className="bb-auto-action-group" data-bb="adjust-group-export">
+            <div style={{ fontSize:11, fontWeight:800, color:'#a78bfa', marginBottom:6 }}>📤 Экспорт и печать</div>
+            <div style={{ display:'flex', gap:6, flexWrap:'wrap', alignItems:'center' }}>
+              <button style={BTN_GHOST} onClick={handlePrintPlan}>🖨 PDF</button>
+              <button style={BTN_GHOST} onClick={() => handlePrintMesocycleTable(bbWeekSel)} title="Печать только текущей недели — лист на страницу для зала">🖨 Неделя</button>
+              <button style={BTN_GHOST} onClick={() => handlePrintMesocycleTable()}>📋 Вся таблица</button>
+              <button style={BTN_GHOST} onClick={handleExportIcs}>📅 .ics</button>
+              <button style={BTN_GHOST} onClick={handleExportQualityReport}>📄 Отчёт (txt)</button>
+              <button style={BTN_GHOST} onClick={handleExportCSV}>📥 CSV</button>
+              {handleExportPlanJson && <button type="button" data-bb="export-json-apk" style={{ ...BTN_GHOST, borderColor: 'rgba(56,189,248,0.4)', color: '#38bdf8' }} onClick={handleExportPlanJson} title="Сохранить полный бэкап плана (.json) в устройство / APK Share">📦 Файл (.json)</button>}
+              {handleImportPlanJson && (
+                <>
+                  <input
+                    ref={jsonFileInputRef}
+                    type="file"
+                    accept=".json,application/json"
+                    style={{ display: 'none' }}
+                    onChange={ev => {
+                      const f = ev.target.files?.[0];
+                      ev.target.value = '';
+                      if (!f) return;
+                      const reader = new FileReader();
+                      reader.onload = () => handleImportPlanJson(String(reader.result || ''));
+                      reader.readAsText(f, 'utf-8');
+                    }}
+                  />
+                  <button type="button" data-bb="import-json-apk" style={BTN_GHOST} onClick={() => jsonFileInputRef.current?.click()} title="Загрузить ранее сохранённый .json план">📂 Импорт (.json)</button>
+                </>
+              )}
+            </div>
           </div>
 
         {/* PRO-3 Э11: мёртвая ветка showPeakWeek/peakPrep удалена — пик-неделя живёт в шаге contest + дедуп ContestPeakWeekCard */}
@@ -271,7 +382,7 @@ export const BbAdjustStep: React.FC<BbAdjustStepProps> = ({
             <div style={{ overflowX:'auto', scrollbarWidth:'none' }}>
               <table style={{ width:'100%', borderCollapse:'collapse', fontSize:10, minWidth:500 }}>
                 <thead>
-                  <tr style={{ color:'#fff', textAlign:'left' }}>
+                  <tr style={{ color: 'var(--text, #fff)', textAlign:'left' }}>
                     <th style={{ padding:'4px 6px', borderBottom:'1px solid rgba(255,255,255,0.1)' }}>Вариант</th>
                     <th style={{ padding:'4px 6px', borderBottom:'1px solid rgba(255,255,255,0.1)', textAlign:'center' }}>Сеты</th>
                     <th style={{ padding:'4px 6px', borderBottom:'1px solid rgba(255,255,255,0.1)', textAlign:'center' }}>RIR</th>
@@ -286,7 +397,7 @@ export const BbAdjustStep: React.FC<BbAdjustStepProps> = ({
                 </thead>
                 <tbody>
                   {savedPlans.map(v => (
-                    <tr key={v.id} style={{ color:'#fff' }}>
+                    <tr key={v.id} style={{ color: 'var(--text, #fff)' }}>
                       <td style={{ padding:'4px 6px', borderBottom:'1px solid rgba(255,255,255,0.05)', fontWeight:600 }}>{v.name}</td>
                       <td style={{ padding:'4px 6px', borderBottom:'1px solid rgba(255,255,255,0.05)', textAlign:'center' }}>{v.metrics.totalSets}</td>
                       <td style={{ padding:'4px 6px', borderBottom:'1px solid rgba(255,255,255,0.05)', textAlign:'center' }}>{v.metrics.avgRir.toFixed(1)}</td>
@@ -300,6 +411,7 @@ export const BbAdjustStep: React.FC<BbAdjustStepProps> = ({
                       </td>
                       <td style={{ padding:'4px 6px', borderBottom:'1px solid rgba(255,255,255,0.05)', display:'flex', gap:4 }}>
                         <button onClick={() => setDiffVariantId(prev => prev === v.id ? null : v.id)} style={{ padding:'3px 8px', borderRadius:6, border:'1px solid rgba(56,189,248,0.35)', background: diffVariantId === v.id ? 'rgba(56,189,248,0.18)' : 'rgba(56,189,248,0.08)', color:'#38bdf8', cursor:'pointer', fontSize:11, fontWeight:700 }} title="По-недельный дифф vs текущий">Дифф</button>
+                        {handleRenameVariant && <button onClick={() => handleRenameVariant(v.id, v.name)} title="Переименовать вариант" style={{ padding:'3px 8px', borderRadius:6, border:'1px solid rgba(245,158,11,0.3)', background:'rgba(245,158,11,0.08)', color:'#f59e0b', cursor:'pointer', fontSize:11, fontWeight:700 }}>✏️</button>}
                         <button onClick={() => handleLoadVariant(v)} style={{ padding:'3px 8px', borderRadius:6, border:'1px solid rgba(0,230,138,0.3)', background:'rgba(0,230,138,0.08)', color:'#00e68a', cursor:'pointer', fontSize:11, fontWeight:700 }}>↩</button>
                         <button onClick={() => handleDeleteVariant(v.id)} style={{ padding:'3px 8px', borderRadius:6, border:'1px solid rgba(239,68,68,0.3)', background:'rgba(239,68,68,0.08)', color:'#ef4444', cursor:'pointer', fontSize:11, fontWeight:700 }}>✕</button>
                       </td>
@@ -322,21 +434,21 @@ export const BbAdjustStep: React.FC<BbAdjustStepProps> = ({
                 <div style={{ marginTop:8, padding:8, borderRadius:8, background:'rgba(56,189,248,0.05)', border:'1px solid rgba(56,189,248,0.15)' }}>
                 <div style={{ fontSize:11, fontWeight:800, color:'#38bdf8', marginBottom:4 }}>🔬 По-недельный дифф (текущий → «{diffPlan?.pattern?.name || 'вариант'}»)</div>
                 <table style={{ width:'100%', borderCollapse:'collapse', fontSize:10 }}>
-                  <thead><tr style={{ color:'#fff', textAlign:'left' }}><th style={{ padding:'3px 6px', borderBottom:'1px solid rgba(255,255,255,0.1)' }}>Неделя</th><th style={{ padding:'3px 6px', borderBottom:'1px solid rgba(255,255,255,0.1)' }}>Изменения</th></tr></thead>
+                  <thead><tr style={{ color: 'var(--text, #fff)', textAlign:'left' }}><th style={{ padding:'3px 6px', borderBottom:'1px solid rgba(255,255,255,0.1)' }}>Неделя</th><th style={{ padding:'3px 6px', borderBottom:'1px solid rgba(255,255,255,0.1)' }}>Изменения</th></tr></thead>
                   <tbody>{meaningful.map(d => (
                     <tr key={d.week}><td style={{ padding:'3px 6px', borderBottom:'1px solid rgba(255,255,255,0.05)' }}>Нед {d.week}</td><td style={{ padding:'3px 6px', borderBottom:'1px solid rgba(255,255,255,0.05)', color:'#f59e0b' }}>{d.detail.join(' · ')}</td></tr>
                   ))}</tbody>
                 </table>
               </div>);
             })()}
-            <div style={{ marginTop:6, fontSize:10, color:'#fff' }}>↩ — загрузить вариант · ✕ — удалить · 🔬 Дифф — по неделям vs текущий · максимум 8 вариантов</div>
+            <div style={{ marginTop:6, fontSize:10, color: 'var(--text, #fff)' }}>↩ — загрузить вариант · ✕ — удалить · 🔬 Дифф — по неделям vs текущий · максимум 8 вариантов</div>
           </div>
         )}
       </CollapsibleCard>
       {/* Per-exercise editing zone */}
       <CollapsibleCard title={`✏️ Редактор упражнений — неделя ${bbWeekSel}`} defaultOpen={true} headerStyle={{ background: 'linear-gradient(135deg, rgba(0,230,138,0.12), rgba(0,230,138,0.04))', color: '#00e68a' }} badge={`${wk.sessions.length} дн · ${W.length} нед`}>
         <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:8 }}>
-          <span style={{ fontSize:11, color:'#fff', opacity:0.7 }}>Выберите неделю для правки упражнений</span>
+          <span style={{ fontSize:11, color: 'var(--text, #fff)', opacity:0.7 }}>Выберите неделю для правки упражнений</span>
           <div style={{ display:'flex', gap:4, alignItems:'center', flexWrap:'wrap' }}>
             {editsHistory.length > 0 && <button onClick={undoEdits} style={{ padding:'3px 8px', borderRadius:8, fontSize:11, cursor:'pointer', border:'1px solid rgba(96,165,250,0.3)', background:'rgba(96,165,250,0.1)', color:'#60a5fa' }} title="Отменить последнюю правку">↩ Отменить</button>}
             {redosHistory.length > 0 && <button onClick={redoEdits} style={{ padding:'3px 8px', borderRadius:8, fontSize:11, cursor:'pointer', border:'1px solid rgba(139,92,246,0.3)', background:'rgba(139,92,246,0.1)', color:'#a78bfa' }} title="Повторить правку">↪ Повторить</button>}
@@ -376,7 +488,7 @@ export const BbAdjustStep: React.FC<BbAdjustStepProps> = ({
                 if ('error' in res) { flash('⚡ Пакетно: ' + res.error); return; }
                 commitEdits(res.edits); setBulkModal(false); flash('⚡ Пакетно применено к неделе ' + bbWeekSel);
               }} style={{ padding:'4px 10px', borderRadius:8, fontSize:11, cursor:'pointer', border:'1px solid rgba(245,158,11,0.35)', background:'rgba(245,158,11,0.15)', color:'#f59e0b', fontWeight:700 }}>Применить ко всем</button>
-              <button onClick={() => setBulkModal(false)} style={{ padding:'4px 10px', borderRadius:8, fontSize:11, cursor:'pointer', border:'1px solid rgba(255,255,255,0.12)', background:'transparent', color:'#fff' }}>✕</button>
+              <button onClick={() => setBulkModal(false)} style={{ padding:'4px 10px', borderRadius:8, fontSize:11, cursor:'pointer', border:'1px solid rgba(255,255,255,0.12)', background:'transparent', color: 'var(--text, #fff)' }}>✕</button>
             </div>
           </div>
         )}
@@ -391,26 +503,29 @@ export const BbAdjustStep: React.FC<BbAdjustStepProps> = ({
                 const storedEdit = exerciseEdits[editKey];
                 const edit = storedEdit && (!storedEdit.exerciseKey || storedEdit.exerciseKey === exerciseKey)
                   ? { ...storedEdit, exerciseKey }
-                  : { sets: e.sets, reps: e.workSets[0]?.reps || 10, weight: e.workSets[0]?.weight || 80, exerciseKey };
+                  : { sets: e.sets, reps: e.workSets[0]?.reps || 10, weight: e.workSets[0]?.weight ?? 0, exerciseKey };
                 const isComp = isCompoundEx(e);
-                const altExercises = getExercisesByGroup(e.muscle).filter(x => x.name !== e.name).slice(0, 5);
+                const byMuscleAlt = catalogByMuscle(e.muscle);
+                const altExercises = (byMuscleAlt.length > 0 ? byMuscleAlt : getExercisesByGroup(e.muscle)).filter(x => x.name !== e.name).slice(0, 5);
                 const editBadges = exerciseFeatureBadges(e, dupMode);
                 const { lines: editSetLines, chain: editSetChain } = planSetsBreakdown(e, edit);
                 return <div key={ei} style={{ marginBottom:8, padding:'8px 10px', borderRadius:10, background:'rgba(255,255,255,0.03)', border:'1px solid rgba(255,255,255,0.06)' }}>
-                  <div style={{ fontWeight:700, fontSize:11, color:'#fff', marginBottom:4 }}>{ei+1}. {e.name} <span style={{ fontWeight:400, fontSize:11, color:'#fff' }}>({muscleLabel(e.muscle)})</span> <span style={{ fontSize:10, fontWeight:700, padding:'1px 6px', borderRadius:5, background:(isComp?'#00e68a':'#f59e0b')+'20', color:isComp?'#00e68a':'#f59e0b', marginLeft:6 }}>{isComp?'База':'Изо'}</span>
+                  <div style={{ fontWeight:700, fontSize:11, color: 'var(--text, #fff)', marginBottom:4 }}>{ei+1}. {e.name} <span style={{ fontWeight:400, fontSize:11, color: 'var(--text, #fff)' }}>({muscleLabel(e.muscle)})</span> <span style={{ fontSize:10, fontWeight:700, padding:'1px 6px', borderRadius:5, background:(isComp?'#00e68a':'#f59e0b')+'20', color:isComp?'#00e68a':'#f59e0b', marginLeft:6 }}>{isComp?'База':'Изо'}</span>
                     {(e as any).warmupActivator && <span style={{ fontSize:10, fontWeight:700, padding:'1px 6px', borderRadius:5, background:'rgba(148,163,184,0.15)', color:'#94a3b8', marginLeft:6 }}>🔥 Разминка</span>}
                     {e.muscle === 'back' && backSubgroupLabel((e as any).backSubgroup) && <span style={{ fontSize:10, fontWeight:700, padding:'1px 6px', borderRadius:5, background:'rgba(45,212,191,0.15)', color:'#2dd4bf', marginLeft:6 }}>{backSubgroupLabel((e as any).backSubgroup)}</span>}
                     {['biceps', 'triceps', 'forearms'].includes(e.muscle) && armHeadLabel((e as any).movementPattern) && <span style={{ fontSize:10, fontWeight:700, padding:'1px 6px', borderRadius:5, background:'rgba(232,121,249,0.15)', color:'#e879f9', marginLeft:6 }}>{armHeadLabel((e as any).movementPattern)}</span>}
                     {editBadges.map((fb, fbi) => <span key={fbi} style={{ fontSize:10, fontWeight:700, padding:'1px 6px', borderRadius:5, background:fb.color+'20', color:fb.color, marginLeft:6 }}>{fb.icon} {fb.label}</span>)}
                   </div>
                   <div style={{ display:'flex', gap:8, marginBottom:6, flexWrap:'wrap', alignItems:'center' }}>
-                    <div><span style={{ ...SMALL, fontSize:11 }}>Сеты</span><input type="number" value={edit.sets} min={0} max={20} onChange={e2 => commitEdits({ ...editsRef.current, [editKey]: { ...edit, sets: clampInlineNumber(e2.target.value, 0, 20, edit.sets) } })} style={{ width:45, background:'#18181b', color:'#fff', border:'1px solid rgba(255,255,255,0.08)', borderRadius:8, padding:'4px 8px', fontSize:11 }} /></div>
+                    <div><span style={{ ...SMALL, fontSize:11 }}>Сеты</span><input type="number" value={edit.sets} min={0} max={20} onChange={e2 => commitEdits({ ...editsRef.current, [editKey]: { ...edit, sets: clampInlineNumber(e2.target.value, 0, 20, edit.sets) } })} style={{ width:45, background:'#18181b', color: 'var(--text, #fff)', border:'1px solid rgba(255,255,255,0.08)', borderRadius:8, padding:'4px 8px', fontSize:11 }} /></div>
                     <div><span style={{ ...SMALL, fontSize:11 }}>Повт</span><input type="number" value={edit.reps} min={1} max={30} onChange={e2 => commitEdits({ ...editsRef.current, [editKey]: { ...edit, reps: clampInlineNumber(e2.target.value, 1, 30, edit.reps) } })} style={{ width:45, ...IN }} /></div>
                     <div><span style={{ ...SMALL, fontSize:11 }}>Вес, кг</span><input type="number" value={edit.weight} min={0} max={500} onChange={e2 => commitEdits({ ...editsRef.current, [editKey]: { ...edit, weight: clampInlineNumber(e2.target.value, 0, 500, edit.weight) } })} style={{ width:55, ...IN }} /></div>
-                    <div><span style={{ ...SMALL, fontSize:11 }}>RIR</span><input type="number" value={edit.rir ?? (e as any).rir ?? 2} min={0} max={10} onChange={e2 => commitEdits({ ...editsRef.current, [editKey]: { ...edit, rir: clampInlineNumber(e2.target.value, 0, 10, edit.rir ?? (e as any).rir ?? 2) } })} style={{ width:45, ...IN }} /></div>
-                    <button onClick={() => setExSwapModal({ si, ei, muscle: e.muscle, currentName: e.name })} style={{ padding:'3px 8px', borderRadius:8, fontSize:11, cursor:'pointer', border:'1px solid rgba(255,255,255,0.1)', background:'rgba(255,255,255,0.03)', color:'#fff' }}>🔄 Заменить</button>
+                    <div><span style={{ ...SMALL, fontSize:11 }}>RIR</span><input type="number" value={edit.rir ?? (e as any).rir ?? 2} min={0} max={5} onChange={e2 => commitEdits({ ...editsRef.current, [editKey]: { ...edit, rir: clampInlineNumber(e2.target.value, 0, 5, edit.rir ?? (e as any).rir ?? 2) } })} style={{ width:45, ...IN }} /></div>
+                    <div><span style={{ ...SMALL, fontSize:11 }}>Отдых, с</span><input type="number" value={edit.restSeconds ?? (e as any).restSeconds ?? 90} min={20} max={360} step={15} onChange={e2 => commitEdits({ ...editsRef.current, [editKey]: { ...edit, restSeconds: clampInlineNumber(e2.target.value, 20, 360, edit.restSeconds ?? (e as any).restSeconds ?? 90) } })} style={{ width:54, ...IN }} /></div>
+                    <button onClick={() => setExSwapModal({ si, ei, muscle: e.muscle, currentName: e.name })} style={{ padding:'3px 8px', borderRadius:8, fontSize:11, cursor:'pointer', border:'1px solid rgba(255,255,255,0.1)', background:'rgba(255,255,255,0.03)', color: 'var(--text, #fff)' }}>🔄 Заменить</button>
                     <button onClick={() => handleMoveExercise(si, ei, -1)} disabled={ei === 0} style={{ padding:'3px 8px', borderRadius:8, fontSize:11, cursor:ei===0?'default':'pointer', border:'1px solid rgba(96,165,250,0.2)', background:ei===0?'transparent':'rgba(96,165,250,0.06)', color:ei===0?'rgba(255,255,255,0.2)':'#60a5fa' }}>↑</button>
                     <button onClick={() => handleMoveExercise(si, ei, 1)} disabled={ei === s.exercises.length - 1} style={{ padding:'3px 8px', borderRadius:8, fontSize:11, cursor:ei===s.exercises.length-1?'default':'pointer', border:'1px solid rgba(96,165,250,0.2)', background:ei===s.exercises.length-1?'transparent':'rgba(96,165,250,0.06)', color:ei===s.exercises.length-1?'rgba(255,255,255,0.2)':'#60a5fa' }}>↓</button>
+                    {handleRemoveExercise && s.exercises.length > 1 && <button onClick={() => handleRemoveExercise(si, ei)} title="Удалить упражнение" style={{ padding:'3px 8px', borderRadius:8, fontSize:11, cursor:'pointer', border:'1px solid rgba(239,68,68,0.3)', background:'rgba(239,68,68,0.08)', color:'#f87171' }}>🗑</button>}
                   </div>
                   <div style={{ display:'flex', gap:8, marginBottom:6, flexWrap:'wrap', alignItems:'center' }}>
                     <span style={{ ...SMALL, fontSize:11, fontWeight:800, color:'#c084fc' }}>⚙️ Фичи и методики</span>
@@ -437,7 +552,7 @@ export const BbAdjustStep: React.FC<BbAdjustStepProps> = ({
                         { id: 'та же группа', label: '🔗 Та же группа' },
                       ]}
                     />
-                    <div style={{ display:'flex', alignItems:'center', gap:4 }}><span style={{ ...SMALL, fontSize:11 }}>Темп</span><input type="text" defaultValue={(e as any).tempoSpec || edit.tempo || ''} onBlur={e2 => { const v=e2.target.value.trim(); commitEdits({ ...editsRef.current, [editKey]: { ...edit, tempo: v || undefined } }); }} placeholder="3-1-1-0" style={{ width:62, ...IN }} /></div>
+                    <div style={{ display:'flex', alignItems:'center', gap:4 }}><span style={{ ...SMALL, fontSize:11 }}>Темп</span><input type="text" value={edit.tempo !== undefined ? edit.tempo : ((e as any).tempoSpec || '')} onChange={e2 => { const v = e2.target.value; commitEdits({ ...editsRef.current, [editKey]: { ...edit, tempo: v } }); }} onBlur={e2 => { const v = e2.target.value.trim(); commitEdits({ ...editsRef.current, [editKey]: { ...edit, tempo: v } }); }} placeholder="3-1-1-0" style={{ width:62, ...IN }} /></div>
                     {(edit.technique && edit.technique !== 'none') || (edit.supersetWith && edit.supersetWith !== 'none') ? <span style={{ fontSize:9, color:'#f59e0b' }}>⚠ применяется при «💾 Сохранить план» / экспорте</span> : null}
                   </div>
                   {(editSetLines.length > 0 || editSetChain) && (
@@ -446,10 +561,13 @@ export const BbAdjustStep: React.FC<BbAdjustStepProps> = ({
                       {editSetChain && <span style={{ fontSize:11, fontFamily:'monospace', fontWeight:700, padding:'2px 7px', borderRadius:5, background:'rgba(248,113,113,0.12)', color:'#fca5a5', border:'0.5px solid rgba(248,113,113,0.35)' }}>💥 {editSetChain.label}: {editSetChain.parts.join(' → ')}</span>}
                     </div>
                   )}
-                  {altExercises.length > 0 && <div style={{ fontSize:11, color:'#fff' }}>Альтернативы: {altExercises.map(x => x.name).join(', ')}</div>}
-                  <div style={{ marginTop:4, padding:'3px 6px', borderRadius:4, background:'rgba(0,230,138,0.04)', fontSize:11, color:'#fff' }}>💡 {exerciseComment(e, weakPoints, '', currentPhase)}</div>
+                  {altExercises.length > 0 && <div style={{ fontSize:11, color: 'var(--text, #fff)' }}>Альтернативы: {altExercises.map(x => x.name).join(', ')}</div>}
+                  <div style={{ marginTop:4, padding:'3px 6px', borderRadius:4, background:'rgba(0,230,138,0.04)', fontSize:11, color: 'var(--text, #fff)' }}>💡 {exerciseComment(e, weakPoints, '', currentPhase)}</div>
                 </div>;
               })}
+              {handleAddExercise && (
+                <button type="button" data-bb="adjust-add-exercise" onClick={() => handleAddExercise(si, s.exercises[s.exercises.length - 1]?.muscle)} style={{ ...BTN_GHOST, width:'100%', marginTop:4, borderColor:'rgba(0,230,138,0.35)', color:'#00e68a', fontSize:11 }}>＋ Добавить упражнение в день {si + 1}</button>
+              )}
             </div>
           } />
         ))}
@@ -460,4 +578,4 @@ export const BbAdjustStep: React.FC<BbAdjustStepProps> = ({
       </div>
     </div>
   );
-};
+});

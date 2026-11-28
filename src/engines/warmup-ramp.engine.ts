@@ -42,20 +42,39 @@ export interface WarmupRampRow {
   bar: boolean;
 }
 
+export interface WarmupRampOptions {
+  /** false для гантелей/блоков/тренажёров/bodyweight — пропускает шаг «пустой гриф 20 кг». */
+  isBarbell?: boolean;
+  /** true для 2-го базового упражнения на уже разогретую мышцу — укороченная рамка 50%→75%. */
+  secondCompoundSameMuscle?: boolean;
+}
+
 /**
  * Канон: разминочные шаги под рабочий вес compound-упражнения.
  * Совпадает с прежним bb-builder.buildWarmup (FIX-B5) по шагам и порогам.
  */
-export function warmupRampFor(workWeight: number, isCompound = true): { load: number; reps: number }[] {
+export function warmupRampFor(
+  workWeight: number,
+  isCompound = true,
+  opts?: WarmupRampOptions,
+): { load: number; reps: number }[] {
   if (!isCompound || !Number.isFinite(workWeight) || workWeight <= 0) return [];
-  return activeRampRows(workWeight).map(r => ({ load: r.load, reps: r.reps }));
+  return activeRampRows(workWeight, opts).map(r => ({ load: r.load, reps: r.reps }));
 }
 
 /** Строки активных шагов канона для веса (с процентом — для UI/печати). */
-export function activeRampRows(workWeight: number): WarmupRampRow[] {
+export function activeRampRows(workWeight: number, opts?: WarmupRampOptions): WarmupRampRow[] {
   if (!Number.isFinite(workWeight) || workWeight <= 0) return [];
+  if (opts?.secondCompoundSameMuscle) {
+    return [
+      { pct: 0.5, load: Math.round(workWeight * 0.5), reps: 8, bar: false },
+      { pct: 0.75, load: Math.round(workWeight * 0.75), reps: 3, bar: false },
+    ].filter(r => r.load > 0);
+  }
+  const allowBar = opts?.isBarbell !== false;
   const rows: WarmupRampRow[] = [];
   for (const s of WARMUP_RAMP_STEPS) {
+    if (s.bar && !allowBar) continue;
     if (s.minWeight !== undefined && workWeight <= s.minWeight) continue;
     rows.push({
       pct: s.pct,

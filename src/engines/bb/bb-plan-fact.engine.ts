@@ -46,6 +46,8 @@ export interface BBPlanFact {
   overallAdherence: number;
   /** Per-muscle покрытие (канонические EN-ключи). */
   byMuscle: Record<string, { plannedSets: number; actualSets: number; adherence: number }>;
+  /** Per-muscle покрытие строго в календарном окне [startDate, endDate] плана (без старой истории). */
+  byMuscleInWindow?: Record<string, { plannedSets: number; actualSets: number; adherence: number }>;
   /** Сессии дневника, не попавшие ни в одну неделю плана. */
   unmatchedSessions: { date: string; sets: number }[];
   plannedTotalSets: number;
@@ -187,11 +189,12 @@ function buildStrengthFact(
   }
   if (!Object.keys(plannedByMuscle).length) return undefined;
 
-  // Факт → имя упражнения → max e1RM (за всё окно плана).
+  const planEnd = weeks.length ? addDaysIso(start, (weeks.length - 1) * 7 + 6) : start;
+  // Факт → имя упражнения → max e1RM (строго за окно плана [start, planEnd]).
   const factByName: Record<string, number> = {};
   for (const sess of (sessions || []).filter(Boolean)) {
     const d = String(sess?.date || '');
-    if (!d) continue;
+    if (!d || d < start || d > planEnd) continue;
     for (const ex of sess.exercises || []) {
       const nm = normExerciseName(ex.exerciseName ?? (ex as any).name);
       if (!nm) continue;
@@ -263,6 +266,7 @@ export function buildBBPlanFact(plan: FactLikePlan, sessions: FactLikeSession[],
     const we = addDaysIso(ws, 6);
     let pSets = 0, pTonn = 0, pRirSum = 0, pRirN = 0;
     for (const s of wk.sessions || []) for (const ex of s.exercises || []) {
+      if ((ex as any).warmupActivator) continue;
       const sc = setCount(ex);
       pSets += sc;
       pTonn += exTonnage(ex);
@@ -309,26 +313,38 @@ export function buildBBPlanFact(plan: FactLikePlan, sessions: FactLikeSession[],
     };
   });
 
-  // Per-muscle покрытие: план (по мышце упражнения) vs факт (muscleGroup).
+  // Непокрытые сессии дневника (вне диапазона недель плана).
+  const planEnd = plan.weeks.length ? addDaysIso(start, (plan.weeks.length - 1) * 7 + 6) : start;
+
+  // Per-muscle покрытие: план (без warmupActivator) vs факт (RU/EN normalize), плюс строго в окне плана byMuscleInWindow.
   const plannedByMuscle: Record<string, number> = {};
   for (const wk of plan.weeks || []) for (const s of wk.sessions || []) for (const ex of s.exercises || []) {
+    if ((ex as any).warmupActivator) continue;
     const m = normMuscle(ex.muscle || '');
     if (m) plannedByMuscle[m] = (plannedByMuscle[m] || 0) + setCount(ex);
   }
   const actualByMuscle: Record<string, number> = {};
-  for (const sess of sessions || []) for (const ex of sess.exercises || []) {
-    const m = normMuscle(ex.muscleGroup || '');
-    if (m) actualByMuscle[m] = (actualByMuscle[m] || 0) + (ex.sets?.length ?? 0);
+  const actualByMuscleWindow: Record<string, number> = {};
+  for (const sess of sessions || []) {
+    const d = String(sess?.date || '');
+    const inWin = !!d && d >= start && d <= planEnd;
+    for (const ex of sess.exercises || []) {
+      const m = normMuscle((ex as any).muscle || ex.muscleGroup || '');
+      if (!m) continue;
+      const cnt = ex.sets?.length ?? 0;
+      actualByMuscle[m] = (actualByMuscle[m] || 0) + cnt;
+      if (inWin) actualByMuscleWindow[m] = (actualByMuscleWindow[m] || 0) + cnt;
+    }
   }
   const byMuscle: Record<string, { plannedSets: number; actualSets: number; adherence: number }> = {};
+  const byMuscleInWindow: Record<string, { plannedSets: number; actualSets: number; adherence: number }> = {};
   const allMuscles = new Set([...Object.keys(plannedByMuscle), ...Object.keys(actualByMuscle)]);
   for (const m of allMuscles) {
-    const p = plannedByMuscle[m] || 0, a = actualByMuscle[m] || 0;
+    const p = plannedByMuscle[m] || 0, a = actualByMuscle[m] || 0, aw = actualByMuscleWindow[m] || 0;
     byMuscle[m] = { plannedSets: p, actualSets: a, adherence: p > 0 ? Math.min(1.5, a / p) : (a > 0 ? 1 : 0) };
+    byMuscleInWindow[m] = { plannedSets: p, actualSets: aw, adherence: p > 0 ? Math.min(1.5, aw / p) : (aw > 0 ? 1 : 0) };
   }
 
-  // Непокрытые сессии дневника (вне диапазона недель плана).
-  const planEnd = plan.weeks.length ? addDaysIso(start, (plan.weeks.length - 1) * 7 + 6) : start;
   const unmatchedSessions: { date: string; sets: number }[] = [];
   for (const sess of (sessions || []).filter(Boolean)) {
     const d = String(sess?.date || '');
@@ -343,7 +359,7 @@ export function buildBBPlanFact(plan: FactLikePlan, sessions: FactLikeSession[],
   let strength: BBPlanFact['strength'];
   try { strength = buildStrengthFact(plan, sessions || [], start); } catch { strength = undefined; }
 
-  return { weeks, overallAdherence, byMuscle, unmatchedSessions, plannedTotalSets, actualTotalSets, strength };
+  return { weeks, overallAdherence, byMuscle, byMuscleInWindow, unmatchedSessions, plannedTotalSets, actualTotalSets, strength };
 }
 
 /** Бейдж силы факт↔план для UI (G9). */

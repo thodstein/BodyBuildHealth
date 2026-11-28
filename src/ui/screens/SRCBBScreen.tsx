@@ -1925,9 +1925,12 @@ const SRCBBScreenInner: React.FC<{ track?: 'pl' | 'bb' | 'auto' }> = ({ track = 
     const profData = linked.profile?.settings?.personal;
     const lifeData = linked.profile?.settings?.lifestyle;
     const nutrData = linked.profile?.settings?.nutrition as Record<string, any> | undefined;
+    const trainData = linked.profile?.settings?.training as Record<string, any> | undefined;
     const bodyFat = profData?.bodyFat;
     const leanMass =
       profData?.weight && bodyFat != null ? Math.round(profData.weight * (1 - bodyFat / 100)) : undefined;
+    const ageNum = Number(profData?.age) || undefined;
+    const srcPeds = ageNum != null && ageNum < 18 ? [] : (Array.isArray((linked.profile?.settings as any)?.pharma?.peds) ? (linked.profile?.settings as any).pharma.peds : undefined);
     // BB-2+BB-5 FIX: pass all available parameters to buildBBPlan.
     // Сборка идёт в воркере (bb-build-async), чтобы не морозить UI на ~0.2–1 с.
     let plan: BBPlan = await buildBBPlanAsync(
@@ -1944,14 +1947,23 @@ const SRCBBScreenInner: React.FC<{ track?: 'pl' | 'bb' | 'auto' }> = ({ track = 
         bodyFat,
         leanMass,
         hrvMs: lifeData?.morningHRV,
+        hrvBaseline: (lifeData as any)?.hrvBaseline ?? (lifeData as any)?.baselineHRV,
         sleepHours: lifeData?.sleepHours,
         stressLevel: lifeData?.stressLevel,
-        // BB-4 FIX: pass PED parameters
-        pedDoses,
+        // BB-4 FIX: pass PED parameters + profile constraints (P1-6)
+        peds: srcPeds,
+        pedDoses: srcPeds && srcPeds.length === 0 ? {} : pedDoses,
         courseIntensity,
+        equipment: trainData?.equipment,
+        injuries: (trainData?.injuries || []).filter((i: any) => i && i.muscle),
+        excludedExercises: trainData?.excludedExercises,
+        favoriteExercises: trainData?.favoriteExercises,
+        avoidAxialLoad: trainData?.avoidAxialLoad,
+        mobilityRestrictions: trainData?.mobilityRestrictions,
+        bodyweightCapability: trainData?.bodyweightCapability,
         // Profile parameters
         sex: profData?.sex,
-        age: Number(profData?.age) || undefined,
+        age: ageNum,
         proteinPerKg: nutrData?.proteinPerKg,
         calorieSurplus: nutrData?.calorieSurplus ?? 0,
       },
@@ -1976,9 +1988,12 @@ const SRCBBScreenInner: React.FC<{ track?: 'pl' | 'bb' | 'auto' }> = ({ track = 
     const profData = linked.profile?.settings?.personal;
     const lifeData = linked.profile?.settings?.lifestyle;
     const nutrData = linked.profile?.settings?.nutrition as Record<string, any> | undefined;
+    const trainData = linked.profile?.settings?.training as Record<string, any> | undefined;
     const bodyFat = profData?.bodyFat;
     const leanMass =
       profData?.weight && bodyFat != null ? Math.round(profData.weight * (1 - bodyFat / 100)) : undefined;
+    const ageNum = Number(profData?.age) || undefined;
+    const srcPeds = ageNum != null && ageNum < 18 ? [] : (Array.isArray((linked.profile?.settings as any)?.pharma?.peds) ? (linked.profile?.settings as any).pharma.peds : undefined);
     // BB-2+BB-5 FIX: pass all available parameters to buildBBPlan.
     // Сборка — в воркере (bb-build-async): кнопка «применить макроцикл» не морозится.
     const plan = await buildBBPlanAsync(
@@ -1995,14 +2010,23 @@ const SRCBBScreenInner: React.FC<{ track?: 'pl' | 'bb' | 'auto' }> = ({ track = 
         bodyFat,
         leanMass,
         hrvMs: lifeData?.morningHRV,
+        hrvBaseline: (lifeData as any)?.hrvBaseline ?? (lifeData as any)?.baselineHRV,
         sleepHours: lifeData?.sleepHours,
         stressLevel: lifeData?.stressLevel,
-        // BB-4 FIX: pass PED parameters
-        pedDoses,
+        // BB-4 FIX: pass PED parameters + profile constraints (P1-6)
+        peds: srcPeds,
+        pedDoses: srcPeds && srcPeds.length === 0 ? {} : pedDoses,
         courseIntensity,
+        equipment: trainData?.equipment,
+        injuries: (trainData?.injuries || []).filter((i: any) => i && i.muscle),
+        excludedExercises: trainData?.excludedExercises,
+        favoriteExercises: trainData?.favoriteExercises,
+        avoidAxialLoad: trainData?.avoidAxialLoad,
+        mobilityRestrictions: trainData?.mobilityRestrictions,
+        bodyweightCapability: trainData?.bodyweightCapability,
         // Profile parameters
         sex: profData?.sex,
-        age: Number(profData?.age) || undefined,
+        age: ageNum,
         proteinPerKg: nutrData?.proteinPerKg,
         calorieSurplus: nutrData?.calorieSurplus ?? 0,
       },

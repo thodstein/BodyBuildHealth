@@ -502,18 +502,11 @@ export function buildBbMovementPrintBlock(): string {
   } catch { return ''; }
 }
 
+import { saveTextFileApk, saveCsvApk } from '../../core/apk-share';
+
 export function downloadHtml(html: string, filename: string): void {
-  const blob = new Blob([html], { type: 'text/html;charset=utf-8' });
-  const url = URL.createObjectURL(blob);
-  const a = document.createElement('a');
-  a.href = url; a.download = filename; a.click();
-  setTimeout(() => URL.revokeObjectURL(url), 1000);
+  void saveTextFileApk(filename, html, 'text/html;charset=utf-8');
 }
 export function downloadCsv(csv: string, filename: string): void {
-  // BOM — иначе Excel на Windows ломает кириллицу (прецедент combat/lab/intelligence-экспортов).
-  const blob = new Blob(['\uFEFF' + csv], { type: 'text/csv;charset=utf-8' });
-  const url = URL.createObjectURL(blob);
-  const a = document.createElement('a');
-  a.href = url; a.download = filename; a.click();
-  setTimeout(() => URL.revokeObjectURL(url), 1000);
+  void saveCsvApk(filename, csv);
 }

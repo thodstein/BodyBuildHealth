@@ -9,6 +9,9 @@
 export interface BBNutritionNote {
   kcal?: number;
   trainDays?: number[];
+  heavyDays?: number[];
+  insulinIU?: number;
+  insulinCarbsG?: number;
   weeklySets?: number;
   text?: string;
 }
@@ -52,6 +55,10 @@ export function applyBBNutritionToTargets(input: BBNutritionTargetsInput): BBNut
     } else {
       const shiftG = isTrainToday ? 30 : -25;
       carbs = Math.max(20, Math.round(input.carbs + shiftG));
+      if (isTrainToday && note?.insulinCarbsG && note.insulinCarbsG > 0 && carbs < note.insulinCarbsG) {
+        carbs = Math.round(note.insulinCarbsG);
+        breakdown.push(`💉 Окно инсулина (${note.insulinIU ?? '?'} МЕ): углеводы в трен-день не ниже ${carbs} г (10 г/МЕ).`);
+      }
       fats = Math.max(35, Math.round(input.fats - (shiftG * 4) / 9));
       breakdown.push(`⚡ ББ-план: ${isTrainToday ? 'трен-день' : 'день отдыха'} — углеводы ${isTrainToday ? '+' : ''}${shiftG} г (циклирование по трен-дням плана).`);
     }

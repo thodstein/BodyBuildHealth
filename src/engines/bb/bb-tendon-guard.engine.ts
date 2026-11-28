@@ -112,13 +112,32 @@ const LEVEL_CAPS: Record<string, { warn: number; stop: number }> = {
   enhanced: { warn: 15, stop: 22 },
 };
 
+/** Фильтрация дневника за скользящие 7 дней (P1-24: не сравниваем всю историю с недельным капом). */
+function filterLast7Days(sessions: any[]): any[] {
+  if (!Array.isArray(sessions) || sessions.length === 0) return [];
+  const parseDateMs = (raw: unknown): number | null => {
+    const m = /^(\d{4})-(\d{2})-(\d{2})/.exec(String(raw || ''));
+    if (!m) return null;
+    return new Date(Number(m[1]), Number(m[2]) - 1, Number(m[3]), 12, 0, 0).getTime();
+  };
+  const datedMs = sessions.map(s => parseDateMs(s?.date)).filter((t): t is number => t != null);
+  if (datedMs.length === 0) return sessions; // юнит-тесты без дат — оставляем как есть
+  const anchorMs = Math.max(...datedMs);
+  const cutoffMs = anchorMs - 6 * 86400000;
+  return sessions.filter(s => {
+    const t = parseDateMs(s?.date);
+    return t == null || t >= cutoffMs;
+  });
+}
+
 export function assessBbTendonGuard(
   sessions: any[],
   opts: { elbowPain?: boolean; shoulderOhsFail?: boolean; level?: string; painRedJoint?: 'elbow' | 'shoulder' | null } = {},
 ): BbTendonGuard {
   const caps = LEVEL_CAPS[String(opts.level || 'intermediate').toLowerCase()] || LEVEL_CAPS.intermediate;
-  const elbowSets = countFor(sessions, ELBOW_RE, isElbowPattern);
-  const shoulderSets = countFor(sessions, SHOULDER_RE);
+  const recent = filterLast7Days(sessions);
+  const elbowSets = countFor(recent, ELBOW_RE, isElbowPattern);
+  const shoulderSets = countFor(recent, SHOULDER_RE);
   // R2: боль-мониторинг красный по суставу — стоп независимо от объёма (PMM, не диагноз).
   const elbowForced = opts.painRedJoint === 'elbow';
   const shoulderForced = opts.painRedJoint === 'shoulder';

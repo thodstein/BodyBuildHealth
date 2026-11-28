@@ -27,6 +27,7 @@ import { recommendPEDMethodology } from './bb-ped-methodology.engine';
 import { applyRehabToPlan, rehabNotes } from './bb-recovery.engine';
 import { applyRecoveryRelief } from './bb-recovery-relief.engine';
 import { applyPlateRoundingToPlan } from './bb-plates.engine';
+import { normalizeEquipmentIds } from './bb-equipment';
 import { applyBfrPattern } from './bb-rep-schemes.engine';
 import { reconcileSchemeComments } from './bb-scheme-comment-reconcile';
 import { mergeWearableIntoRecovery, type WearableDaily } from './bb-wearable.engine';
@@ -2115,6 +2116,8 @@ export interface ProgramToBBPlanOpts {
    * 'standard' (дефолт) = прежнее поведение (рампа 0.85→1.10).
    */
   volumeRamp?: 'standard' | 'preloaded' | 'flat';
+  volumeWave?: boolean;
+  hrvBaseline?: number;
   /** Цель пользователя (mass/cut/recomp/maintenance/strength_mass): объём-множитель
    *  adapt-пути (паритет с generic/convert). Без поля — 'mass' (легаси-вызовы). */
   goal?: string;
@@ -2386,7 +2389,7 @@ export function programToBBPlan(program: FullProgram, opts: ProgramToBBPlanOpts)
   // Применяется только в adapt режиме (faithful сохраняет программу дословно).
   let workMax = opts.workMax || {};
   if (mode === 'adapt' && opts.previousPlan) {
-    const progression = extractMesocycleProgression(opts.previousPlan, level, 'mass');
+    const progression = extractMesocycleProgression(opts.previousPlan, level, (opts.goal || 'mass') as any);
     workMax = applyWeightProgression(workMax, progression);
   }
   const weakPoints = mode === 'faithful' ? [] : (opts.weakPoints || []);
@@ -2405,7 +2408,7 @@ export function programToBBPlan(program: FullProgram, opts: ProgramToBBPlanOpts)
   const favIds = new Set(opts.favoriteExercises || []);
   // favoriteExercises могут быть id или именами — строим множество имён для приоритета при замене.
   const favNames = new Set<string>((opts.favoriteExercises || []).flatMap(id => { const cat = EXERCISE_CATALOG.find(e => e.id === id); return cat ? [cat.name] : [id]; }));
-  const eqList = opts.equipment || [];
+  const eqList = normalizeEquipmentIds(opts.equipment || []);
   const avAxial = opts.avoidAxialLoad || false;
 
   // PED adaptation для MRV-кап (добивка слабых групп не превышает MRV)
@@ -3299,6 +3302,7 @@ export function programToBBPlan(program: FullProgram, opts: ProgramToBBPlanOpts)
         for (const sess of w.sessions) {
           for (const e of sess.exercises) {
             if ((e as any).warmupActivator || e.role !== 'accessory') continue;
+            if (Number((e as any).schemeAssignedSets) > 0) continue;
             const isIso = (e as any).exerciseType === 'isolation' || (e as any).type === 'isolation' || /разгибан|сгибан|curl|raise|fly|мах|развод|шраг|pushdown|подъем|отведен|сведен|face.?pull|тяга.*лиц/i.test(e.name || '');
             if (!isIso) continue;
             applyBfrPattern(e, (opts.workMax as any)?.[e.muscle] || 50);
@@ -3437,6 +3441,9 @@ export function programToBBPlan(program: FullProgram, opts: ProgramToBBPlanOpts)
     });
     finalized.weeks = dupPlan.weeks;
     finalized.rationale = dupPlan.rationale;
+  }
+  if (opts.availablePlates?.length) {
+    applyPlateRoundingToPlan(finalized as any, opts.availablePlates, 20);
   }
   // Аудит Y: тот же класс, что и в цикл-пути — MRV-трим/rehab-relief правят
   // план после finalizeBBPlan, поэтому снимки факта пересобираются последними.

@@ -128,6 +128,7 @@ export const BbProgramLibraryPicker: React.FC<{
     </button>
     {open && (
       <PortalOverlay onClose={() => setOpen(false)}>
+        <div className="lib-picker" style={{ width: '100%', display: 'flex', justifyContent: 'center' }}>
         <div className="lib-sheet" onClick={e => e.stopPropagation()} style={{
           width: '92%', maxWidth: 460, maxHeight: '80vh', borderRadius: 16,
           background: '#18181b', border: '1px solid rgba(255,255,255,0.1)', overflow: 'hidden',
@@ -210,6 +211,7 @@ export const BbProgramLibraryPicker: React.FC<{
               color: '#fff', fontWeight: 700, fontSize: 12, cursor: 'pointer',
             }}>Закрыть</button>
           </div>
+        </div>
         </div>
       </PortalOverlay>
     )}

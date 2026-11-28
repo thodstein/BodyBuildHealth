@@ -23,6 +23,9 @@ import { trueMuscleOf } from '../movement-pattern';
 import { canonicalMuscle } from './bb-specialization.engine';
 import { bbExerciseTier } from './bb-exercise-tier.engine';
 import { localIsoDate } from '../../core/local-date';
+import { equipmentAllows, normalizeEquipmentIds } from './bb-equipment';
+import { isAxialLoadExercise } from '../exercise-selector.engine';
+import { isMobilityRestricted } from './bb-mobility.engine';
 
 /**
  * Стартовые ISO-даты недель плана (неделя 1 = planStartWeek плана).
@@ -208,16 +211,37 @@ export function computePlanFeedback(
   return out;
 }
 
-/** Применить рекомендацию к следующей неделе плана (клонирует неделю, правит веса/RIR). */
+/** Масштабировать все рабочие подходы пропорционально новому топ-весу (сохраняя бэкоффы). */
+function scaleWorkSetsFromTop(
+  workSets: BBExercise['workSets'],
+  nextWeight: number,
+  nextReps: number,
+  nextRir: number,
+): BBExercise['workSets'] {
+  const arr = workSets || [];
+  if (arr.length === 0) return [];
+  const prevTop = Number(arr[0]?.weight) || 0;
+  const ratio = prevTop > 0 && nextWeight > 0 ? nextWeight / prevTop : 1;
+  return arr.map((ws, i) => {
+    if (i === 0) return { ...ws, weight: nextWeight, reps: nextReps, rir: nextRir };
+    const prevW = Number(ws?.weight) || 0;
+    const scaledW = prevW > 0 ? Math.round(prevW * ratio * 2) / 2 : nextWeight;
+    return { ...ws, weight: scaledW, reps: nextReps, rir: nextRir };
+  });
+}
+
+/** Применить рекомендацию к следующей неделе плана (не клонирует делод, масштабирует все workSets). */
 export function applyFeedbackToNextWeek(plan: BBPlan, feedback: ExerciseFeedback[]): BBPlan {
   if (plan.weeks.length === 0) return plan;
-  // Клонируем последнюю неделю как основу для «следующей».
   const last = plan.weeks[plan.weeks.length - 1];
+  // P1-23: если последняя неделя — делод, берём последнюю рабочую неделю как шаблон
+  const workingWeeks = plan.weeks.filter(w => !(w as any).deload && String((w as any).phase || '').toLowerCase() !== 'deload');
+  const template = workingWeeks.length > 0 ? workingWeeks[workingWeeks.length - 1] : last;
   const nextWeekNum = last.week + 1;
   const fbMap = new Map<string, ExerciseFeedback>();
   for (const f of feedback) if (f.last) fbMap.set(f.planKey, f);
 
-  const newSessions: typeof last.sessions = last.sessions.map(s => ({
+  const newSessions: typeof template.sessions = template.sessions.map(s => ({
     ...s,
     exercises: s.exercises.map((ex: BBExercise) => {
       const key = ex.muscle + '|' + (ex.name || ex.exerciseName || '');
@@ -229,12 +253,12 @@ export function applyFeedbackToNextWeek(plan: BBPlan, feedback: ExerciseFeedback
       return {
         ...ex,
         rir: nrir,
-        workSets: (ex.workSets || []).map((ws, i) => i === 0 ? { ...ws, weight: nw, reps: nr, rir: nrir } : { ...ws, rir: nrir }),
+        workSets: scaleWorkSetsFromTop(ex.workSets, nw, nr, nrir),
         comment: (ex.comment || '') + ` | ↻ из факта: ${fb.last!.topWeight}×${fb.last!.topReps} RIR${fb.last!.actualRir} → ${nw}×${nr} RIR${nrir}`,
       };
     }),
   }));
-  return { ...plan, weeks: [...plan.weeks, { week: nextWeekNum, sessions: newSessions }] };
+  return { ...plan, weeks: [...plan.weeks, { ...template, week: nextWeekNum, phase: (template as any).phase || 'accumulation', deload: false, sessions: newSessions } as any] };
 }
 
 // ═══════════════════════════════════════════════════════════════════════════
@@ -266,6 +290,12 @@ export function applyFeedbackToBuild(
   if (lastIndex.size === 0) return plan;
   const tw = plan.weeks.length;
 
+  // P1-23: накапливаем прогрессию от недели к неделе (а не считаем каждую неделю от одного и того же last)
+  const carryState = new Map<string, { topWeight: number; topReps: number; actualRir: number }>();
+  for (const [k, v] of lastIndex.entries()) {
+    carryState.set(k, { topWeight: v.topWeight, topReps: v.topReps, actualRir: v.actualRir });
+  }
+
   const newWeeks = plan.weeks.map((wk, wIdx) => {
     if (wIdx === 0) return wk; // неделя 1 — без факта (нет предыдущей)
     if ((wk as any).deload || String((wk as any).phase || '').toLowerCase() === 'deload') return wk;
@@ -273,25 +303,20 @@ export function applyFeedbackToBuild(
       ...s,
       exercises: s.exercises.map((ex: BBExercise) => {
         const key = normName(ex.name || ex.exerciseName || '');
-        const last = lastIndex.get(key);
-        if (!last) return ex; // нет факта — плановые веса
-        const plannedReps = ex.repsRange?.[0] ?? (ex.workSets?.[0]?.reps ?? 10);
+        const cur = carryState.get(key);
+        if (!cur) return ex; // нет факта — плановые веса
         const plannedRir = ex.rir ?? 2;
-        const maxW = workMax[ex.muscle] || last.topWeight || 80;
+        const maxW = workMax[ex.muscle] || cur.topWeight || 80;
         const exType = ex.role === 'primary' ? 'compound' : 'isolation';
-        // P1-7: prescribeLoad с фактом + plannedRir для success-aware коррекции
         const phase = ((wk as any).phase || 'intensification') as any;
-        const rec = prescribeLoad(strategy, last.topWeight, last.topReps, last.actualRir, maxW, wk.week, tw, phase, exType, ex.role, plannedRir);
-        const rirDelta = last.actualRir - plannedRir;
-        const comment = (ex.comment || '') + ` | ↻ из факта: ${last.topWeight}×${last.topReps} RIR${last.actualRir} → ${rec.nextWeight}×${rec.nextReps} RIR${rec.nextRIR}`;
+        const rec = prescribeLoad(strategy, cur.topWeight, cur.topReps, cur.actualRir, maxW, wk.week, tw, phase, exType, ex.role, plannedRir);
+        // Переносим предписанный прогресс на следующую неделю (накопительная прогрессия)
+        carryState.set(key, { topWeight: rec.nextWeight, topReps: rec.nextReps, actualRir: rec.nextRIR });
+        const comment = (ex.comment || '') + ` | ↻ из факта: ${cur.topWeight}×${cur.topReps} RIR${cur.actualRir} → ${rec.nextWeight}×${rec.nextReps} RIR${rec.nextRIR}`;
         return {
           ...ex,
           rir: rec.nextRIR,
-          workSets: (ex.workSets || []).map((ws, i) =>
-            i === 0
-              ? { ...ws, weight: rec.nextWeight, reps: rec.nextReps, rir: rec.nextRIR }
-              : { ...ws, rir: rec.nextRIR }
-          ),
+          workSets: scaleWorkSetsFromTop(ex.workSets, rec.nextWeight, rec.nextReps, rec.nextRIR),
           comment,
         };
       }),
@@ -616,9 +641,31 @@ export function autoUpdateWeakPoints(
  *
  * Возвращает обновлённый план + список замен для rationale.
  */
+/** Оценка безопасного коэффициента переноса веса при авто-замене упражнения (P1-23). */
+function transferWeightRatio(fromName: string, toName: string, toEquipment?: string | string[]): number {
+  const f = (fromName || '').toLowerCase();
+  const t = (toName || '').toLowerCase();
+  const tEq = Array.isArray(toEquipment) ? toEquipment.join(' ').toLowerCase() : String(toEquipment || '').toLowerCase();
+  const fromLegPress = /жим.*ног|leg.?press/.test(f);
+  const toFreeSquat = /присед|squat|выпад|lunge/.test(t) && !/жим.*ног|leg.?press/.test(t);
+  if (fromLegPress && toFreeSquat) return 0.55;
+  const fromMachine = /трен|машин|machine|блок|cable|смит|smith/.test(f);
+  const toDumbbell = /гантел|dumbbell/.test(t) || tEq.includes('dumbbell');
+  const fromBarbell = /штанг|barbell|жим лёжа|жим лежа|присед/.test(f) && !/гантел/.test(f);
+  if (fromBarbell && toDumbbell) return 0.72;
+  if (fromMachine && !/трен|машин|machine|блок|cable/.test(t)) return 0.78;
+  return 0.90; // консервативный старт на новом движении (−10%)
+}
+
 export function autoReplaceOnPlateau(
   plan: BBPlan,
   sessions: WorkoutSession[],
+  opts?: {
+    equipment?: string[];
+    avoidAxialLoad?: boolean;
+    excludedExercises?: string[];
+    mobilityRestrictions?: string[];
+  },
 ): { plan: BBPlan; changes: string[] } {
   if (!sessions || sessions.length < 6 || plan.weeks.length === 0) {
     return { plan, changes: [] };
@@ -661,6 +708,12 @@ export function autoReplaceOnPlateau(
 
   if (plateauExercises.size === 0) return { plan, changes: [] };
 
+  const snap: any = (plan as any).inputSnapshot || {};
+  const eqNorm = normalizeEquipmentIds(opts?.equipment ?? snap.equipment ?? []);
+  const avoidAxial = opts?.avoidAxialLoad ?? !!snap.avoidAxialLoad;
+  const exclSet = new Set<string>(opts?.excludedExercises ?? snap.excludedExercises ?? []);
+  const mobRestr: string[] = opts?.mobilityRestrictions ?? snap.mobilityRestrictions ?? [];
+
   // Заменяем упражнения в плане (только primary — accessory не критично)
   const newWeeks = plan.weeks.map(wk => ({
     ...wk,
@@ -670,14 +723,18 @@ export function autoReplaceOnPlateau(
         const key = normName(ex.name || ex.exerciseName || '');
         if (!plateauExercises.has(key)) return ex;
         if (ex.role !== 'primary') return ex; // только primary
-        // Ищем альтернативу по той же мышце, compound, ДРУГОЕ имя (не исходное)
+        // Ищем альтернативу по той же мышце, compound, ДРУГОЕ имя + соблюдаем оборудование/травмы/осевые
         const origName = ex.name || ex.exerciseName || '';
         const origNorm = normName(origName);
         const alternatives = (EXERCISE_CATALOG as any[]).filter((e: any) => {
           if (e.id === origName || normName(e.name || '') === origNorm) return false;
+          if (exclSet.has(e.id) || exclSet.has(e.name)) return false;
           const mg = e.group || e.muscleGroup || '';
           if (mg !== ex.muscle && mg !== collapseKeyLocal(ex.muscle)) return false;
           if (e.type !== 'compound' && e.exerciseType !== 'compound') return false;
+          if (avoidAxial && isAxialLoadExercise(e)) return false;
+          if (mobRestr.length > 0 && isMobilityRestricted(e, mobRestr)) return false;
+          if (eqNorm.length > 0 && !equipmentAllows(eqNorm, e.equipment)) return false;
           return true;
         }).sort((a: any, b: any) => {
           const tierDiff = bbExerciseTier(a) - bbExerciseTier(b);
@@ -688,12 +745,18 @@ export function autoReplaceOnPlateau(
         if (alternatives.length === 0) return ex;
         const sub = alternatives[0];
         const subName = sub.name || sub.id;
-        changes.push(`🔄 ${origName} → ${subName}: e1RM на плато 4+ нед, замена для нового стимула.`);
+        const ratio = transferWeightRatio(origName, subName, sub.equipment);
+        const scaledWorkSets = (ex.workSets || []).map(ws => ({
+          ...ws,
+          weight: Number(ws.weight) > 0 ? Math.round(Number(ws.weight) * ratio * 2) / 2 : ws.weight,
+        }));
+        changes.push(`🔄 ${origName} → ${subName}: e1RM на плато 4+ нед, замена (вес ×${ratio.toFixed(2)}).`);
         return {
           ...ex,
           name: subName,
           exerciseName: subName,
-          comment: (ex.comment || '') + ` | 🔄 Замена по плато: ${origName} → ${subName} (e1RM стабилен 4+ нед).`,
+          workSets: scaledWorkSets,
+          comment: (ex.comment || '') + ` | 🔄 Замена по плато: ${origName} → ${subName} (вес ×${ratio.toFixed(2)}, e1RM стабилен 4+ нед).`,
           rationale: 'Авто-замена: e1RM на плато, нужна новая вариация для стимула.',
         };
       }),

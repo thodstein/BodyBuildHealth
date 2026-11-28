@@ -98,7 +98,7 @@ function accumulate(bucket: PlanMuscleBucket, eff: BBExerciseEffect, sets: numbe
 
 /** Задан ли темп/пауза упражнения (строка темпа по 4 фазам или pauseSeconds>0). */
 function hasTempoSpec(ex: any): boolean {
-  const raw = String(ex?.tempo ?? ex?.tempoCode ?? '').trim();
+  const raw = String(ex?.tempoSpec ?? ex?.tempo ?? ex?.tempoCode ?? '').trim();
   if (raw) {
     const parts = raw.split(/[-x×/,\s]+/).map(Number).filter((n) => Number.isFinite(n));
     if (parts.length >= 2) return true; // темп вообще задан (даже без паузы)
@@ -160,6 +160,7 @@ export function auditPlanExercises(plan: any): PlanExerciseAudit | null {
 
   for (const s of sessions) {
     for (const ex of (s.exercises || [])) {
+      if ((ex as any).warmupActivator) continue;
       const muscle = groupOf(ex);
       const sets = Number(ex.sets ?? ex.workSets?.length ?? 3);
       const tempoKnown = hasTempoSpec(ex);
@@ -195,9 +196,6 @@ export function auditPlanExercises(plan: any): PlanExerciseAudit | null {
   for (const [zone, bm] of Object.entries(byZone)) {
     if (bm) finalizeBucket(String(canonicalOfZone(zone)), bm);
   }
-
-  // покрытие углов/строгих/регионов per muscle
-  for (const [muscle, bm] of Object.entries(byMuscle)) finalizeBucket(muscle, bm);
 
   const avgSfr = sfrCnt ? Math.round((sfrSum / sfrCnt) * 10) / 10 : null;
   const lengthenedRatio = totalSets ? Math.round((lengthened / totalSets) * 100) / 100 : 0;

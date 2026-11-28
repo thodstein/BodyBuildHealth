@@ -83,8 +83,13 @@ export function estimateDiaryExperience(
   const dates = valid.map(s => s.date!).sort();
   const firstDate = dates[0];
   const lastDate = dates[dates.length - 1];
+  const parseNoonMs = (iso: string): number => {
+    const m = /^(\d{4})-(\d{2})-(\d{2})/.exec(iso);
+    if (m) return new Date(Number(m[1]), Number(m[2]) - 1, Number(m[3]), 12, 0, 0).getTime();
+    return new Date(iso).getTime();
+  };
   const daysDiff = Math.max(1, Math.round(
-    (new Date(lastDate).getTime() - new Date(firstDate).getTime()) / 86400000,
+    (parseNoonMs(lastDate) - parseNoonMs(firstDate)) / 86400000,
   ));
   const weeks = Math.max(1, daysDiff / 7);
   const spw = Math.round((valid.length / weeks) * 10) / 10;
@@ -185,7 +190,8 @@ export function buildAdaptiveTaper(
   const mods = opts?.modifiers ?? buildTaperModifiers({ cfg, experience: opts?.experience });
   const weeksOut = mods.taperLength ?? cfg.weeksOut;
   const cfgWithWeeks: BBContestPrepConfig = { ...cfg, weeksOut };
-  const base = buildTrainingTaper(cfgWithWeeks, { volumeMult: opts?.volumeMult });
+  // skipConfigModifiers: true — предотвращает двойное умножение volumeMult/intensityMult (P1-19).
+  const base = buildTrainingTaper(cfgWithWeeks, { volumeMult: opts?.volumeMult, skipConfigModifiers: true });
 
   const volM = mods.volumeMult ?? 1;
   const intM = mods.intensityMult ?? 1;

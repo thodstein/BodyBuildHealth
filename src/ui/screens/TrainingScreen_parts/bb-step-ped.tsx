@@ -12,7 +12,8 @@
 import React from 'react';
 import { PedInputPanel, PedAdaptationCard } from './PedCoursePanel';
 import { recommendPEDMethodology, suggestMethodologyForStack } from '../../../engines/bb/bb-ped-methodology.engine';
-import type { PED, PEDAdaptation } from '../../../engines/bb/bb-ped-adaptation.engine';
+import { assessFemalePedSafety, type PED, type PEDAdaptation } from '../../../engines/bb/bb-ped-adaptation.engine';
+import type { BBPharmaPhase } from '../../../engines/bb/bb-course-sync';
 import type { BBTrainingFocus } from '../../../engines/bb/bb-goal-types';
 import type { DUPMode } from '../../../engines/bb/bb-dup.engine';
 import type { SessionMethodology } from '../../../engines/bb/bb-session-order.engine';
@@ -59,6 +60,14 @@ export interface BbPedWorkMaxStepProps {
   planMode: PlanMode;
   /** Возраст из профиля — PED-гейт <18. */
   age?: number;
+  /** Пол из профиля — Female PED Safety Layer. */
+  sex?: 'male' | 'female';
+  /** Авто-синк активного курса (по умолчанию вкл). */
+  autoSyncCourse?: boolean;
+  onToggleAutoSyncCourse?: (v: boolean) => void;
+  courseSummary?: string;
+  coursePhase?: BBPharmaPhase;
+  hasActiveCourse?: boolean;
   onBuild: () => void;
   onNext: () => void;
   onBackToParams: () => void;
@@ -74,9 +83,15 @@ export const BbPedWorkMaxStep: React.FC<BbPedWorkMaxStepProps> = ({
   proPreset, setProPreset, dupMode, setDupMode, supersetMode, setSupersetMode,
   volumeScheme, setVolumeScheme, methodology, setMethodology,
   bfrMode, setBfrMode, dcMode, setDcMode, blastCruiseEnabled, setBlastCruiseEnabled, blastWeeks, setBlastWeeks,
-  cruiseWeeks, setCruiseWeeks, workMax, setWorkMax, planMode, age, onBuild, onNext, onBackToParams, flash,
+  cruiseWeeks, setCruiseWeeks, workMax, setWorkMax, planMode, age, sex,
+  autoSyncCourse, onToggleAutoSyncCourse, courseSummary, coursePhase, hasActiveCourse,
+  onBuild, onNext, onBackToParams, flash,
 }) => {
   const isMinor = Number(age) > 0 && Number(age) < 18;
+  const femaleSafety = !isMinor && sex === 'female' && peds.length > 0
+    ? assessFemalePedSafety({ sex, peds, pedDoses })
+    : null;
+  const canBlastCruise = !isMinor && peds.length > 0 && coursePhase !== 'pct';
   /* Пресет — явная макро-команда над настройками шага 1: применяем и СООБЩАЕМ,
      что изменили (раньше перезапись была тихой, а meadows не делал ничего). */
   const applyProPreset = (v: string) => {
@@ -108,17 +123,60 @@ export const BbPedWorkMaxStep: React.FC<BbPedWorkMaxStepProps> = ({
         </div>
       )}
 
+      {!isMinor && hasActiveCourse && onToggleAutoSyncCourse && (
+        <div data-bb="course-sync-banner" style={{ marginBottom: 10, padding: '9px 11px', borderRadius: 10, background: autoSyncCourse ? 'rgba(56,189,248,0.10)' : 'rgba(255,255,255,0.04)', border: autoSyncCourse ? '1px solid rgba(56,189,248,0.35)' : '1px solid rgba(255,255,255,0.12)', fontSize: 11, lineHeight: 1.45, color: '#fff' }}>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8, flexWrap: 'wrap' }}>
+            <span style={{ fontWeight: 700, color: autoSyncCourse ? '#7dd3fc' : '#e2e8f0' }}>
+              {autoSyncCourse ? '💉 Из активного курса' : '✍️ Ручной режим PED'}
+              {courseSummary ? ` · ${courseSummary}` : ''}
+            </span>
+            <button
+              type="button"
+              data-bb="course-sync-toggle"
+              onClick={() => onToggleAutoSyncCourse(!autoSyncCourse)}
+              style={{ ...BTN_GHOST, minHeight: 36, padding: '4px 10px', fontSize: 10, borderColor: autoSyncCourse ? 'rgba(56,189,248,0.5)' : 'rgba(255,255,255,0.2)' }}
+            >
+              {autoSyncCourse ? 'Перейти на ручной ввод' : 'Вернуть авто-синк курса'}
+            </button>
+          </div>
+          {coursePhase === 'pct' && autoSyncCourse && (
+            <div style={{ marginTop: 4, fontSize: 10, color: '#fbbf24' }}>
+              🛡️ Активна фаза ПКТ: андрогены отключены, объём и восстановление снижены (×0.80), RIR +1, без отказных техник.
+            </div>
+          )}
+        </div>
+      )}
+
+      {femaleSafety && femaleSafety.virilizationRisk !== 'none' && (
+        <div data-bb="female-ped-safety" style={{ marginBottom: 10, padding: '9px 11px', borderRadius: 10, background: 'rgba(244,114,182,0.10)', border: '1px solid rgba(244,114,182,0.40)', color: '#fff', fontSize: 11, lineHeight: 1.5 }}>
+          <div style={{ fontWeight: 800, color: '#f472b6', marginBottom: 4 }}>
+            👩 Female PED Safety · риск вирилизации: {femaleSafety.virilizationRisk === 'high' ? 'высокий' : 'умеренный'}
+          </div>
+          {femaleSafety.warnings.map((w, i) => <div key={i} style={{ fontSize: 10, marginBottom: 2 }}>{w}</div>)}
+          {femaleSafety.redFlags.map((r, i) => <div key={i} style={{ fontSize: 10, color: '#fecaca', marginTop: 4 }}>{r}</div>)}
+        </div>
+      )}
+
       <PedInputPanel
         peds={isMinor ? [] : peds}
         disabled={isMinor}
         onToggle={p => {
           if (isMinor) { flash('PED-протоколы недоступны до 18 лет'); return; }
+          if (autoSyncCourse && onToggleAutoSyncCourse) onToggleAutoSyncCourse(false);
           setPeds(prev => prev.includes(p) ? prev.filter(x => x !== p) : [...prev, p]);
         }}
         pedDoses={pedDoses}
-        onDose={(p, v) => { if (!isMinor) setPedDoses(d => ({ ...d, [p]: v })); }}
+        onDose={(p, v) => {
+          if (isMinor) return;
+          if (autoSyncCourse && onToggleAutoSyncCourse) onToggleAutoSyncCourse(false);
+          setPedDoses(d => ({ ...d, [p]: v }));
+        }}
         courseIntensity={courseIntensity}
-        onIntensity={v => { if (!isMinor) setCourseIntensity(v); }}
+        onIntensity={v => {
+          if (isMinor) return;
+          if (autoSyncCourse && onToggleAutoSyncCourse) onToggleAutoSyncCourse(false);
+          setCourseIntensity(v);
+        }}
       />
       <PedAdaptationCard adaptation={pedAdapt} />
 
@@ -167,9 +225,23 @@ export const BbPedWorkMaxStep: React.FC<BbPedWorkMaxStepProps> = ({
           title={`BFR окклюзия${bfrMode ? ' (30-15-15-15)' : ''}`} desc="Только памп-изоляции: 20-30% 1ПМ, схема 30-15-15-15, пауза 30 сек. Не для базы." />
         <BbRowSwitch checked={dcMode} onChange={setDcMode} icon="🎯" accent="#ef4444"
           title="DC-лайт (Dante)" desc="Ротация-3 топ-лифтов + widowmaker + круиз каждые 6 нед. Гейт: AAS от 750 + advanced/enhanced." />
-        <BbRowSwitch checked={blastCruiseEnabled} onChange={setBlastCruiseEnabled} icon="🔄" accent="#facc15"
-          title={`Blast/Cruise${blastCruiseEnabled ? ` (${blastWeeks}н / ${cruiseWeeks}н)` : ''}`} desc="Чередование высокой (объём ×1.15) и низкой (×0.85, RIR +1) нагрузки для долгосрочного курса." />
-        {blastCruiseEnabled && (
+        <BbRowSwitch
+          checked={canBlastCruise ? blastCruiseEnabled : false}
+          onChange={v => {
+            if (!canBlastCruise) {
+              flash('Blast/Cruise доступен только на активном курсе (для натуралов и ПКТ отключён)');
+              return;
+            }
+            setBlastCruiseEnabled(v);
+          }}
+          icon="🔄"
+          accent="#facc15"
+          title={`Blast/Cruise${canBlastCruise && blastCruiseEnabled ? ` (${blastWeeks}н / ${cruiseWeeks}н)` : ''}`}
+          desc={canBlastCruise
+            ? 'Чередование высокой (объём ×1.15) и низкой (×0.85, RIR +1) нагрузки для долгосрочного курса.'
+            : 'Недоступно для натурального режима, ПКТ и возраста < 18 лет.'}
+        />
+        {canBlastCruise && blastCruiseEnabled && (
           <div style={{ display: 'flex', gap: 8, marginBottom: 6 }}>
             <PopupNumber label='Blast нед' value={blastWeeks} min={4} max={12} onChange={setBlastWeeks} />
             <PopupNumber label='Cruise нед' value={cruiseWeeks} min={2} max={8} onChange={setCruiseWeeks} />
@@ -182,7 +254,7 @@ export const BbPedWorkMaxStep: React.FC<BbPedWorkMaxStepProps> = ({
           { id: 'meadows', label: 'Meadows (Джон Медоуз)', desc: 'Акцент на растянутой позиции, памп, медленный эксцентрик, проработка слабых мест. Включает: порядок Mountain Dog' },
         ]} />
         {dcMode && <div style={{ fontSize: 10, color: '#fff', opacity: 0.85, marginTop: 2 }}>DC-лайт: ротация-3 топ-лифтов + widowmaker + круиз каждые 6 нед. Гейт: AAS от 750 + advanced/enhanced.</div>}
-        {((pedDoses.MGF || 0) > 0 && (pedDoses.IGF1 || 0) > 0) && (
+        {(peds.includes('MGF') && peds.includes('IGF1') && (pedDoses.MGF || 0) > 0 && (pedDoses.IGF1 || 0) > 0) && (
           <div style={{ marginTop: 6 }}>
             <PopupSelect label='Фаза MGF/IGF1' value={pedPhaseOverride} onChange={v => setPedPhaseOverride(v as any)} hint='Вручную поверх авто-фазировки. В режиме источника применяется (адаптировать) — фаза оживлена в обоих путях.' options={[
               { id: 'auto', label: 'Авто (по стеку)', desc: 'Авто.' },

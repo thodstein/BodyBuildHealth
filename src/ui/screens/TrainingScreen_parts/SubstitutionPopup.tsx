@@ -1,17 +1,20 @@
-import React from 'react';
+import React, { useEffect } from 'react';
+import ReactDOM from 'react-dom';
 import { EXERCISE_CATALOG, getSubstitutes, getExerciseById } from '../../../core/exercise-catalog';
 import { getExerciseBio, type ExerciseBio } from '../../../data/exercise-biomechanics-db';
 
-const ACCENT = '#00e68a';
-const DIM = '#fff';
+const ACCENT = 'var(--accent, #00e68a)';
+const DIM = 'var(--text, #fff)';
 
 const overlay: React.CSSProperties = {
   position: 'fixed', inset: 0, zIndex: 300, display: 'flex',
   alignItems: 'center', justifyContent: 'center', background: 'rgba(0,0,0,0.85)',
+  paddingBottom: 'env(safe-area-inset-bottom, 0px)',
 };
 const sheet: React.CSSProperties = {
   width: '90%', maxWidth: 420, maxHeight: '80vh', borderRadius: 16,
-  background: '#18181b', border: '1px solid rgba(255,255,255,0.1)', overflow: 'hidden',
+  background: 'var(--card-bg, #18181b)', color: 'var(--text, #fff)',
+  border: '1px solid var(--border, rgba(255,255,255,0.1))', overflow: 'hidden',
 };
 const sheetBody: React.CSSProperties = {
   padding: '14px 16px', maxHeight: 'calc(80vh - 3px)', overflowY: 'auto',
@@ -63,16 +66,25 @@ const BioLine: React.FC<{ bio?: ExerciseBio }> = ({ bio }) => {
 };
 
 export const SubstitutionPopup: React.FC<Props> = ({ exerciseName, group, onSelect, onClose }) => {
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') onClose(); };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [onClose]);
+
+  const wrapPortal = (node: React.ReactElement) =>
+    typeof document !== 'undefined' ? ReactDOM.createPortal(node, document.body) : node;
+
   const cat = EXERCISE_CATALOG.find(c => c.name === exerciseName) || getExerciseById(exerciseName);
   if (!cat) {
-    return (
-      <div className="train-subspopup" style={overlay} onClick={onClose}>
+    return wrapPortal(
+      <div className="train-subspopup" role="dialog" aria-modal="true" aria-label="Замена упражнения" style={overlay} onClick={onClose}>
         <div onClick={e => e.stopPropagation()} style={sheet}>
           <div style={{ height: 3, background: `linear-gradient(90deg,${ACCENT},#00c853)` }} />
           <div style={sheetBody}>
             <div style={{ fontSize: 13, fontWeight: 700, color: '#ef4444', marginBottom: 8 }}>Упражнение не найдено</div>
             <button onClick={onClose}
-              style={{ width: '100%', padding: 10, borderRadius: 8, fontSize: 12, fontWeight: 700, cursor: 'pointer', border: 'none', background: `linear-gradient(135deg,${ACCENT},#00c853)`, color: '#000' }}>
+              style={{ width: '100%', minHeight: 44, padding: 10, borderRadius: 8, fontSize: 12, fontWeight: 700, cursor: 'pointer', border: 'none', background: 'var(--accent-gradient, linear-gradient(135deg,#00e68a,#00c853))', color: 'var(--accent-contrast, #000)' }}>
               Закрыть
             </button>
           </div>
@@ -129,8 +141,8 @@ export const SubstitutionPopup: React.FC<Props> = ({ exerciseName, group, onSele
     }
   }
 
-  return (
-    <div className="train-subspopup-main" style={overlay} onClick={onClose}>
+  return wrapPortal(
+    <div className="train-subspopup-main" role="dialog" aria-modal="true" aria-label={`Замена упражнения ${exerciseName}`} style={overlay} onClick={onClose}>
       <div onClick={e => e.stopPropagation()} style={sheet}>
         <div style={{ height: 3, background: `linear-gradient(90deg,${ACCENT},#00c853)` }} />
         <div style={sheetBody}>

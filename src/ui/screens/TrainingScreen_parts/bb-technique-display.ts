@@ -160,7 +160,7 @@ export function workSetsBreakdown(ex: ExLike, edit?: { sets?: number; reps?: num
   if (edit && edit.sets != null) {
     const sets = Math.max(0, edit.sets);
     const reps = edit.reps || ws[0]?.reps || 10;
-    const w = edit.weight || ws[0]?.weight || 0;
+    const w = edit.weight ?? ws[0]?.weight ?? 0;
     const rir = ws[0]?.rir ?? ex.rir ?? 2;
     return Array.from({ length: sets }, () => `${round(w)}×${reps} @RIR${rir}`);
   }

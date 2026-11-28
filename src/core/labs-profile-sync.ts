@@ -58,7 +58,7 @@ export function isNewerLabDate(next: unknown, prev: unknown): boolean {
   const b = typeof prev === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(prev) ? prev : '';
   if (!a) return false;
   if (!b) return true;
-  return a > b;
+  return a >= b;
 }
 
 /**

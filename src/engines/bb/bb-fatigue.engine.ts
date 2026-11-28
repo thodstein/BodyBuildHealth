@@ -172,8 +172,12 @@ export function fitBBSessionToBudget(session: BBSession, budget: BBFatigueBudget
   const totalWorkingSets = (): number => session.exercises.reduce((sum, exercise) => sum + exerciseSetCount(exercise), 0);
   // Разминочное упражнение не входит в лимит упражнений и рабочий бюджет.
   const workingExercises = (): BBExercise[] => session.exercises.filter(exercise => !(exercise as any).warmupActivator);
+  const muscleSetsInSession = (muscle: string): number =>
+    workingExercises()
+      .filter(e => e.muscle === muscle)
+      .reduce((sum, e) => sum + exerciseSetCount(e), 0);
   const syncSets = (exercise: BBExercise, sets: number): void => {
-    const target = Math.max(floorFor(exercise.muscle), sets);
+    const target = Math.max(minSets, sets);
     exercise.sets = target;
     const current = exercise.workSets || [];
     const template = current[current.length - 1] || {
@@ -206,7 +210,11 @@ export function fitBBSessionToBudget(session: BBSession, budget: BBFatigueBudget
     return finisher + accessory + isolation + normalizedSystemic + normalizedTime;
   };
   const reducible = (exercise: BBExercise): number => {
-    if (exercise.role === 'primary' || exerciseSetCount(exercise) <= floorFor(exercise.muscle)) return -Infinity;
+    if ((exercise as any).warmupActivator) return -Infinity;
+    if (exercise.role === 'primary') return -Infinity;
+    if (exerciseSetCount(exercise) <= minSets) return -Infinity;
+    // P2: сравниваем общий объём мышцы в сессии с полом мышцы (а не сеты 1 упражнения).
+    if (muscleSetsInSession(exercise.muscle) - 1 < floorFor(exercise.muscle)) return -Infinity;
     const finisher = exercise.character === 'памп' || exercise.repsRange?.[0] >= 15 ? 20 : 0;
     const isolation = catalogType(exercise) === 'isolation' ? 10 : 0;
     return finisher + isolation + estimateBBExerciseCost(exercise).timeSeconds / 120;

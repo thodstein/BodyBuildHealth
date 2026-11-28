@@ -849,10 +849,13 @@ export const BB_NUTRITION_NOTE_KEY = 'he_bb_nutrition_note';
  * Пишет заметку в localStorage (he_bb_nutrition_note) + копирует текст в буфер.
  */
 const bbNutritionHandler: Handler = (payload, { showToast }) => {
-  const d = payload.data as { kcal?: number; proteinG?: number; trainDays?: number[]; weeklySets?: number; splitId?: string; weightKg?: number; sex?: 'male' | 'female'; goal?: string };
+  const d = payload.data as { kcal?: number; proteinG?: number; trainDays?: number[]; heavyDays?: number[]; insulinIU?: number; insulinCarbsG?: number; weeklySets?: number; splitId?: string; weightKg?: number; sex?: 'male' | 'female'; goal?: string };
   const kcal = typeof d?.kcal === 'number' ? d.kcal : undefined;
   const proteinG = typeof d?.proteinG === 'number' ? d.proteinG : undefined;
   const trainDays = Array.isArray(d?.trainDays) ? d.trainDays : [];
+  const heavyDays = Array.isArray(d?.heavyDays) ? d.heavyDays : [];
+  const insulinIU = typeof d?.insulinIU === 'number' && d.insulinIU > 0 ? d.insulinIU : undefined;
+  const insulinCarbsG = typeof d?.insulinCarbsG === 'number' && d.insulinCarbsG > 0 ? d.insulinCarbsG : undefined;
   const weeklySets = typeof d?.weeklySets === 'number' ? d.weeklySets : undefined;
   const trainDaysLabel = trainDays.length
     ? `Трен-дни: ${trainDays.map(day => ['Пн','Вт','Ср','Чт','Пт','Сб','Вс'][day - 1] ?? day).join(', ')} — углеводы выше в трен-дни, ниже в отдых.`
@@ -860,13 +863,14 @@ const bbNutritionHandler: Handler = (payload, { showToast }) => {
   const basisLabel = (typeof d?.weightKg === 'number' && d.weightKg > 0)
     ? `Основа расчёта: вес ${d.weightKg} кг · цель ${d.goal || '—'} · ${d.sex === 'female' ? 'жен' : d.sex === 'male' ? 'муж' : 'пол не указан'} (ориентир; уточните в планировщике).`
     : '';
+  const insulinLabel = insulinCarbsG ? `Окно инсулина (${insulinIU ?? '?'} МЕ): ≥${insulinCarbsG} г быстрых углеводов в трен-день.` : '';
   const kcalLabel = kcal ? `Целевой калораж: ~${kcal} ккал/день.` : '';
   const proteinLabel = proteinG ? `Белок: ~${proteinG} г/день.` : '';
   const volumeLabel = weeklySets ? `Недельный объём: ${ruAdjCount(weeklySets, RU_ADJ_WORKING, RU_SETS)}.` : '';
-  const text = ['🍽 Питание для ББ-плана:', kcalLabel, proteinLabel, volumeLabel, trainDaysLabel, basisLabel].filter(Boolean).join('\n');
+  const text = ['🍽 Питание для ББ-плана:', kcalLabel, proteinLabel, volumeLabel, trainDaysLabel, insulinLabel, basisLabel].filter(Boolean).join('\n');
   try {
     localStorage.setItem(BB_NUTRITION_NOTE_KEY, JSON.stringify({
-      kcal, proteinG, trainDays, weeklySets, splitId: d?.splitId,
+      kcal, proteinG, trainDays, heavyDays, insulinIU, insulinCarbsG, weeklySets, splitId: d?.splitId,
       weightKg: d?.weightKg, sex: d?.sex, goal: d?.goal,
       text, updatedAt: new Date().toISOString(),
     }));

@@ -14417,3 +14417,55 @@ html.app-native .nd-addsheet .nd-ocr-actions {
     border-right: 1px solid rgba(255, 255, 255, 0.08) !important;
   }
 }
+
+/* === 120. BB-AUTO CONSTRUCTOR PRO (Wave 6) === */
+html.app-native .bb-auto-root {
+  color: var(--text);
+  padding-bottom: calc(74px + max(env(safe-area-inset-bottom, 0px), 12px)) !important;
+}
+html.app-native .bb-auto-root .bb-auto-topbar {
+  background: var(--card-bg, rgba(24, 24, 27, 0.85)) !important;
+  border-color: var(--border, rgba(255, 255, 255, 0.1)) !important;
+}
+html.app-native .bb-auto-root button,
+html.app-native .bb-auto-root [role="switch"] {
+  min-height: 44px;
+}
+html.app-native .bb-auto-root .bb-auto-card {
+  background: var(--card-bg, rgba(24, 24, 27, 0.72));
+  border-color: var(--border, rgba(255, 255, 255, 0.1));
+  color: var(--text);
+}
+html.app-native .bb-auto-root .bb-auto-num,
+html.app-native .bb-auto-root table {
+  font-variant-numeric: tabular-nums;
+}
+html.app-native .bb-auto-sticky-cta {
+  position: sticky;
+  bottom: 0;
+  z-index: 30;
+  margin-top: 12px;
+  padding: 10px 12px calc(10px + max(env(safe-area-inset-bottom, 0px), 8px));
+  background: var(--bg, rgba(16, 18, 24, 0.94));
+  border-top: 1px solid var(--border, rgba(255, 255, 255, 0.1));
+  backdrop-filter: blur(14px);
+  -webkit-backdrop-filter: blur(14px);
+}
+html.app-native .bb-auto-action-group {
+  border-radius: 12px;
+  padding: 8px 10px;
+  background: var(--surface-subtle, rgba(255, 255, 255, 0.03));
+  border: 1px solid var(--border, rgba(255, 255, 255, 0.08));
+}
+@media (max-width: 380px) {
+  html.app-native .bb-auto-root .bb-auto-grid2,
+  html.app-native .bb-auto-root .bb-auto-grid3,
+  html.app-native .bb-auto-root .bb-split-compare-grid {
+    grid-template-columns: 1fr !important;
+  }
+  html.app-native .bb-auto-root .bb-auto-topbar button {
+    font-size: 10.5px !important;
+    padding: 6px 8px !important;
+  }
+}
+

@@ -57,6 +57,12 @@ export const BB_WORKER_STORAGE_KEYS = [
   'he_prep_postshow_v1',
   'he_wearable_daily',
   'he_bb_lvp_profile',
+  // P1-9: ключи, читаемые workout-logger / diary-feedback (раньше вызывали sync-fallback).
+  'he_workout_log_trimmed',
+  'he_workout_progress_cache',
+  'he_workout_stats_cache',
+  'he_bb_plan_saved',
+  'he_bb_plans',
 ] as const;
 
 const DEFAULT_TIMEOUT_MS = 30000;
@@ -244,7 +250,12 @@ function submit<T = BBPlan>(req: BBTaskRequest, timeoutMs: number): Promise<T> {
     };
     const timer = setTimeout(() => {
       pending.delete(id);
-      // Воркер молчит дольше таймаута — не держим пользователя в вечном спиннере.
+      // P1-9: зависший воркер необходимо прибить и сбросить, иначе все следующие
+      // вызовы тоже будут висеть по 30 с в его очереди.
+      if (worker) {
+        try { worker.terminate(); } catch { /* ignore */ }
+        worker = null;
+      }
       fallback();
     }, timeoutMs);
     pending.set(id, { req, resolve: resolve as (p: any) => void, reject, timer });

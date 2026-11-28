@@ -47,7 +47,7 @@ const clamp = (v: number, lo: number, hi: number) => Math.max(lo, Math.min(hi, v
 
 /** Оценка готовности тела: % жира vs целевой (по катего-профилю из плана/результата). */
 function bodyReadiness(ctx: BBShowCoachCtx): { score: number; note: BBShowNote | null } {
-  const bf = ctx.currentBodyFatPct;
+  const bf = ctx.currentBodyFatPct ?? ctx.plan.config?.bodyFatPct;
   if (bf == null) {
     return { score: 0, note: { severity: 'info', icon: '⚖️', text: 'Укажите текущий % жира — без него оценка готовности тела неполная.' } };
   }

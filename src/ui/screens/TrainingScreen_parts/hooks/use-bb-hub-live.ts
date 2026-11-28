@@ -14,7 +14,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { localIsoDateOffset } from '../../../../core/local-date';
 import { loadHubDiarySessions } from '../../../../engines/hub-diary.engine';
-import { aggregateBBVolume } from '../../../../engines/bb/bb-volume.engine';
+import { aggregateBBVolume, normalizeBBMuscle } from '../../../../engines/bb/bb-volume.engine';
 import { analyzeBBBalance } from '../../../../engines/bb/bb-balance.engine';
 import { computePerMuscleACWR } from '../../../../engines/bb/bb-progression-feedback.engine';
 import { readSavedBbPlan } from '../bb-hub-state';
@@ -75,7 +75,7 @@ export function useBbHubLive(planNonce: number): BbHubLive {
       // а не своя сумма «direct = effective» без косвенной нагрузки.
       const exercises = recent.flatMap((s: any) => ((s.exercises || []) as any[]).map((ex) => ({
         name: String(ex.exerciseName || ex.name || ''),
-        muscle: String(ex.muscleGroup || ex.muscle || '').toLowerCase(),
+        muscle: normalizeBBMuscle(String(ex.muscle || ex.muscleGroup || '')),
         sets: Array.isArray(ex.sets) ? ex.sets.length : Math.max(0, Number(ex.sets) || 0),
         rir: Number(ex.rir) || 2,
         role: 'accessory' as const,

@@ -109,8 +109,11 @@ describe('BB zero-state snapshots (baseline Этапа 10)', () => {
     // по каждой неделе (раньше брался из недели 1 и добавлялся всем — в поздних
     // неделях перебор), а разрыв в 1 сет больше не превращается в 2. Сумма по
     // дельтам не выросла: delt_mid 4 → delt_front 2 + delt_mid 2. Валидатор зелёный.
+    // Re-baseline 14 (аудит 2026-11, P0-17): lateCap финализатора больше не режет
+    // enhanced onCourse 6+ (60/16) до натуральных 40 сетов → устраняется прежний
+    // недобор спины (back 31→42, ≥36 по бюджету), грудь 15→23, трицепс 4→6, rear 2→3.
     expect(directVolume(plan)).toEqual({
-      abs: 10, back: 31, biceps: 4, calves: 9, chest: 15, delt_front: 2, delt_mid: 2, delt_rear: 2, forearms: 6, glutes: 10, hamstrings: 22, quads: 16, shoulders: 0, traps: 6, triceps: 4,
+      abs: 10, back: 42, biceps: 4, calves: 9, chest: 23, delt_front: 2, delt_mid: 2, delt_rear: 3, forearms: 6, glutes: 10, hamstrings: 22, quads: 16, shoulders: 0, traps: 6, triceps: 6,
     });
   });
 
@@ -213,8 +216,11 @@ describe('BB zero-state snapshots (baseline Этапа 10)', () => {
     // (раньше библиотечный путь строил enhanced-натурал 40/15). Факт W1:
     // 178 прямых сетов < бюджета 224; новых MRV-переливов нет (2 прежних
     // session_exercise_cap остались).
+    // Re-baseline 7 (аудит 2026-11, P0-17): finalizeBBPlan больше не сбрасывает
+    // курсовой лимит enhanced 6+ до натуральных 40 сетов — трицепс 5→12 и бицепс
+    // 10→15 добираются в пределах канонического бюджета курса без лишних шраг (15→9).
     expect(directVolume(plan)).toEqual({
-      abs: 15, back: 22, biceps: 10, calves: 15, chest: 18, delt_front: 3, delt_mid: 2, delt_rear: 10, forearms: 12, glutes: 8, hamstrings: 15, quads: 28, shoulders: 0, traps: 15, triceps: 5,
+      abs: 13, back: 22, biceps: 15, calves: 15, chest: 18, delt_front: 3, delt_mid: 2, delt_rear: 10, forearms: 10, glutes: 8, hamstrings: 15, quads: 28, shoulders: 0, traps: 9, triceps: 12,
     });
   });
 

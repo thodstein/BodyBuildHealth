@@ -211,6 +211,34 @@ function migrateSavedPlan(value: any): SavedBBPlan {
   };
 }
 
+let lastBBPlansStoreError: string | null = null;
+export function getLastBBPlansStoreError(): string | null { return lastBBPlansStoreError; }
+
+function persistBBPlans(updated: SavedBBPlan[]): SavedBBPlan[] {
+  lastBBPlansStoreError = null;
+  try {
+    localStorage.setItem(KEY, JSON.stringify(updated));
+    return updated;
+  } catch (err: any) {
+    const isQuota = err?.name === 'QuotaExceededError' || err?.code === 22 || /quota/i.test(String(err?.message || ''));
+    if (isQuota && updated.length > 1) {
+      // Попытка освободить место, удалив самый старый вариант
+      for (let len = updated.length - 1; len >= 1; len--) {
+        try {
+          const trimmed = updated.slice(0, len);
+          localStorage.setItem(KEY, JSON.stringify(trimmed));
+          lastBBPlansStoreError = 'Память хранилища почти заполнена: самые старые варианты удалены для сохранения нового.';
+          return trimmed;
+        } catch { /* try smaller */ }
+      }
+    }
+    lastBBPlansStoreError = isQuota
+      ? 'Недостаточно места в локальном хранилище (QuotaExceededError) — удалите старые сохранённые планы.'
+      : 'Не удалось сохранить вариант плана в хранилище.';
+    return updated;
+  }
+}
+
 export function saveBBPlanVariant(name: string, plan: any, params: SavedBBPlan['params'], metrics: SavedBBPlan['metrics']): SavedBBPlan[] {
   const existing = loadSavedBBPlans();
   const entry: SavedBBPlan = {
@@ -222,15 +250,21 @@ export function saveBBPlanVariant(name: string, plan: any, params: SavedBBPlan['
     metrics,
   };
   const updated = [entry, ...existing].slice(0, MAX_PLANS);
-  try { localStorage.setItem(KEY, JSON.stringify(updated)); } catch { /* ignore */ }
-  return updated;
+  return persistBBPlans(updated);
+}
+
+export function renameBBPlanVariant(id: string, newName: string): SavedBBPlan[] {
+  const trimmed = String(newName || '').trim();
+  if (!trimmed) return loadSavedBBPlans();
+  const existing = loadSavedBBPlans();
+  const updated = existing.map(p => (p.id === id ? { ...p, name: trimmed } : p));
+  return persistBBPlans(updated);
 }
 
 export function deleteBBPlanVariant(id: string): SavedBBPlan[] {
   const existing = loadSavedBBPlans();
   const updated = existing.filter(p => p.id !== id);
-  try { localStorage.setItem(KEY, JSON.stringify(updated)); } catch { /* ignore */ }
-  return updated;
+  return persistBBPlans(updated);
 }
 
 export function clearAllBBPlans(): void {

@@ -8,6 +8,7 @@ import { ruCount, RU_SETS } from '../ru-plural';
 import { EXERCISE_CATALOG } from '../../core/exercise-catalog';
 import { canonicalMuscle } from './bb-specialization.engine';
 import { sessionLimitsFor, computeBBWeeklyBudget, computeBBRecoveryScore } from './bb-volume.engine';
+import { onCourseOf } from './bb-ped-profile';
 import { isBBJunk } from './bb-builder.engine';
 import { isPoolAllowed } from './bb-exercise-levels.engine';
 import { isMobilityRestricted } from './bb-mobility.engine';
@@ -173,7 +174,11 @@ function computeBudgetBB(plan: BBPlan, level?: string): number {
     sleepHours: snap.sleepHours,
     stressLevel: snap.stressLevel,
   });
-  const onCourse = snap.courseIntensity != null || lvl === 'enhanced';
+  const onCourse = onCourseOf({
+    onCourse: snap.onCourse,
+    peds: snap.peds,
+    pedDoses: snap.pedDoses,
+  }) || lvl === 'enhanced';
   const weekly = computeBBWeeklyBudget({
     onCourse,
     courseIntensity: snap.courseIntensity,
@@ -335,7 +340,7 @@ export function injectBBWeakPoints(plan: BBPlan, weakZones: string[], opts: BBIn
         muscle: muscleKey,
         name: catName,
         role: 'accessory' as const,
-        character: 'pump' as any,
+        character: 'памп' as any,
         sets: addSets,
         repsRange: [reps, repsMax] as [number, number],
         rir,

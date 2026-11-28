@@ -681,6 +681,24 @@ if (!existsSync(join(root, NOTES_UI))) {
 }
 
 
+// 7e. ББ-авто (Волна 2 аудита 2026-11): экспорт/печать через apk-share, никаких a.download/window.open/clipboard.
+for (const f of [
+  'src/ui/screens/TrainingScreen_parts/BbAutoConstructor.tsx',
+  'src/ui/screens/TrainingScreen_parts/PlanExportCard.tsx',
+  'src/engines/bb/bb-spec-ics.engine.ts',
+  'src/engines/bb/bb-diagnostics-export.engine.ts',
+]) {
+  const lines = readFileSync(join(root, f), 'utf8').split(/\r?\n/);
+  for (const [re, label] of CARDIO_HOSTILE) {
+    const i = lines.findIndex(l => re.test(l) && !isCommentLine(l));
+    if (i >= 0) fails.push(`BB-AUTO HOSTILE ${label} → ${f}:${i + 1}: ${lines[i].trim().slice(0, 70)}`);
+  }
+}
+mustContain('src/ui/screens/TrainingScreen_parts/BbAutoConstructor.tsx', 'printHtmlApk', 'bb-auto apk print');
+mustContain('src/ui/screens/TrainingScreen_parts/BbAutoConstructor.tsx', 'saveCsvApk', 'bb-auto apk csv');
+mustContain('src/ui/screens/TrainingScreen_parts/BbAutoConstructor.tsx', 'saveTextFileApk', 'bb-auto apk text/ics/json');
+mustContain('src/ui/screens/TrainingScreen_parts/PlanExportCard.tsx', 'copyOrShareText', 'bb-auto export copy/share');
+
 // 8. Секции native-слоя на месте (молчаливый откат хвоста файла).
 for (const sec of [
   '67. SUPPORT + SECONDARY HEADS',
@@ -697,6 +715,7 @@ for (const sec of [
   '98. COMBAT POPUPS PRO',
   '114. COMBAT BB-STYLE',
   '115. COMBAT CARDS/BUTTONS',
+  '120. BB-AUTO CONSTRUCTOR PRO (Wave 6)',
 ]) mustContain('src/styles-native.css', sec, `css section ${sec}`);
 
 // 9. Главная: картинка целиком (contain), без своих надписей поверх верха.

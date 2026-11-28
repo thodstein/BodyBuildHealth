@@ -77,12 +77,17 @@ export function pedClassesOf(input: PedProfileInput): PedClassProfile {
   const peds = input.peds || [];
   const doses = (input.pedDoses || {}) as Record<string, number>;
   const nameHas = (re: RegExp) => peds.some((x) => re.test(String(x).toLowerCase()));
+  const doseKeys = Object.entries(doses).filter(([, v]) => num(v) > 0).map(([k]) => k.toLowerCase());
+  const doseHas = (re: RegExp) => doseKeys.some((k) => re.test(k));
+  const aasRe = /aas|тест|test|tren|deca|nandro|npp|bold|prim|drost|mast|stan|oxan|anavar|methan|anadrol|oxymeth|sust|equip|tbol|turinabol|dbol|dianabol|winstrol|primo|dhb|trest|ment|sdrol|superdrol|halo|provir|sarm|ostarine|lgd|rad140|yk11/;
+  const ghRe = /^(?:gh|hgh|somatropin|гр)$/i;
+  const insRe = /^(?:insulin|инсулин|humalog|novorapid|lantus|apida)$/i;
   return {
-    hasAAS: nameHas(/aas|тест|test|tren|deca|nandro|bold|prim|drost|stan|oxan|methan|anadrol|sust|equip|tbol|dbol|winstrol|primo/) || num(doses['AAS']) > 0,
-    hasGH: peds.some((x) => String(x) === 'GH') || num(doses['GH']) > 0,
-    hasIns: peds.some((x) => String(x) === 'insulin') || num(doses['insulin']) > 0,
-    hasMGF: peds.some((x) => /^mgf$/i.test(String(x))) || num(doses['MGF']) > 0,
-    hasIGF1: peds.some((x) => /^igf/i.test(String(x))) || num(doses['IGF1'] ?? doses['IGF']) > 0,
+    hasAAS: nameHas(aasRe) || doseHas(aasRe) || num(doses['AAS']) > 0,
+    hasGH: peds.some((x) => ghRe.test(String(x).trim())) || doseKeys.some((k) => ghRe.test(k)) || num(doses['GH']) > 0,
+    hasIns: peds.some((x) => insRe.test(String(x).trim())) || doseKeys.some((k) => insRe.test(k)) || num(doses['insulin']) > 0,
+    hasMGF: peds.some((x) => /^(?:peg[-_]?)?mgf$/i.test(String(x).trim())) || num(doses['MGF']) > 0,
+    hasIGF1: peds.some((x) => /^igf/i.test(String(x).trim())) || num(doses['IGF1'] ?? doses['IGF']) > 0,
   };
 }
 

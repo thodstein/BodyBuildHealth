@@ -82,26 +82,29 @@ export const PED_META: Record<PED, { unit: string; tEq: number }> = {
  */
 export const AAS_SUBSTANCE_TEQ: Record<string, number> = {
   // эфиры тестостерона / чистый тест
-  test: 1.0, test_e: 1.0, test_c: 1.0, test_p: 1.0, sustanon: 1.0,
+  test: 1.0, test_e: 1.0, test_enan: 1.0, test_c: 1.0, test_cyp: 1.0, test_p: 1.0, test_prop: 1.0, test_susp: 1.0, sustanon: 1.0,
   // 19-нор (прогестиновая активность)
   deca: 0.7, nandrolone: 0.7, npp: 0.7, deca_200: 0.7,
-  // trenbolone — самый андрогенный
-  tren: 2.5, tren_ace: 2.5, tren_e: 2.5, tren_hex: 2.5,
-  // прочие
+  // trenbolone — самый андрогенный (trena = Tren Acetate, не Tbol)
+  tren: 2.5, tren_ace: 2.5, tren_acet: 2.5, trena: 2.5, tren_e: 2.5, tren_hex: 2.5,
+  // прочие инъекционные
   // 26.09.2026 (аудит): `bold_undec` — КАНОНИЧЕСКИЙ id болденона (ped-alias-map:
   // boldenone → bold_undec). Без него resolveTequivKey('bold_undec') возвращал ''
   // и доза болденона молча выпадала из T-эквивалента (риск-порог занижался).
   equipoise: 0.9, eq: 0.9, boldenone: 0.9, bold_undec: 0.9, boldenone_undecylenate: 0.9,
   primobolan: 0.5, prim: 0.5, prim_enan: 0.5,
   masteron: 0.9, drostanolone: 0.9, drost: 0.9,
+  dhb: 1.0, trest: 3.0, ment: 3.0, trestolone: 3.0,
+  // оральные 17α и SARMs
   winstrol: 2.0, stan: 2.0, stanozolol: 2.0,
   anavar: 0.8, oxan: 0.8, oxandrolone: 0.8,
   dianabol: 3.5, dbol: 3.5, methand: 3.5, methandienone: 3.5,
   anadrol: 3.5, oxymetholone: 3.5, adrol: 3.5,
-  turinabol: 1.5, tbol: 1.5, trena: 1.5,
+  turinabol: 1.5, tbol: 1.5,
   superdrol: 4.0, sdrol: 4.0,
   proviron: 0.6, mesterolone: 0.6,
   halotestin: 5.0, fluoxymesterone: 5.0, halo: 5.0,
+  sarm: 0.4, ostarine: 0.3, lgd: 0.5, lgd4033: 0.5, rad140: 0.5, yk11: 0.8,
 };
 
 function resolveTequivKey(raw: string): string {
@@ -335,11 +338,13 @@ export function adaptForPEDs(
     // P2-12: previously `Number(doses[ped]) || 0` silently returned 0 for string doses
     // like "500mg" (NaN → 0 → fallback to base multiplier, losing dose-aware precision).
     // P0-2: unified parser via parseDose() — handles "500mg", "1,5г", numbers.
-    const dose = parseDose(doses[ped]);
-    // Dose-aware множитель: если доза ЯВНО передана (даже 0) — интерполяция по кривой.
-    // interpolateDose(ped, 0) = {1, 1} (нет эффекта при нулевой дозе).
-    // Если pedDoses не передан (undefined) или ped отсутствует в doses — fallback на базу.
-    const doseProvided = ped in doses;
+    // Если агрегированный ключ 'AAS' не задан явно, но в pedDoses переданы
+    // отдельные вещества (test_e/tren_ace/deca...), берём их T-equiv как дозу AAS.
+    const rawDose = ped === 'AAS' && !('AAS' in doses)
+      ? computeAASEquivDose(doses)
+      : parseDose(doses[ped]);
+    const dose = rawDose;
+    const doseProvided = (ped in doses) || (ped === 'AAS' && rawDose > 0);
     let doseMrv: number, doseRec: number;
     if (doseProvided && PED_DOSE_CURVES[ped]) {
       const interp = interpolateDose(ped, dose);
@@ -413,6 +418,9 @@ export function adaptForPEDs(
     risks.push('ААС: контроль гематокрита, эстрадиола, липидов, оси HPTA.');
     if (aasTEquiv >= 1500) risks.push(`⚠ Высокая доза ААС (${aasDose} мг/нед, T-equiv ${aasTEquiv}): риск эритроцитоза (HCT>54), гипертонии, дислипидемии. Сократить объём при росте АД/усталости.`);
   }
+  if (activePEDs.length > 0) {
+    rationale.push('ⓘ Оценки MRV/T-equiv ориентировочные (harm-reduction модель, не медназначение) — корректируйте объём по восстановлению и анализам.');
+  }
 
   return {
     activePEDs, pedDoses: doses, courseIntensity: intensity,
@@ -420,6 +428,50 @@ export function adaptForPEDs(
     combinedRecoveryMultiplier: recMult, periWorkoutCarbs: carbs, adjustedMrv,
     perPED, rationale, risks,
   };
+}
+
+export interface FemalePedSafetyResult {
+  virilizationRisk: 'none' | 'moderate' | 'high';
+  teqMgPerWeek: number;
+  warnings: string[];
+  redFlags: string[];
+  /** Множитель капа MRV для женского курса (дозы у женщин кратно ниже мужских). */
+  mrvScale: number;
+}
+
+/** Female PED Safety Layer: оценка риска вирилизации, красных флагов и адекватности MRV. */
+export function assessFemalePedSafety(input: {
+  sex?: string;
+  peds?: string[];
+  pedDoses?: Record<string, number>;
+}): FemalePedSafetyResult {
+  if (input.sex !== 'female') {
+    return { virilizationRisk: 'none', teqMgPerWeek: 0, warnings: [], redFlags: [], mrvScale: 1 };
+  }
+  const peds = (input.peds || []).map((x) => String(x).toLowerCase());
+  const doses = input.pedDoses || {};
+  const teq = computeAASEquivDose(doses);
+  const warnings: string[] = [];
+  const redFlags: string[] = [];
+  const hasHighAndro = peds.some((p) => /tren|test|mast|drost|stan|winstrol|dbol|methan|anadrol|superdrol|halo|deca|nandro|npp/.test(p))
+    || Object.entries(doses).some(([k, v]) => parseDose(v) > 0 && /tren|test|mast|drost|stan|winstrol|dbol|methan|anadrol|superdrol|halo|deca|nandro|npp/i.test(k));
+  const hasMildFemaleOral = peds.some((p) => /oxan|anavar|prim|aas/.test(p)) || teq > 0;
+
+  let risk: FemalePedSafetyResult['virilizationRisk'] = 'none';
+  if (hasHighAndro || teq >= 50) {
+    risk = 'high';
+    warnings.push(`⚠ Женский профиль: высокий риск вирилизации (${teq > 0 ? `~${teq} мг T-equiv/нед, ` : ''}высокоандрогенный профиль). Безопасные женские протоколы не используют мужские дозировки и стероиды с высоким АИ.`);
+  } else if (hasMildFemaleOral) {
+    risk = 'moderate';
+    warnings.push('⚠ Женский профиль: даже мягкие средства (оксандролон/примоболан) несут дозо- и длительностно-зависимый риск вирилизации. Не применять мужские дозы.');
+  }
+
+  if (risk !== 'none') {
+    redFlags.push('🚨 Стоп-сигналы вирилизации: огрубение/охриплость голоса, гипертрофия клитора, быстрое оволосение лица/тела, стойкая аменорея — повод немедленно прекратить приём и обратиться к эндокринологу.');
+  }
+
+  const mrvScale = risk === 'none' ? 1 : risk === 'high' ? 0.85 : 0.78;
+  return { virilizationRisk: risk, teqMgPerWeek: teq, warnings, redFlags, mrvScale };
 }
 
 /** Описание для UI. */

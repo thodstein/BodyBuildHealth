@@ -6,6 +6,7 @@
  * показывает оценку качества и позволяет скопировать/распечатать.
  */
 import React, { useMemo, useState } from 'react';
+import { copyOrShareText, printHtmlApk } from '../../../core/apk-share';
 import {
   validatePlanQuality,
   manualToQualityInput,
@@ -17,24 +18,24 @@ import type { ManualResult, ManualDay } from './program-types';
 import { GROUP_RU, LEVELS, GOALS } from './program-types';
 import { ruCount, RU_SETS } from '../../../engines/ru-plural';
 
-const ACCENT = '#00e68a';
-const DIM = '#fff';
+const ACCENT = 'var(--accent, #00e68a)';
+const DIM = 'var(--text, #fff)';
 const CARD: React.CSSProperties = {
-  background: 'rgba(24,24,27,0.5)',
+  background: 'var(--card-bg, rgba(24,24,27,0.5))',
   borderRadius: 12,
   padding: 12,
-  border: '1px solid rgba(255,255,255,0.05)',
+  border: '1px solid var(--border, rgba(255,255,255,0.08))',
 };
 const BTN: React.CSSProperties = {
   padding: '10px 14px',
-  background: 'linear-gradient(135deg,#00e68a,#00c853)',
-  color: '#000',
+  background: 'var(--accent-gradient, linear-gradient(135deg,#00e68a,#00c853))',
+  color: 'var(--accent-contrast, #000)',
   border: 'none',
   borderRadius: 8,
   cursor: 'pointer',
   fontWeight: 800,
   fontSize: 12,
-  minHeight: 40,
+  minHeight: 44,
 };
 const BTN_GHOST: React.CSSProperties = {
   ...BTN,
@@ -133,20 +134,27 @@ function generateExportText(
       }
       lines.push('');
     }
-  } else if (bbPlan) {
-    const week1 = bbPlan.weeks[0];
-    if (week1) {
-      for (let si = 0; si < week1.sessions.length; si++) {
-        const sess = week1.sessions[si];
+  } else if (bbPlan && Array.isArray(bbPlan.weeks)) {
+    for (let wi = 0; wi < bbPlan.weeks.length; wi++) {
+      const wk: any = bbPlan.weeks[wi];
+      const wkNum = wk.week ?? wi + 1;
+      const wkFlags = [wk.phase, wk.deload ? 'разгрузка' : ''].filter(Boolean).join(', ');
+      lines.push(`── НЕДЕЛЯ ${wkNum}${wkFlags ? ` (${wkFlags})` : ''} ──`);
+      for (let si = 0; si < (wk.sessions || []).length; si++) {
+        const sess = wk.sessions[si];
         const tag = (sess as any).sessionTag || '';
-        lines.push(`  Сессия ${si + 1} (${tag}):`);
-        for (const ex of sess.exercises) {
+        lines.push(`  Сессия ${si + 1}${tag ? ` (${tag})` : ''}:`);
+        for (const ex of (sess.exercises || [])) {
+          if ((ex as any).warmupActivator) continue;
           const ws = (ex as any).workSets;
           const weight = ws && ws.length > 0 ? ws[0].weight : 0;
           const reps = ws && ws.length > 0 ? ws[0].reps : 10;
           const rir = (ex as any).rir ?? 2;
+          const rest = (ex as any).restSeconds;
+          const tempo = (ex as any).tempoSpec;
           const wStr = weight > 0 ? ` @ ${weight} кг` : '';
-          lines.push(`    ${ex.name}: ${ex.sets}×${reps} RIR${rir}${wStr}`);
+          const metaStr = [tempo ? `темп ${tempo}` : '', rest ? `отдых ${rest}с` : ''].filter(Boolean).join(', ');
+          lines.push(`    ${ex.name}: ${ex.sets}×${reps} RIR${rir}${wStr}${metaStr ? ` (${metaStr})` : ''}`);
         }
         lines.push('');
       }
@@ -172,7 +180,7 @@ function generateExportText(
     lines.push(`  ${statusIcon} ${GROUP_RU[m.muscle] || m.muscle}: ${ruCount(m.weeklySets, RU_SETS)}/нед (${m.pctOfMav}% MAV)${weakMark}`);
   }
   lines.push('');
-  lines.push(`Толкай/Тянай: ${result.metadata.pushPullRatio}`);
+  lines.push(`Толкай/Тяни: ${result.metadata.pushPullRatio}`);
   lines.push(`Разгрузка: ${result.metadata.hasDeload ? 'включена' : 'отсутствует'}`);
   lines.push(`Покрытие слабых групп: ${result.metadata.weakPointCoverage}%`);
 
@@ -271,37 +279,39 @@ export const PlanExportCard: React.FC<PlanExportCardProps> = ({
   );
 
   const handleCopy = () => {
-    navigator.clipboard.writeText(exportText).then(() => {
-      setCopied(true);
-      setTimeout(() => setCopied(false), 2000);
-    }).catch(() => {
-      // Fallback for non-HTTPS
-      const ta = document.createElement('textarea');
-      ta.value = exportText;
-      document.body.appendChild(ta);
-      ta.select();
-      document.execCommand('copy');
-      document.body.removeChild(ta);
-      setCopied(true);
-      setTimeout(() => setCopied(false), 2000);
+    void copyOrShareText(exportText, 'Тренировочный план').then(outcome => {
+      if (outcome !== 'failed') {
+        setCopied(true);
+        setTimeout(() => setCopied(false), 2000);
+      }
     });
   };
 
+  const [exportMsg, setExportMsg] = useState('');
   const handlePrint = () => {
-    const win = window.open('', '_blank');
-    if (!win) return;
     const html = exportText
       .replace(/&/g, '&amp;')
       .replace(/</g, '&lt;')
       .replace(/>/g, '&gt;')
       .replace(/═/g, '━')
       .replace(/\n/g, '<br>');
-    win.document.write(`<!DOCTYPE html><html><head><meta charset="utf-8"><title>Тренировочный план</title>
+    const docHtml = `<!DOCTYPE html><html><head><meta charset="utf-8"><title>Тренировочный план</title>
       <style>body{font-family:'SF Pro Display',-apple-system,sans-serif;background:#0a0a0a;color:#e5e5e5;padding:24px;font-size:13px;line-height:1.6;}
       @media print{body{background:#fff;color:#000;padding:12px;font-size:11px;}}</style></head>
-      <body><pre style="white-space:pre-wrap;font-family:inherit;">${html}</pre>
-      <script>setTimeout(()=>{window.print();},300);</script></body></html>`);
-    win.document.close();
+      <body><pre style="white-space:pre-wrap;font-family:inherit;">${html}</pre></body></html>`;
+    void printHtmlApk(docHtml, 'bb-training-plan.html', exportText).then(res => {
+      if (res === 'failed') setExportMsg('⚠ Не удалось открыть печать/сохранить HTML');
+      else { setExportMsg('✅ HTML для печати/PDF готов'); setTimeout(() => setExportMsg(''), 2500); }
+    });
+  };
+
+  const handleSaveTxt = () => {
+    void import('../../../core/apk-share').then(({ saveTextFileApk, shareOutcomeLabel }) =>
+      saveTextFileApk('bb-training-plan.txt', exportText, 'text/plain;charset=utf-8').then(res => {
+        setExportMsg(res === 'failed' ? '⚠ Не удалось сохранить файл' : `📄 bb-training-plan.txt (${shareOutcomeLabel(res)})`);
+        setTimeout(() => setExportMsg(''), 2800);
+      })
+    );
   };
 
   const scoreColor = qualityResult.score >= 85 ? '#22c55e' : qualityResult.score >= 65 ? '#eab308' : qualityResult.score >= 45 ? '#f97316' : '#ef4444';
@@ -417,14 +427,18 @@ export const PlanExportCard: React.FC<PlanExportCardProps> = ({
       </div>
 
       {/* Action buttons */}
-      <div style={{ display: 'flex', gap: 8 }}>
+      <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
         <button style={{ ...BTN, flex: 1 }} onClick={handleCopy}>
           {copied ? '✓ Скопировано!' : '📋 Копировать план'}
+        </button>
+        <button style={BTN_GHOST} onClick={handleSaveTxt}>
+          📄 Файл (.txt)
         </button>
         <button style={BTN_GHOST} onClick={handlePrint}>
           🖨 PDF
         </button>
       </div>
+      {exportMsg && <div style={{ fontSize: 10.5, color: 'var(--accent, #00e68a)', marginTop: 6 }}>{exportMsg}</div>}
     </div>
   );
 };

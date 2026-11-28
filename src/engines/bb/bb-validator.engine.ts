@@ -1,5 +1,6 @@
 import type { BBPlan, BBSession } from './bb-builder.engine';
 import { trueMuscleOf } from '../movement-pattern';
+import { normalizeEquipmentIds } from './bb-equipment';
 import { ruAdjCount, ruCount, RU_ADJ_WORKING, RU_APPROACHES, RU_EXERCISES, RU_SETS } from '../ru-plural';
 import { estimateBBSessionCost } from './bb-fatigue.engine';
 import { aggregateBBVolume, aggregateFractionalVolume, PUOS_SESSION_FRACTIONAL, BB_MRV_TOLERANCE, sessionLimitsFor as centralizedSessionLimits } from './bb-volume.engine';
@@ -195,7 +196,11 @@ function validateSession(session: BBSession, week: number, sessionIndex: number,
       if (options.methodology !== 'pre_exhaust' && !isCompoundEx(primary)) {
         issues.push({ level: 'warning', code: 'primary_not_compound', message: `${primary.name}: primary упражнение не является compound.`, week, session: sessionIndex, exercise: primary.name });
       }
-      if (options.methodology !== 'pre_exhaust' && exercises.slice(0, primaryIndex).some(exercise => exercise.role !== 'primary')) {
+      const allowAccessoryBeforePrimary = options.methodology === 'pre_exhaust'
+        || options.methodology === 'mountain_dog'
+        || options.methodology === 'fst7'
+        || options.methodology === 'hyperemia';
+      if (!allowAccessoryBeforePrimary && exercises.slice(0, primaryIndex).some(exercise => exercise.role !== 'primary')) {
         issues.push({ level: 'warning', code: 'order_primary_after_accessory', message: `Primary упражнение ${primary.name} стоит после accessory в сессии.`, week, session: sessionIndex, exercise: primary.name });
       }
     }
@@ -211,7 +216,12 @@ function validateSession(session: BBSession, week: number, sessionIndex: number,
     if (sets !== exercise.sets) {
       issues.push({ level: 'error', code: 'sets_mismatch', message: `${exercise.name}: sets=${exercise.sets}, workSets=${sets}.`, week, session: sessionIndex, exercise: exercise.name });
     }
-    if (sets > 0 && sets < 2) {
+    const isIntentionalSingleSet = Boolean(
+      (exercise as any).techniqueTag === 'widowmaker'
+      || (exercise as any).schemeId === 'dc_rp'
+      || /widowmaker|dc.?rp|rest.?pause/i.test(String(exercise.comment || '')),
+    );
+    if (sets > 0 && sets < 2 && !isIntentionalSingleSet) {
       issues.push({ level: 'warning', code: 'single_work_set', message: `${exercise.name}: только ${sets} рабочий сет.`, week, session: sessionIndex, exercise: exercise.name });
     }
     // Аудит 2026-11: атрибуция должна идти по ПОЛНОЙ каталожной записи (group/
@@ -243,9 +253,10 @@ function validateSession(session: BBSession, week: number, sessionIndex: number,
         const rawEquipment = catalog?.equipment;
         const equipment = Array.isArray(rawEquipment) ? rawEquipment.map(String) : rawEquipment ? [String(rawEquipment)] : [];
         const syntheticMuscleName = new Set(['chest', 'back', 'shoulders', 'quads', 'hamstrings', 'glutes', 'calves', 'biceps', 'triceps', 'forearms', 'abs', 'traps', 'arms', 'legs', 'core', 'lower_back']).has(exercise.name.toLowerCase());
+        const normOptEq = normalizeEquipmentIds(options.equipment!);
         if (!catalog && !syntheticMuscleName) {
           issues.push({ level: 'error', code: 'equipment_unknown_exercise', message: `${exercise.name}: упражнение отсутствует в каталоге, оборудование невозможно подтвердить.`, week, session: sessionIndex, exercise: exercise.name });
-        } else if (catalog && equipment.length > 0 && !equipment.includes('bodyweight') && !equipment.some(item => options.equipment!.includes(item))) {
+        } else if (catalog && equipment.length > 0 && !equipment.includes('bodyweight') && !equipment.some(item => normOptEq.includes(item))) {
           issues.push({ level: 'error', code: 'equipment_restriction_violation', message: `${exercise.name}: оборудование не входит в доступный список.`, week, session: sessionIndex, exercise: exercise.name });
         }
       }
@@ -442,7 +453,7 @@ export function validateBBPlan(plan: BBPlan, options: BBPlanValidationOptions = 
         if (cap > 0 && values.effectiveSets > cap * tol) {
           const label = MUSCLE_LABEL_RU[muscle] || muscle;
           const suffix = isSpecTarget ? ' (цель акцента — проверьте восстановление)' : '';
-          issues.push({ level: 'warning', code: 'effective_mrv_overflow', message: `Неделя ${week.week}: ${label}: эффективных ${Math.round(values.effectiveSets * 10) / 10} > MRV ${cap}${suffix}.`, week: week.week });
+          issues.push({ level: 'warning', code: 'effective_mrv_overflow', message: `Неделя ${week.week}: ${label}: эффективных ${Math.round(values.effectiveSets * 10) / 10} > MRV ${cap}${suffix}.`, week: week.week, exercise: muscle });
         }
       }
     }
@@ -496,7 +507,7 @@ export function validateBBPlan(plan: BBPlan, options: BBPlanValidationOptions = 
     issues.push({ level: 'warning', code: 'goal_focus_mismatch', message: `Цель strength_mass + фокус ${planFocus}: для силы нужны низкие повторы (6-10/3-6), смените фокус на «сила».`, exercise: 'trainingFocus' });
   }
   if (planGoal === 'cut' && planFocus === 'strength' && plan.weeks.length > 6) {
-    issues.push({ level: 'warning', code: 'goal_focus_mismatch', message: `Сушка + силовой фокус (низкие повторы) на ${plan.weeks} нед — риск потери мышц, предпочтителен hypertrophy фокус при дефиците.`, exercise: 'trainingFocus' });
+    issues.push({ level: 'warning', code: 'goal_focus_mismatch', message: `Сушка + силовой фокус (низкие повторы) на ${plan.weeks.length} нед — риск потери мышц, предпочтителен hypertrophy фокус при дефиците.`, exercise: 'trainingFocus' });
   }
   if (plan.volumeTargets) {
     for (const [muscle, target] of Object.entries(plan.volumeTargets)) {

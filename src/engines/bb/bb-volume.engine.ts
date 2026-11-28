@@ -25,6 +25,31 @@ const ALIASES: Record<string, string> = {
   arms: 'arms',
   legs: 'legs',
   core: 'abs',
+  // Русские лейблы из muscleLabel() / he_workout_log_v2 — чинит замкнутый контур
+  // Дневник → Диагностика/Симметрия/SessionPlayer для новых и исторических записей.
+  'грудь': 'chest',
+  'спина': 'back',
+  'ноги': 'legs',
+  'квадрицепсы': 'quads',
+  'квадры': 'quads',
+  'бицепс бедра': 'hamstrings',
+  'задняя поверхность бедра': 'hamstrings',
+  'ягодицы': 'glutes',
+  'плечи': 'shoulders',
+  'дельты': 'shoulders',
+  'передняя дельта': 'delt_front',
+  'средняя дельта': 'delt_mid',
+  'задняя дельта': 'delt_rear',
+  'бицепс': 'biceps',
+  'трицепс': 'triceps',
+  'предплечья': 'forearms',
+  'трапеции': 'traps',
+  'икры': 'calves',
+  'пресс': 'abs',
+  'пресс / кор': 'abs',
+  'кор': 'abs',
+  'шея': 'neck',
+  'руки': 'arms',
 };
 
 export function normalizeBBMuscle(muscle: string | null | undefined): string {
@@ -143,8 +168,10 @@ export function computeBBRecoveryScore(input: {
       const ratio = (input.hrvMs as number) / (input.hrvBaseline as number);
       if (ratio <= 0.8) score -= 20;
       else if (ratio <= 0.9) score -= 10;
-    } else if ((input.hrvMs as number) > 70) score += 5;
-    else if ((input.hrvMs as number) < 50) score -= 12;
+      else if (ratio >= 1.1) score += 5;
+    }
+    // P2: без индивидуального hrvBaseline абсолютные пороги (>70 / <50 мс) не применяются —
+    // норма HRV строго индивидуальна (20–120+ мс).
   }
   if (Number.isFinite(input.sleepHours)) {
     const s = input.sleepHours as number;
@@ -192,10 +219,18 @@ export function computeBBWeeklyBudget(input: {
   calorieSurplus?: number;
   proteinPerKg?: number;
   labMrvMultiplier?: number;
+  doseAwareMrv?: number;
+  sex?: 'male' | 'female';
   /** Явный режим объёма (приоритет выше пересчёта по списку препаратов). */
   volumeRegime?: VolumeRegime;
 }): number {
-  const regime = computeRegimeMrvMult(input);
+  let regime = input.doseAwareMrv != null && Number.isFinite(input.doseAwareMrv) && input.doseAwareMrv > 0
+    ? computeMrvMult(input)
+    : computeRegimeMrvMult(input);
+  // Женский физиологический потолок объёма на курсе: женские дозы/переносимость не дают мужских 224 сетов.
+  if (input.sex === 'female' && regime > 1) {
+    regime = Math.min(regime, 1.55);
+  }
   // База: натурал ~112, пептиды — по своей кривой (112 × 1.13–1.24), курс ~220 (× ~2).
   // Вторичные/игнор-мышцы вне этого бюджета.
   const base = Math.round(112 * Math.max(1.0, regime));
@@ -222,6 +257,8 @@ export function sessionLimitsFor(
     calorieSurplus?: number;
     proteinPerKg?: number;
     labMrvMultiplier?: number;
+    doseAwareMrv?: number;
+    sex?: 'male' | 'female';
     level?: string;
     trainingYears?: number;
     trainingVolumeMode?: 'standard' | 'high';

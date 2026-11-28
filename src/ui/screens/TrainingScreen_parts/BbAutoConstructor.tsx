@@ -15,11 +15,13 @@
  */
 import React, { useCallback, useEffect, useMemo, useState, useRef } from 'react';
 import { useDataLink } from '../../../core/data-link';
+import { printHtmlApk, saveCsvApk, saveTextFileApk, shareOutcomeLabel } from '../../../core/apk-share';
+import { saveNativeJsonBackup, loadNativeJsonBackup } from '../../../core/native-bridge';
 import { EXERCISE_CATALOG, getExerciseById } from '../../../core/exercise-catalog';
 import { SubstitutionPopup } from './SubstitutionPopup';
 import { SPLIT_PATTERNS } from '../../../engines/bb/bb-split-patterns';
 import { rankBBSplits, splitFitWarnings } from '../../../engines/bb/bb-selector.engine';
-import { applyMacrocycleToBBPlan, type BBPlan } from '../../../engines/bb/bb-builder.engine';
+import { applyMacrocycleToBBPlan, sanitizePedDosesForInput, type BBPlan } from '../../../engines/bb/bb-builder.engine';
 import { buildBBPlanAsync, prewarmBBWorker, replanBBMesoAsync, buildPrepCycleAsync, buildPrepSeasonAsync } from '../../../engines/bb/bb-build-async';
 import { autoCalibrateFromStored, type PlanWeightEntry } from '../../../engines/bb/bb-weight-calibration.engine';
 import type { DUPMode } from '../../../engines/bb/bb-dup.engine';
@@ -60,7 +62,8 @@ import { PopupNumber } from '../SRCBBScreen_parts/TrainingPopups';
 import type { InjurySelectEntry } from './InjurySelectCard';
 import { DELOAD_PROTOCOLS, type LoadStrategy, type DeloadType, type IntensityTechnique } from '../../../engines/bb/bb-autocoach.engine';
 import type { SessionMethodology } from '../../../engines/bb/bb-session-order.engine';
-import { labTrainingAdjust } from './lab-training-adjust';
+import { labTrainingAdjust, type SerumLabTrainingSignals } from './lab-training-adjust';
+import { deriveBBPedFromPharma } from '../../../engines/bb/bb-course-sync';
 import { getCycleById, normalizeCycleDirection, getCyclesByDirection } from '../../../data/lms-cycles/lms-cycle-index';
 import { cycleTemplateToFullProgram } from '../../../engines/bb/cycle-to-plan';
 import { programToBBPlanAsync } from '../../../engines/bb/bb-build-async';
@@ -72,7 +75,7 @@ import { WOMENS_PROGRAMS, CUSTOM_PROGRAMS } from './programs-data';
 import { useOriginalPrograms } from './useOriginalPrograms';
 
 import { PlanExportCard } from './PlanExportCard';
-import { loadSavedBBPlans, saveBBPlanVariant, deleteBBPlanVariant, type SavedBBPlan } from './bb-plans-store';
+import { loadSavedBBPlans, saveBBPlanVariant, deleteBBPlanVariant, renameBBPlanVariant, getLastBBPlansStoreError, type SavedBBPlan } from './bb-plans-store';
 import { bbPlanSaveBlockReason } from './bb-plan-save-guard';
 import { deserializeBBPrepConfig, isoAddDays, isoToday, CATEGORY_PROFILES, buildBBContestPrepPlan, applyContestPrepToBBPlan, extendBBPlanPreparation, shrinkBBPlanPreparation, addPrepWeeks, shiftBBContestPrepShowDate, prepPhaseForDate, configFromPlan, computeReadiness, spillRiskScore, isShortCycle, saveTestPeakWeekResult, latestTestPeakWeek, planFromStored, prepWeightAdvice, syncPrepDietBreaksWithPlan, recommendBBTaperConfig, sRPEAdjustment, loadShowChecklist, type BBTaperRecommendation, buildContestPrepPrintHtml, recordPrepAdjustment, buildPrepIcs, buildPrepCoachJson, prepTrainingCompliance, buildPrepWeeklyReportHtml, buildPrepCheckinsCsv, trialCarbDoseGPerKg, type BBContestPrepConfig, type BBContestCategory, type ContestSpecialization, type BBContestPrepPlan, type BBPlanWithPrep, type ContestEventEntry, type WaterStrategy, type SodiumStrategy, type CarbLoadStrategy } from '../../../engines/bb/bb-contest-prep.engine';
 import { CONTEST_PREP_UPDATED_EVENT, migrateLegacyContestPrepIfNeeded, storeContestPrepPlan } from '../../../engines/bb/bb-contest-prep-sync';
@@ -132,8 +135,21 @@ export const BbAutoConstructor: React.FC = () => {
   // Профиль перечитываем при обновлении linked.profile: иначе травмы/оборудование,
   // изменённые в другом экране, не доходили до конструктора (мемо было []).
   const prof = useMemo(() => loadTrainingProfile(), [linked.profile]);
-  // P0-5: лабораторная коррекция MRV (ALT/CRP/HCT/гормоны/почки → снижение объёма).
-  const labAdjust = useMemo(() => labTrainingAdjust(linked.labAnalysis ?? null), [linked.labAnalysis]);
+  // P0-5 + Wave 5: лабораторная коррекция MRV с сывороточными порогами (HCT/ферритин/глюкоза/Na/K/E2).
+  const serumLabSignals = useMemo<SerumLabTrainingSignals>(() => {
+    const labs = (linked.profile?.settings as any)?.labs || {};
+    const numOrNull = (v: unknown) => { const n = Number(v); return Number.isFinite(n) && n > 0 ? n : null; };
+    return {
+      hematocritPct: numOrNull(labs.hematocrit ?? labs.hct),
+      ferritinNgMl: numOrNull(labs.ferritin),
+      glucoseMmol: numOrNull(labs.glucose),
+      homaIr: numOrNull(labs.homaIr ?? labs.homa_ir),
+      sodiumMmol: numOrNull(labs.sodium ?? labs.na),
+      potassiumMmol: numOrNull(labs.potassium ?? labs.k),
+      estradiolPgMl: numOrNull(labs.estradiol ?? labs.e2),
+    };
+  }, [linked.profile]);
+  const labAdjust = useMemo(() => labTrainingAdjust(linked.labAnalysis ?? null, serumLabSignals), [linked.labAnalysis, serumLabSignals]);
 
   const [step, setStep] = useState<Step>('params');
   const [bbLevel, setBbLevel] = useState<string>(prof.level || 'intermediate');
@@ -178,6 +194,28 @@ export const BbAutoConstructor: React.FC = () => {
     setPrepSplit(p.recommendedSplits[0] || '');
     setPrepResult(null);
   }, [prepCat]);
+  // P1-25: восстановление преференсов Prep-цикла при монтировании (раньше только писались в he_prep_cycle_v1).
+  const prepHydratedRef = useRef(false);
+  useEffect(() => {
+    if (prepHydratedRef.current) return;
+    prepHydratedRef.current = true;
+    try {
+      const raw = localStorage.getItem('he_prep_cycle_v1');
+      if (!raw) return;
+      const saved = JSON.parse(raw);
+      if (saved.cat && PREP_SPLIT_PROFILES[saved.cat as BBContestCategory]) setPrepCat(saved.cat);
+      if (Number.isFinite(Number(saved.weeks)) && saved.weeks >= 4 && saved.weeks <= 26) setPcWeeks(saved.weeks);
+      if (Number.isFinite(Number(saved.taper)) && saved.taper >= 1 && saved.taper <= 4) setPrepTaper(saved.taper);
+      if (typeof saved.showDate === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(saved.showDate)) setPcShowDate(saved.showDate);
+      if (Array.isArray(saved.accent)) setPrepAccent(saved.accent);
+      if (Array.isArray(saved.minimal)) setPrepMinimal(saved.minimal);
+      if (saved.minMode) setPrepMinMode(saved.minMode);
+      if (typeof saved.split === 'string') setPrepSplit(saved.split);
+      if (saved.bodyFat != null && Number.isFinite(Number(saved.bodyFat))) setPrepBodyFat(Number(saved.bodyFat));
+      if (Array.isArray(saved.comps)) setPrepComps(saved.comps);
+      if (typeof saved.mainId === 'string') setPrepMainId(saved.mainId);
+    } catch { /* silent */ }
+  }, []);
   // Сохранение преференсов Prep-цикла (авто-восстановление).
   useEffect(() => {
     if (!prepMode) return;
@@ -350,24 +388,53 @@ const [bbVolumeWave, setBbVolumeWave] = useState(false);
   const [intensityLevel, setIntensityLevel] = useState<'light' | 'moderate' | 'high'>('moderate');
 
   const [peds, setPeds] = useState<PED[]>((prof.bbPeds?.length ? prof.bbPeds : (prof.onCourse ? ['AAS'] : [])) as PED[]);
+  const [autoSyncCourse, setAutoSyncCourse] = useState<boolean>(true);
   // Возрастной PED-гейт: до 18 лет курс не применяется даже если он был в профиле.
   const profileAge = Number(linked.profile?.settings?.personal?.age) || 0;
   const isMinorProfile = profileAge > 0 && profileAge < 18;
+  const courseSync = useMemo(() => {
+    const ph = (linked.profile?.settings as any)?.pharma;
+    return deriveBBPedFromPharma({
+      phase: ph?.phase,
+      onCourse: ph?.onCourse,
+      substances: ph?.substances,
+      age: profileAge,
+    });
+  }, [linked.profile, profileAge]);
   useEffect(() => {
     if (isMinorProfile && peds.length > 0) setPeds([]);
   }, [isMinorProfile, peds.length]);
-  const effectivePeds = useMemo<PED[]>(() => (isMinorProfile ? [] : peds), [isMinorProfile, peds]);
+  const effectivePeds = useMemo<PED[]>(() => {
+    if (isMinorProfile) return [];
+    if (autoSyncCourse && courseSync.hasActiveCourse) return courseSync.peds;
+    return peds;
+  }, [isMinorProfile, autoSyncCourse, courseSync, peds]);
   const [pedDoses, setPedDoses] = useState<Record<string, number>>({
     AAS: 500, insulin: 10, MGF: 200, IGF1: 50, GH: 4,
     ...(prof.pedDoses || {}),
   });
   const [courseIntensity, setCourseIntensity] = useState<'mild' | 'moderate' | 'heavy'>(prof.courseIntensity || 'moderate');
+  const effectiveCourseIntensity = (autoSyncCourse && courseSync.hasActiveCourse) ? courseSync.courseIntensity : courseIntensity;
+  const activePedPhase = (autoSyncCourse && courseSync.hasActiveCourse) ? courseSync.phase : undefined;
   // Проход 17: режим объёма — одно правило (`bb-ped-profile`), а не «список непуст».
   // Пептиды (MGF/IGF-1): свой MRV-тир и капы по уровню, а не курс 52/15.
   // Явный «на курсе» из профиля — только когда препаратов нет в списке.
   const explicitOnCourse = useMemo(
-    () => explicitOnCourseFor({ onCourse: prof.onCourse, bbPeds: effectivePeds }),
-    [prof.onCourse, effectivePeds],
+    () => (autoSyncCourse && courseSync.hasActiveCourse)
+      ? courseSync.onCourse
+      : explicitOnCourseFor({ onCourse: prof.onCourse, bbPeds: effectivePeds }),
+    [autoSyncCourse, courseSync, prof.onCourse, effectivePeds],
+  );
+  // P0-1: отфильтрованные дозы PED — натуралам и <18 всегда {}, стеку ['AAS'] — без GH/insulin/MGF/IGF1.
+  const effectivePedDoses = useMemo<Record<string, number>>(
+    () => {
+      if (isMinorProfile) return {};
+      if (autoSyncCourse && courseSync.hasActiveCourse) {
+        return sanitizePedDosesForInput({ peds: courseSync.peds, pedDoses: courseSync.pedDoses, onCourse: courseSync.onCourse, age: profileAge }) ?? {};
+      }
+      return sanitizePedDosesForInput({ peds: effectivePeds, pedDoses, onCourse: explicitOnCourse, age: profileAge }) ?? {};
+    },
+    [isMinorProfile, autoSyncCourse, courseSync, effectivePeds, pedDoses, explicitOnCourse, profileAge],
   );
   const bbVolumeRegime = useMemo<VolumeRegime>(
     () => volumeRegimeOf({ peds: effectivePeds, onCourse: explicitOnCourse }),
@@ -495,8 +562,18 @@ const [bbVolumeWave, setBbVolumeWave] = useState(false);
   const wearableData = useMemo(() => { try { const raw = localStorage.getItem('he_wearable_daily'); return raw ? JSON.parse(raw) : null; } catch { return null; } }, [wearableTick]);
   // P1: VBT — ввод скорости лучшего/последнего повтора для рекомендации нагрузки.
   const [vbtInput, setVbtInput] = useState<{ lift: string; best: string; last: string }>({ lift: 'bench', best: '', last: '' });
-  // PRO: mobility restrictions — biomechanics-based exercise filtering
+  // PRO: mobility restrictions — biomechanics-based exercise filtering (живая подписка на profile-updated из Диагностики)
   const [mobilityRestrictions, setMobilityRestrictions] = useState<string[]>(prof.mobilityRestrictions || []);
+  useEffect(() => {
+    const syncMob = () => {
+      try {
+        const fresh = loadTrainingProfile();
+        if (Array.isArray(fresh.mobilityRestrictions)) setMobilityRestrictions(fresh.mobilityRestrictions);
+      } catch { /* ignore */ }
+    };
+    window.addEventListener('profile-updated', syncMob);
+    return () => window.removeEventListener('profile-updated', syncMob);
+  }, []);
 
   const [selectedSplitId, setSelectedSplitId] = useState<string>('');
   // Пользователь трогал сплит вручную → авто-рекомендация больше не перезаписывает выбор.
@@ -570,20 +647,25 @@ const [bbVolumeWave, setBbVolumeWave] = useState(false);
   const [bbSource, setBbSource] = useState<'cycle' | 'program'>('program');
   const [selectedProgramId, setSelectedProgramId] = useState<string | null>(null);
   const [bridgeMsg, setBridgeMsg] = useState('');
-  // C4: flash helper — заменяет alert() для некритичных уведомлений.
-  const flash = useCallback((m: string) => { setBridgeMsg(m); setTimeout(() => setBridgeMsg(''), 4000); }, []);
+  const flashTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  // C4: flash helper — заменяет alert() для некритичных уведомлений; чистит прошлый таймер.
+  const flash = useCallback((m: string) => {
+    setBridgeMsg(m);
+    if (flashTimerRef.current) clearTimeout(flashTimerRef.current);
+    flashTimerRef.current = setTimeout(() => { setBridgeMsg(''); flashTimerRef.current = null; }, 4000);
+  }, []);
   // P1.6: авто-выбор методики порядка по PED-стеку — применяем ТОЛЬКО поверх
   // дефолта (ручной выбор не затираем). Чип ручного применения — в PED-карте.
   useEffect(() => {
     try {
       if (bbMethodology !== 'compound_first') return;
-      const sug = suggestMethodologyForStack({ peds: effectivePeds as any, pedDoses });
+      const sug = suggestMethodologyForStack({ peds: effectivePeds as any, pedDoses: effectivePedDoses });
       if (sug) {
         setBbMethodology(sug);
         flash('Методика порядка обновлена под PED-стек');
       }
     } catch { /* suggest не должен ломать UI */ }
-  }, [effectivePeds, pedDoses]);
+  }, [effectivePeds, effectivePedDoses]);
   // Имя для сохранения (модалка вместо prompt — prompt не работает в Telegram Mini App).
   const [namePrompt, setNamePrompt] = useState<{ title: string; value: string; onOk: (name: string) => void } | null>(null);
   const confirmName = () => {
@@ -600,8 +682,28 @@ const [bbVolumeWave, setBbVolumeWave] = useState(false);
   // Фаза 4.27: по-недельный дифф текущего плана против выбранного варианта.
   const [diffVariantId, setDiffVariantId] = useState<string | null>(null);
   const diffPlan = diffVariantId ? savedPlans.find(v => v.id === diffVariantId)?.plan : null;
-  // Фаза 4.23: дата старта мезоцикла → календарные диапазоны недель + «📍 текущая неделя».
-  const [startDateInput, setStartDateInput] = useState<string>(() => { try { return localIsoDate(); } catch { return ''; } });
+  // Фаза 4.23 + Wave 6: дата старта мезоцикла — персистится в planStartWeek и he_pl_runtime при сдвиге ±1д/±1н.
+  const [startDateInput, setStartDateInput] = useState<string>(() => {
+    try {
+      const saved = localStorage.getItem('he_bb_start_date');
+      if (saved && /^\d{4}-\d{2}-\d{2}$/.test(saved)) return saved;
+      return localIsoDate();
+    } catch { return ''; }
+  });
+  useEffect(() => {
+    if (!startDateInput || !/^\d{4}-\d{2}-\d{2}$/.test(startDateInput)) return;
+    try { localStorage.setItem('he_bb_start_date', startDateInput); } catch { /* ignore */ }
+    setBuiltPlan(prev => (prev && prev.planStartWeek !== startDateInput ? { ...prev, planStartWeek: startDateInput } : prev));
+    try {
+      const rawRt = localStorage.getItem('he_pl_runtime');
+      if (rawRt) {
+        const rt = JSON.parse(rawRt);
+        if (rt && rt.source === 'bb_auto' && rt.startDate !== startDateInput) {
+          localStorage.setItem('he_pl_runtime', JSON.stringify({ ...rt, startDate: startDateInput }));
+        }
+      }
+    } catch { /* ignore */ }
+  }, [startDateInput]);
   /**
    * Якорь выполнения плана (`he_pl_runtime.startDate`) — выбранная здесь дата
    * старта мезоцикла: от неё же считаются недели, ICS и печать. Момент клика
@@ -821,7 +923,12 @@ const [bbVolumeWave, setBbVolumeWave] = useState(false);
       competitions: prepCompetitions,
       mainCompetitionId: prepMainCompetitionId,
       schedule: { wake: '07:00', stage: '12:00' },
-      pedContext: effectivePeds.length>0 ? { ghIU: (pedDoses.GH ?? pedDoses.gh ?? 0) || undefined, trenMg: (pedDoses.tren ?? pedDoses.trenbolone ?? 0) || undefined, insulinIU: (pedDoses.insulin ?? 0) || undefined, diuretic: false } : undefined,
+      pedContext: effectivePeds.length > 0 ? {
+        ghIU: (effectivePedDoses.GH ?? effectivePedDoses.gh ?? 0) || undefined,
+        trenMg: (effectivePedDoses.tren ?? effectivePedDoses.trenbolone ?? 0) || undefined,
+        insulinIU: (effectivePedDoses.insulin ?? 0) || undefined,
+        diuretic: false,
+      } : undefined,
     };
     return base;
   };
@@ -1055,8 +1162,6 @@ const [bbVolumeWave, setBbVolumeWave] = useState(false);
             loadSessions().map(s => ({ date: s.date, totalSets: s.totalSets })),
           )
         : undefined;
-      const win = window.open('', '_blank', 'width=900,height=700');
-      if (!win) { flash('Браузер заблокировал окно печати — разрешите всплывающие окна'); return; }
       // PRO-4: монитор пик-недели + экстренная карточка — в печатную сводку (тренеру/на шоу).
       let monitorLines: string[] | undefined;
       try {
@@ -1074,42 +1179,30 @@ const [bbVolumeWave, setBbVolumeWave] = useState(false);
           ];
         }
       } catch { /* нет стора — без секции */ }
-      win.document.write(buildContestPrepPrintHtml(prepPlan, { compliance, postShowLog: getPostShowLog(prepPlan.id), monitor: monitorLines, emergency: emergencyLines() }));
-      win.document.close();
-      win.focus();
-      setTimeout(() => { try { win.print(); } catch { /* ignore */ } }, 300);
+      const html = buildContestPrepPrintHtml(prepPlan, { compliance, postShowLog: getPostShowLog(prepPlan.id), monitor: monitorLines, emergency: emergencyLines() });
+      void printHtmlApk(html, `contest-prep-${prepPlan.showDate}.html`).then(res => {
+        if (res === 'failed') flash('Не удалось открыть окно печати — разрешите всплывающие окна');
+      });
     } catch (e) {
       flash(`Не удалось открыть сводку: ${(e as Error).message}`);
     }
   };
 
-  /** 📅 Скачать .ics с фазами contest prep. */
+  /** 📅 Скачать .ics с фазами contest prep (APK-safe). */
   const handleExportPrepIcs = () => {
     if (!prepPlan) return;
     try {
-      const blob = new Blob([buildPrepIcs(prepPlan)], { type: 'text/calendar;charset=utf-8' });
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement('a');
-      a.href = url;
-      a.download = `contest-prep-${prepPlan.showDate}.ics`;
-      a.click();
-      setTimeout(() => URL.revokeObjectURL(url), 2000);
+      void saveTextFileApk(`contest-prep-${prepPlan.showDate}.ics`, buildPrepIcs(prepPlan), 'text/calendar;charset=utf-8');
     } catch (e) {
       flash(`Не удалось создать календарь: ${(e as Error).message}`);
     }
   };
 
-  /** 📥 JSON-снапшот плана для тренера. */
+  /** 📥 JSON-снапшот плана для тренера (APK-safe). */
   const handleExportPrepJson = () => {
     if (!prepPlan) return;
     try {
-      const blob = new Blob([buildPrepCoachJson(prepPlan, { postShowLog: getPostShowLog(prepPlan.id) })], { type: 'application/json;charset=utf-8' });
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement('a');
-      a.href = url;
-      a.download = `contest-prep-${prepPlan.showDate}.json`;
-      a.click();
-      setTimeout(() => URL.revokeObjectURL(url), 2000);
+      void saveTextFileApk(`contest-prep-${prepPlan.showDate}.json`, buildPrepCoachJson(prepPlan, { postShowLog: getPostShowLog(prepPlan.id) }), 'application/json;charset=utf-8');
     } catch (e) {
       flash(`Не удалось экспортировать: ${(e as Error).message}`);
     }
@@ -1129,13 +1222,7 @@ const [bbVolumeWave, setBbVolumeWave] = useState(false);
     const input = prepReportInput();
     if (!input) return;
     try {
-      const blob = new Blob([buildPrepWeeklyReportHtml(prepPlan, input)], { type: 'text/html;charset=utf-8' });
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement('a');
-      a.href = url;
-      a.download = `contest-prep-report-${prepPlan.showDate}.html`;
-      a.click();
-      setTimeout(() => URL.revokeObjectURL(url), 2000);
+      void saveTextFileApk(`contest-prep-report-${prepPlan.showDate}.html`, buildPrepWeeklyReportHtml(prepPlan, input), 'text/html;charset=utf-8');
     } catch (e) {
       flash(`Не удалось экспортировать отчёт: ${(e as Error).message}`);
     }
@@ -1145,13 +1232,7 @@ const [bbVolumeWave, setBbVolumeWave] = useState(false);
     const input = prepReportInput();
     if (!input) return;
     try {
-      const blob = new Blob([buildPrepCheckinsCsv(input.checkins)], { type: 'text/csv;charset=utf-8' });
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement('a');
-      a.href = url;
-      a.download = `contest-prep-checkins-${prepPlan.showDate}.csv`;
-      a.click();
-      setTimeout(() => URL.revokeObjectURL(url), 2000);
+      void saveCsvApk(`contest-prep-checkins-${prepPlan.showDate}.csv`, buildPrepCheckinsCsv(input.checkins));
     } catch (e) {
       flash(`Не удалось экспортировать CSV: ${(e as Error).message}`);
     }
@@ -1364,13 +1445,18 @@ const [bbVolumeWave, setBbVolumeWave] = useState(false);
     calorieSurplus, eccentricMult, rotationMode, intensityLevel, labMultOverride, recoveryOverride,
     rehabMuscles, avoidAxialLoadUi, fewerCompound, allowStrengthLifts, abRotation, packingV2,
     usePreviousPlan, platePreset, targetBodyFat, injuries, mobilityRestrictions, step, bbWeekSel]);
-  // Кросс-синхронизация: правки из питания (saveContestPrepEverywhere source=planner) → обновить локальные состояния без пересборки плана
+  // Кросс-синхронизация: правки/удаление из питания (saveContestPrepEverywhere / clearContestPrepEverywhere) → обновить локальные состояния из актуального профиля.
   useEffect(() => {
     const handler = () => {
       try {
-        const prof = (linked.profile?.settings ?? {}) as any;
+        const freshProfile = getProfile();
+        const prof = (freshProfile?.settings ?? {}) as any;
         const stored = planFromStored(prof?.goals?.bbContestPrepPlan, prof?.goals?.bbPeakConfig, prof?.goals, prof?.personal);
-        if (!stored) return;
+        if (!stored) {
+          setPrepPlan(null);
+          setPrepApplied(false);
+          return;
+        }
         // Не трогаем builtPlan — только мета-состояния шага contest
         setPrepPlan(prev => {
           if (prev && prev.id === stored.id && prev.updatedAt === stored.updatedAt) return prev;
@@ -1380,9 +1466,10 @@ const [bbVolumeWave, setBbVolumeWave] = useState(false);
         setPrepWeeks(stored.preparation.weeks);
         setPrepTaperWeeks(stored.taper.weeks);
         setPeakWeekCategory(stored.category);
-        setPrepWaterMode(stored.peakWeek.waterMode === 'stable' ? 'stable' : 'tapered' as WaterStrategy);
-        setPrepSodiumMode(stored.peakWeek.sodiumMode === 'stable' ? 'stable' : 'tapered' as SodiumStrategy);
-        setPrepCarbMode(stored.peakWeek.carbMode === 'conservative' ? 'back' : stored.peakWeek.carbMode === 'high' ? 'front' : 'moderate' as CarbLoadStrategy);
+        const restoredCfg = configFromPlan(stored);
+        setPrepWaterMode(restoredCfg.waterStrategy);
+        setPrepSodiumMode(restoredCfg.sodiumStrategy);
+        setPrepCarbMode(restoredCfg.carbLoadStrategy);
         if (stored.preparation.volumeMult != null) setPrepVolumeMode(stored.preparation.volumeMult);
         try {
           const raw = prof?.goals?.bbPeakConfig as string | undefined;
@@ -1404,7 +1491,6 @@ const [bbVolumeWave, setBbVolumeWave] = useState(false);
       window.removeEventListener(CONTEST_PREP_UPDATED_EVENT as any, handler);
       window.removeEventListener('he-bb-contest-prep-updated' as any, handler);
     };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
   /** Конфиг тапера для кнопки «🎭 Peak week»: профиль (goals.bbPeakConfig/legacy)
    *  с переопределением категории и специализации выбранными в UI. */
@@ -1793,10 +1879,13 @@ const [bbVolumeWave, setBbVolumeWave] = useState(false);
         // D1: явная stale-чистка L/R-канала. Маркер канала — ключ lrVerdicts в payload
         // (BB-хаб шлёт всегда; WL/SM/Arm-хабы не шлют → их мосты ничего не сносят). Новый
         // мост движения lrTopUp/returnAction НЕ шлёт — без чистки старые значения висели бы на сборках.
+        const hasActiveLr = Array.isArray((bbDiag as any).lrVerdicts) && (bbDiag as any).lrVerdicts.some((v: any) => v && v.verdict && v.verdict !== 'ok');
         if (diagExtras.clean.lrTopUp) {
-          setLrTopUp({});
-          try { localStorage.removeItem('he_bb_lr_topup'); } catch {}
-          pro2parts.push('L/R-добивка снята — канал закрыт');
+          if (!hasActiveLr) {
+            setLrTopUp({});
+            try { localStorage.removeItem('he_bb_lr_topup'); } catch {}
+            pro2parts.push('L/R-добивка снята — канал закрыт');
+          }
         }
         if (diagExtras.clean.returnAction) {
           setReturnAction(null);
@@ -1952,12 +2041,12 @@ const [bbVolumeWave, setBbVolumeWave] = useState(false);
     donorMuscles: specBlocks.flatMap(b => b.donors),
     specialization: specTargets.length > 0,
     peds: effectivePeds,
-    pedDoses,
+    pedDoses: effectivePedDoses,
     equipment: bbEquipment,
     injuries,
     mobilityRestrictions,
     preset: proPreset,
-  }), [bbLevel, bbTrainingYears, bbGoal, bbDays, weakPoints, specBlocks, specTargets, linked.profile?.settings?.personal?.sex, effectivePeds, pedDoses, bbEquipment, injuries, mobilityRestrictions, proPreset]);
+  }), [bbLevel, bbTrainingYears, bbGoal, bbDays, weakPoints, specBlocks, specTargets, linked.profile?.settings?.personal?.sex, effectivePeds, effectivePedDoses, bbEquipment, injuries, mobilityRestrictions, proPreset]);
   const bestSplit = ranked[0];
   // Авто-синхронизация сплита (аудит 2026-09): раньше once-set `selectedSplitId`
   // навсегда «прилипал» — смена числа дней/уровня/фармы оставляла неподходящий
@@ -1984,14 +2073,14 @@ const [bbVolumeWave, setBbVolumeWave] = useState(false);
     const keyChanged = splitFitKeyRef.current !== '' && splitFitKeyRef.current !== key;
     splitFitKeyRef.current = key;
     const hard = selectedSplitId
-      ? splitFitWarnings({ level: bbLevel, trainingYears: bbTrainingYears, goal: bbGoal as any, daysPerWeek: bbDays, peds: effectivePeds, pedDoses, sex }, selectedSplitId)
+      ? splitFitWarnings({ level: bbLevel, trainingYears: bbTrainingYears, goal: bbGoal as any, daysPerWeek: bbDays, peds: effectivePeds, pedDoses: effectivePedDoses, sex }, selectedSplitId)
       : [];
     const shouldSync = !selectedSplitId || (!splitTouched.current ? keyChanged : hard.length > 0);
     if (shouldSync && selectedSplitId !== bestSplit.pattern.id) {
       setSelectedSplitId(bestSplit.pattern.id);
       if (selectedSplitId) flash(`🔄 Сплит обновлён под параметры: «${bestSplit.pattern.name}»`);
     }
-  }, [bestSplit, selectedSplitId, bbDays, bbLevel, bbTrainingYears, bbGoal, effectivePeds, pedDoses, linked.profile?.settings?.personal?.sex]);
+  }, [bestSplit, selectedSplitId, bbDays, bbLevel, bbTrainingYears, bbGoal, effectivePeds, effectivePedDoses, linked.profile?.settings?.personal?.sex]);
 
   const allLandmarks = useMemo(() => getAllVolumeLandmarks(bbLevel), [bbLevel]);
   // Расчётный объём целей специализации для подсказки: цель = MAV × (1.0 + 0.1×зон)
@@ -2023,7 +2112,7 @@ const [bbVolumeWave, setBbVolumeWave] = useState(false);
   // (shoulders + delt_mid нельзя; delt_mid + delt_rear можно).
   const specChipDisabled = (targets: string[], id: string, on: boolean) =>
     !!on ? false : targets.length >= 2 || targets.some(t => isRegionConflict(t, id));
-  const pedAdapt = useMemo(() => adaptForPEDs(effectivePeds, Object.fromEntries(Object.entries(allLandmarks).map(([m, v]) => [m, v.mrv])), pedDoses, courseIntensity), [effectivePeds, allLandmarks, pedDoses, courseIntensity]);
+  const pedAdapt = useMemo(() => adaptForPEDs(effectivePeds, Object.fromEntries(Object.entries(allLandmarks).map(([m, v]) => [m, v.mrv])), effectivePedDoses, courseIntensity), [effectivePeds, allLandmarks, effectivePedDoses, courseIntensity]);
   // Аудит 2026-11 (BB-21): здесь считался «режим-множитель» (computeRegimeMrvMult),
   // но ни в карточке, ни в сборке он не использовался — мёртвый расчёт. Единственный
   // источник множителя: сам план (`mrvMultiplier`) либо `pedAdapt.combinedMrvMultiplier`
@@ -2036,6 +2125,25 @@ const [bbVolumeWave, setBbVolumeWave] = useState(false);
       return acuteChronicRatio(toDailyLoads(srpe));
     } catch { return null; }
   }, [builtPlan, allSrpeSessions]);
+  // P0-12: единый расчёт SafetyScore для UI, всех 6 гейтов сохранения/запуска и TXT-отчёта
+  // (раньше гейты передавали фейковый ACWR=1.0 и опускали сон/стресс/HRV/%жира/баланс → +20 баллов).
+  const computePlanSafety = useCallback((plan: BBPlan): PlanSafetyScore => {
+    const personal = linked.profile?.settings?.personal;
+    const lifestyle = linked.profile?.settings?.lifestyle;
+    return calculatePlanSafetyScore(plan, {
+      acwrRatio: acwrData?.ratio,
+      bodyFat: personal?.bodyFat,
+      hrvMs: lifestyle?.morningHRV,
+      sleepHours: lifestyle?.sleepHours,
+      stressLevel: lifestyle?.stressLevel,
+      injuryCount: injuries.length,
+      injuries,
+      mobilityRestrictions,
+      balanceReport: (plan as any).balanceReport || null,
+      weeklySessions: plan.weeks[0]?.sessions.length ?? 4,
+      goal: bbGoal,
+    });
+  }, [linked.profile, injuries, mobilityRestrictions, acwrData, bbGoal]);
   // Аудит 2026-10: mrvMultiplier был захардкожен 1 — на курсе (pedAdapt ×1.3-2.0)
   // шаг «План» показывал натуральные MRV-капы и ложные «перебор MRV», тогда как
   // сохранение варианта и таблица используют pedAdapt.combinedMrvMultiplier.
@@ -2084,6 +2192,16 @@ const [bbVolumeWave, setBbVolumeWave] = useState(false);
           planDate = typeof parsed.date === 'string' ? parsed.date : null;
           planWeeks = Array.isArray(parsed.plan.weeks) ? parsed.plan.weeks.length : 0;
         }
+      } else {
+        // APK-восстановление: если localStorage пуст на новом старте WebView — пробуем Directory.Data.
+        void loadNativeJsonBackup<{ plan?: BBPlan; date?: string; startDate?: string }>('bb-plan-saved-backup.json').then(bk => {
+          if (!bk?.plan?.weeks?.length || builtPlanRef.current) return;
+          setBuiltPlan(revalidateEditedPlan(bk.plan));
+          if (bk.startDate && /^\d{4}-\d{2}-\d{2}$/.test(bk.startDate)) setStartDateInput(bk.startDate);
+          try {
+            localStorage.setItem('he_bb_plan_saved', JSON.stringify({ plan: bk.plan, date: bk.date || new Date().toISOString() }));
+          } catch { /* ignore */ }
+        });
       }
       // Контекст переданного блока читаем всегда: без плана он бесполезен, а
       // оставленный в хранилище «выстрелит» через неделю (см. annualBlockCtxIsFresh).
@@ -2500,14 +2618,14 @@ const [bbVolumeWave, setBbVolumeWave] = useState(false);
   // с индикатором, потом сборка. Двойной клик режется ref-гардом.
   const buildBb = async () => {
     if (buildingRef.current) return;
+    // P1-25: проверяем валидность цели ДО сброса правок пользователя, иначе невалидный сплит/программа
+    // стирали правки предыдущего плана без сообщения.
+    if (planMode !== 'programs' && !SPLIT_PATTERNS.some(p => p.id === selectedSplitId)) {
+      flash('Выберите сплит для сборки плана');
+      return;
+    }
     buildingRef.current = true;
     setIsBuilding(true);
-    // Новая сборка — новая структура: старые позиционные правки/веса не применяем.
-    setExerciseEdits({});
-    setEditsHistory([]);
-    setRedosHistory([]);
-    setWeightEntries([]);
-    setWeightsApplied(0);
     await new Promise<void>((resolve) => {
       if (typeof requestAnimationFrame === 'function') requestAnimationFrame(() => setTimeout(resolve, 0));
       else setTimeout(resolve, 0);
@@ -2570,7 +2688,7 @@ const [bbVolumeWave, setBbVolumeWave] = useState(false);
           intensityLevel,
           equipment: bbEquipment,
           peds: effectivePeds,
-           pedDoses,
+           pedDoses: effectivePedDoses,
            // Проход 17: явный «на курсе» из профиля сильнее списка (только без списка).
            onCourse: explicitOnCourse,
            courseIntensity,
@@ -2592,9 +2710,12 @@ const [bbVolumeWave, setBbVolumeWave] = useState(false);
              sex: linked.profile?.settings?.personal?.sex,
               bodyFat: linked.profile?.settings?.personal?.bodyFat,
               leanMass: (linked.profile?.settings?.personal?.weight ?? 80) * (1 - (linked.profile?.settings?.personal?.bodyFat ?? 20) / 100),
-             hrvMs: linked.profile.settings.lifestyle.morningHRV,
-             sleepHours: linked.profile.settings.lifestyle.sleepHours,
-             stressLevel: linked.profile.settings.lifestyle.stressLevel,
+             hrvMs: linked.profile?.settings?.lifestyle?.morningHRV,
+             hrvBaseline: (linked.profile?.settings?.lifestyle as any)?.hrvBaseline ?? (linked.profile?.settings?.lifestyle as any)?.baselineHRV,
+             sleepHours: linked.profile?.settings?.lifestyle?.sleepHours,
+             stressLevel: linked.profile?.settings?.lifestyle?.stressLevel,
+             dupMode,
+             dupMuscles: dupMuscles.length ? dupMuscles : undefined,
             proteinPerKg: linked.profile?.settings?.nutrition?.proteinPerKg,
             calorieSurplus,
             eccentricMult,
@@ -2669,7 +2790,7 @@ const [bbVolumeWave, setBbVolumeWave] = useState(false);
          deloadType,
          loadStrategy,
          autoRegResult: autoRegPayload,
-          pedDoses,
+          pedDoses: effectivePedDoses,
           // Проход 17: классы препаратов — движок сам решает режим (пептиды MGF/IGF-1
           // не получают курс-тир). Без списка билдер считал курсом любую дозу.
           peds: effectivePeds,
@@ -2678,6 +2799,7 @@ const [bbVolumeWave, setBbVolumeWave] = useState(false);
           pedPhaseOverride,
           dcMode,
           equipment: bbEquipment,
+          bannedPatterns: returnAction?.bannedPatterns,
          methodology: bbMethodology,
          sex: linked.profile?.settings?.personal?.sex,
          // P0-5: лабораторная коррекция MRV (Ф4.28: ручной оверрайд приоритетнее)
@@ -2686,19 +2808,20 @@ const [bbVolumeWave, setBbVolumeWave] = useState(false);
           labIntensityNote: labAdjust.intensityNote,
           trainingFocus: bbTrainingFocus,
           recoveryMultOverride: recoveryOverride ?? undefined,
-          bodyFat: linked.profile.settings.personal.bodyFat,
-          leanMass: linked.profile.settings.personal.weight * (1 - linked.profile.settings.personal.bodyFat / 100),
-          hrvMs: linked.profile.settings.lifestyle.morningHRV,
-          sleepHours: linked.profile.settings.lifestyle.sleepHours,
-          stressLevel: linked.profile.settings.lifestyle.stressLevel,
+          bodyFat: linked.profile?.settings?.personal?.bodyFat,
+          leanMass: (linked.profile?.settings?.personal?.weight ?? 80) * (1 - (linked.profile?.settings?.personal?.bodyFat ?? 20) / 100),
+          hrvMs: linked.profile?.settings?.lifestyle?.morningHRV,
+          hrvBaseline: (linked.profile?.settings?.lifestyle as any)?.hrvBaseline ?? (linked.profile?.settings?.lifestyle as any)?.baselineHRV,
+          sleepHours: linked.profile?.settings?.lifestyle?.sleepHours,
+          stressLevel: linked.profile?.settings?.lifestyle?.stressLevel,
           proteinPerKg: linked.profile?.settings?.nutrition?.proteinPerKg,
           calorieSurplus,
           eccentricMult,
           mobilityRestrictions,
           // PRO: cross-mesocycle continuity — передаём последний сохранённый план
           previousPlan: usePreviousPlan && savedPlans.length > 0 ? savedPlans[0].plan : undefined,
-          // Tonnage progression (≥2 прошлых мезо) и cooldown-история ротации.
-          previousPlans: usePreviousPlan ? savedPlans.slice(0, 3).map(s => s.plan) : undefined,
+          // P1-23: хронологический порядок (oldest → newest) для корректного расчёта tonnageProgression
+          previousPlans: usePreviousPlan ? savedPlans.slice(0, 3).reverse().map(s => s.plan) : undefined,
           cooldownHistory: usePreviousPlan && savedPlans[0]?.plan
             ? (() => {
                 const weeks = (savedPlans[0].plan as any).weeks;
@@ -2721,6 +2844,8 @@ const [bbVolumeWave, setBbVolumeWave] = useState(false);
           blastCruiseEnabled,
           blastWeeks,
           cruiseWeeks,
+          pedPhase: activePedPhase,
+          estradiolPgMl: serumLabSignals.estradiolPgMl ?? undefined,
           rehabMuscles: rehabMuscles.length ? rehabMuscles : undefined,
           availablePlates: platePreset === 'machine' ? undefined : (PLATE_SET_PRESETS.find(p => p.id === platePreset)?.plates ?? undefined),
           cycleDay,
@@ -2746,7 +2871,7 @@ const [bbVolumeWave, setBbVolumeWave] = useState(false);
         const schemePhase: 'peaking' | 'intensification' | 'accumulation' = wkPhases.includes('peaking')
           ? 'peaking' : wkPhases.includes('intensification') ? 'intensification' : 'accumulation';
         const meth = recommendPEDMethodology({
-          peds: effectivePeds as any, pedDoses, level: bbLevel, goal: bbGoal,
+          peds: effectivePeds as any, pedDoses: effectivePedDoses, level: bbLevel, goal: bbGoal,
           focus: bbTrainingFocus, targetMuscles: specTargets,
           totalWeeks: bbWeeks, phaseOverride: pedPhaseOverride, phase: schemePhase,
         });
@@ -2760,19 +2885,15 @@ const [bbVolumeWave, setBbVolumeWave] = useState(false);
       plan = applyMacrocycleToBBPlan(plan, bbAnnualMacrocycle);
     }
 
-    // Проф-методики: DUP поверх плана (все ветки). Суперсеты и схемы объёма для всех веток теперь обрабатываются внутри движка (finalize) через BBBuilderInput/CycleToPlanInput — единый путь.
-    // Generic-путь накладывает DUP уже внутри сборки (до финального снимка, см.
-    // P3-3 ядра): повторный вызов ниже идемпотентен и нужен только програмной
-    // ветке (programToBBPlan DUP в входе не принимает).
-    if (dupMode !== 'none') {
-      plan = applyDUPOverlay(plan, { mode: dupMode, cycleDays: dupMode === 'full_dup' ? 3 : 2, muscles: dupMuscles.length ? dupMuscles : undefined });
-    }
+    // P1-2: DUP теперь применяется внутри buildBBPlan и programToBBPlan до финальных снимков
+    // и округления весов — внешний повторный вызов убран.
     // Лаборатория ББ-диагностики: замены + предпочитаемые + PROF-коррекции выполнения (темп/ROM/техника) — поверх плана
     // PRO-3 R2: L/R-добивка слабой стороны — поверх плана (унилатерально, слабая первой, ≤3 сетов, делод скип, сессия <10 упр)
     // Аудит 2026-11 (BB-01): признак «поверх плана что-то вставили». Пере-финализация
     // нужна ТОЛЬКО тогда — иначе чистовая сборка программ (faithful) не должна меняться.
     let postPhaseInjected = false;
-    if (exerciseSwaps.length > 0 || preferredExerciseIds.length > 0 || executionCorrections.length > 0 || Object.keys(lrTopUp).length > 0) {
+    const hasReturnCut = !!(returnAction && Number.isFinite(returnAction.volumeMult) && returnAction.volumeMult < 1);
+    if (exerciseSwaps.length > 0 || preferredExerciseIds.length > 0 || executionCorrections.length > 0 || Object.keys(lrTopUp).length > 0 || hasReturnCut) {
       postPhaseInjected = true;
       const swaps = exerciseSwaps.slice();
       // Лимит упражнений сессии — из движка (уровень/стаж/курс/объёмный режим), не хардкод 10
@@ -3030,6 +3151,12 @@ const [bbVolumeWave, setBbVolumeWave] = useState(false);
       } catch { /* не роняем сборку: план остаётся как есть */ }
     }
 
+    // Новая сборка успешна — сбрасываем старые позиционные правки/веса только теперь.
+    setExerciseEdits({});
+    setEditsHistory([]);
+    setRedosHistory([]);
+    setWeightEntries([]);
+    setWeightsApplied(0);
     setBuiltPlan({
       ...plan,
       // Слепок всех кнопок — чтобы отчёт соответствовал реальным настройкам, а не «от новичка»
@@ -3048,6 +3175,7 @@ const [bbVolumeWave, setBbVolumeWave] = useState(false);
       courseIntensity,
       level: bbLevel,
       inputSnapshot: {
+        ...((plan as any).inputSnapshot || {}),
         level: bbLevel,
         goal: bbGoal,
         trainingVolumeMode,
@@ -3059,6 +3187,7 @@ const [bbVolumeWave, setBbVolumeWave] = useState(false);
         supersetMode,
         volumeScheme: effectiveVolumeScheme,
         dupMode,
+        dupMuscles: dupMuscles.length ? [...dupMuscles] : undefined,
         trainingYears: bbTrainingYears,
         courseIntensity,
         fewerCompound,
@@ -3078,14 +3207,21 @@ const [bbVolumeWave, setBbVolumeWave] = useState(false);
         eccentricMult,
         calorieSurplus,
         proteinPerKg: linked.profile?.settings?.nutrition?.proteinPerKg,
-        labMrvMultiplier: labAdjust.mrvMultiplier,
+        labMrvMultiplier: labMultOverride ?? labAdjust.mrvMultiplier,
         bodyFat: linked.profile?.settings?.personal?.bodyFat,
         leanMass: (linked.profile?.settings?.personal?.weight ?? 80) * (1 - (linked.profile?.settings?.personal?.bodyFat ?? 20) / 100),
-        hrvMs: linked.profile.settings.lifestyle.morningHRV,
-        sleepHours: linked.profile.settings.lifestyle.sleepHours,
-        stressLevel: linked.profile.settings.lifestyle.stressLevel,
+        hrvMs: linked.profile?.settings?.lifestyle?.morningHRV,
+        sleepHours: linked.profile?.settings?.lifestyle?.sleepHours,
+        stressLevel: linked.profile?.settings?.lifestyle?.stressLevel,
         weakPoints,
         focusGroup: '',
+        specialization: specializationMode,
+        specializationSchedule: buildSpecBlocks,
+        sex: linked.profile?.settings?.personal?.sex,
+        peds: effectivePeds,
+        pedDoses: effectivePedDoses,
+        onCourse: explicitOnCourse,
+        bannedPatterns: returnAction?.bannedPatterns,
       },
       rationale: [...plan.rationale,
         `📌 Источник: ${modeLabel}`,
@@ -3109,39 +3245,12 @@ const [bbVolumeWave, setBbVolumeWave] = useState(false);
       // Не пишем runtime до валидации: план с error-ами/низким SafetyScore
       // не должен попадать в плеер (раньше писался сразу после сборки).
       const runtimeValidation = plan.validation || validateBBPlan(plan, plan.safetyConstraints);
-      const runtimeSafety = calculatePlanSafetyScore(plan, {
-        acwrRatio: calculateACWR(),
-        injuries,
-        mobilityRestrictions,
-      });
+      const runtimeSafety = computePlanSafety(plan);
       const runtimeGuardPlan = { ...plan, validation: runtimeValidation };
       if (!runtimeValidation.valid || bbPlanSaveBlockReason(runtimeGuardPlan, runtimeSafety)) {
         flash('⚠ План собран, но не отправлен в выполнение: есть ошибки валидации/безопасности.');
       } else {
-        const playerDays = plan.weeks.flatMap(w => w.sessions.map((s, si) => ({
-          label: 'Нед' + w.week + ' Д' + (si+1),
-          exercises: s.exercises.map(e => {
-            const targetSets = (e.workSets || []).map(ws => ({
-              weight: ws.weight || 0,
-              reps: ws.reps || 0,
-              rir: ws.rir ?? e.rir ?? 2,
-              technique: ws.technique,
-              tempo: ws.tempo || (e as any).tempoSpec,
-              restSeconds: ws.restSeconds ?? e.restSeconds ?? 90,
-            }));
-            return {
-              name: e.name,
-              muscleGroup: muscleLabel(e.muscle),
-              notes: [exerciseTargetNote(e), e.comment || e.rationale || '', e.muscle === 'back' ? backSubgroupLabel((e as any).backSubgroup) : '', ['biceps', 'triceps', 'forearms'].includes(e.muscle) ? armHeadLabel((e as any).movementPattern) : ''].filter(Boolean).join(' · ') || '',
-              targetSets,
-              restSec: e.restSeconds ?? 90,
-              ...((e as any).supersetGroup != null ? {
-                supersetGroup: Number((e as any).supersetGroup),
-                supersetSlot: (Number((e as any).supersetSlot) === 1 ? 1 : 0) as 0 | 1,
-              } : {}),
-            };
-          }),
-        })));
+        const playerDays = serializePlanToPlayerDays(plan);
         localStorage.setItem('he_pl_runtime', JSON.stringify({ days: playerDays, focus: plan.pattern?.name || 'ББ-сплит', week: 1, track: 'bb', startDate: planAnchorIso() }));
         notifyPlRuntimeSaved();
       }
@@ -3193,10 +3302,11 @@ const [bbVolumeWave, setBbVolumeWave] = useState(false);
           const repsChanged = Number.isFinite(edit.reps) && Number(edit.reps) !== Number(first?.reps);
           const setsChanged = Number.isFinite(edit.sets) && Number(edit.sets) !== Number(e.sets);
           const rirChanged = edit.rir != null && Number.isFinite(edit.rir) && Number(edit.rir) !== Number(e.rir);
-          const tempoChanged = !!edit.tempo && edit.tempo !== (e as any).tempoSpec;
+          const tempoChanged = edit.tempo !== undefined && edit.tempo !== ((e as any).tempoSpec || '');
+          const restChanged = edit.restSeconds != null && Number.isFinite(edit.restSeconds) && Number(edit.restSeconds) !== Number(e.restSeconds);
           const techChanged = edit.technique != null
             && edit.technique !== ((e as any).technique || 'none');
-          const workSets = (e.workSets || []).map((ws, i) => {
+          let workSets = (e.workSets || []).map((ws, i) => {
             const next: any = { ...ws };
             // Вес масштабируем от первого сета: дроп-сет/рест-пауза сохраняют
             // свои относительные веса, а не выравниваются по одному числу.
@@ -3205,23 +3315,51 @@ const [bbVolumeWave, setBbVolumeWave] = useState(false);
                 ? Math.round((Number(ws.weight) || 0) * (Number(edit.weight) / currentWeight) * 10) / 10
                 : Math.max(0, Number(edit.weight) || 0);
             }
-            if (repsChanged && i === 0) next.reps = Math.max(1, Math.round(Number(edit.reps)));
+            if (repsChanged) next.reps = Math.max(1, Math.round(Number(edit.reps)));
             if (rirChanged) next.rir = Number(edit.rir);
-            if (tempoChanged) next.tempo = edit.tempo;
+            if (restChanged) next.restSeconds = Math.max(20, Math.min(360, Math.round(Number(edit.restSeconds))));
+            if (tempoChanged) {
+              if (edit.tempo) next.tempo = edit.tempo;
+              else delete next.tempo;
+            }
             if (techChanged && i === (e.workSets?.length || 1) - 1) {
               if (edit.technique === 'none') delete next.technique;
               else next.technique = canonTechniqueId(edit.technique!) || edit.technique;
             }
             return next;
           });
+          // P1-10: ресайз workSets прямо здесь с сохранением техники ТОЛЬКО на новом последнем сете
+          // (иначе syncBBPlanSetShape дублировал технику на добавленные сеты или отрезал её).
+          const targetSets = setsChanged ? Math.max(0, Math.round(Number(edit.sets))) : workSets.length;
+          if (setsChanged && targetSets !== workSets.length) {
+            const savedLastTech = workSets.length > 0 ? workSets[workSets.length - 1]?.technique : undefined;
+            if (targetSets < workSets.length) {
+              workSets = workSets.slice(0, targetSets);
+            } else {
+              const baseTpl = workSets[workSets.length - 1]
+                || { reps: Number(edit.reps) || e.repsRange?.[0] || 10, rir: Number(edit.rir ?? e.rir ?? 2), weight: Number(edit.weight) || 0, restSeconds: e.restSeconds ?? 90 };
+              const cleanTpl = { ...baseTpl };
+              delete cleanTpl.technique;
+              while (workSets.length < targetSets) workSets.push({ ...cleanTpl });
+            }
+            for (const ws of workSets) delete ws.technique;
+            const effectiveTech = techChanged
+              ? (edit.technique === 'none' ? undefined : (canonTechniqueId(edit.technique!) || edit.technique))
+              : savedLastTech;
+            if (effectiveTech && workSets.length > 0) workSets[workSets.length - 1].technique = effectiveTech;
+          }
           const edited: any = { ...e, workSets };
-          if (setsChanged) edited.sets = Math.max(0, Math.round(Number(edit.sets)));
+          if (setsChanged) edited.sets = targetSets;
           if (repsChanged) {
             const reps = Math.max(1, Math.round(Number(edit.reps)));
             edited.repsRange = [reps, reps];
           }
           if (rirChanged) edited.rir = Number(edit.rir);
-          if (tempoChanged) edited.tempoSpec = edit.tempo;
+          if (restChanged) edited.restSeconds = Math.max(20, Math.min(360, Math.round(Number(edit.restSeconds))));
+          if (tempoChanged) {
+            if (edit.tempo) edited.tempoSpec = edit.tempo;
+            else delete edited.tempoSpec;
+          }
           if (techChanged) {
             if (edit.technique === 'none') delete edited.technique;
             else edited.technique = canonTechniqueId(edit.technique!) || edit.technique;
@@ -3233,11 +3371,32 @@ const [bbVolumeWave, setBbVolumeWave] = useState(false);
           }
           return edited;
         });
-        // Суперсет применяем после маппинга: нужен доступ ко всей сессии.
+        // Суперсет применяем/снимаем после маппинга: нужен доступ ко всей сессии.
         for (let ei = 0; ei < exercises.length; ei++) {
           const edit = exerciseEdits[`${w.week}-${si}-${ei}`];
-          if (!edit?.supersetWith || edit.supersetWith === 'none') continue;
+          if (!edit?.supersetWith) continue;
           if (edit.exerciseKey && edit.exerciseKey !== bbExerciseIdentity(exercises[ei])) continue;
+          if (edit.supersetWith === 'none') {
+            const cur: any = exercises[ei];
+            const partnerName = cur.supersetWith;
+            const grp = cur.supersetGroup;
+            delete cur.supersetWith;
+            delete cur.supersetGroup;
+            delete cur.supersetSlot;
+            if (cur.comment) cur.comment = String(cur.comment).replace(/🔗 Суперсет с[^·|]*·?/g, '').trim();
+            if (partnerName || grp != null) {
+              for (const other of exercises as any[]) {
+                if (other === cur) continue;
+                if ((grp != null && other.supersetGroup === grp) || (partnerName && (other.name === partnerName || other.exerciseName === partnerName))) {
+                  delete other.supersetWith;
+                  delete other.supersetGroup;
+                  delete other.supersetSlot;
+                  if (other.comment) other.comment = String(other.comment).replace(/🔗 Суперсет с[^·|]*·?/g, '').trim();
+                }
+              }
+            }
+            continue;
+          }
           applyManualSupersetTo(exercises, ei, edit.supersetWith);
         }
         return { ...s, exercises };
@@ -3266,11 +3425,91 @@ const [bbVolumeWave, setBbVolumeWave] = useState(false);
 
   /** Применить план из шага весов: правки уже вошли в effectivePlan, поэтому
    *  очищаем оверлей — иначе старый edit.weight перезапишет калибровку. */
+  /** Единый сериализатор BBPlan → he_pl_runtime v2 (P1-22: реальная weekNumber, notes, warmupActivator, progressionRule, side, restSeconds). */
+  const serializePlanToPlayerDays = (p: BBPlan) =>
+    p.weeks.flatMap(w => w.sessions.map((s, si) => ({
+      label: 'Нед' + w.week + ' Д' + (si + 1),
+      weekNumber: Number(w.week) || 1,
+      exercises: s.exercises.map(e => {
+        const targetSets = (e.workSets || []).map(ws => ({
+          weight: ws.weight || 0,
+          reps: ws.reps || 0,
+          rir: ws.rir ?? e.rir ?? 2,
+          technique: ws.technique,
+          tempo: ws.tempo || (e as any).tempoSpec,
+          restSeconds: ws.restSeconds ?? e.restSeconds ?? 90,
+        }));
+        const isBw = (e.workSets || []).every(ws => (ws.weight ?? 0) === 0)
+          && /подтяг|брус|отжиман|скручив|планк|гиперэкстенз|pull.?up|chin.?up|dip|push.?up|crunch/i.test(e.name || '');
+        return {
+          name: e.name,
+          muscle: e.muscle,
+          muscleGroup: muscleLabel(e.muscle) || e.muscle,
+          notes: [
+            exerciseTargetNote(e),
+            e.comment || e.rationale || '',
+            e.muscle === 'back' ? backSubgroupLabel((e as any).backSubgroup) : '',
+            ['biceps', 'triceps', 'forearms'].includes(e.muscle) ? armHeadLabel((e as any).movementPattern) : '',
+          ].filter(Boolean).join(' · ') || '',
+          warmupActivator: !!(e as any).warmupActivator,
+          warmupSets: Array.isArray((e as any).warmupSets) ? (e as any).warmupSets : undefined,
+          progressionRule: typeof (e as any).progressionRule === 'string' ? (e as any).progressionRule : undefined,
+          side: (e as any).side,
+          unilateral: !!(e as any).unilateral,
+          isBodyweight: isBw || undefined,
+          targetSets,
+          restSec: e.restSeconds ?? 90,
+          ...((e as any).supersetGroup != null ? {
+            supersetGroup: Number((e as any).supersetGroup),
+            supersetSlot: (Number((e as any).supersetSlot) === 1 ? 1 : 0) as 0 | 1,
+          } : {}),
+        };
+      }),
+    })));
+
+  const persistSavedPlanSafe = (nextPlan: BBPlan): boolean => {
+    const payload = JSON.stringify({ plan: nextPlan, date: new Date().toISOString() });
+    void saveNativeJsonBackup('bb-plan-saved-backup.json', {
+      plan: nextPlan,
+      date: new Date().toISOString(),
+      startDate: startDateInput || (nextPlan as any).planStartWeek || '',
+    });
+    try {
+      localStorage.setItem('he_bb_plan_saved', payload);
+      return true;
+    } catch {
+      // Освобождаем кэш при QuotaExceededError (часто на WebView APK при длинных мезоциклах).
+      try {
+        localStorage.removeItem('he_workout_progress_cache');
+        localStorage.removeItem('he_bb_plan_saved_prev');
+        localStorage.removeItem('he_bb_plan_history');
+        localStorage.setItem('he_bb_plan_saved', payload);
+        return true;
+      } catch {
+        return false;
+      }
+    }
+  };
+
+  const persistPlanAndRuntime = (nextPlan: BBPlan) => {
+    persistSavedPlanSafe(nextPlan);
+    try {
+      const val = nextPlan.validation || validateBBPlan(nextPlan, nextPlan.safetyConstraints);
+      const saf = computePlanSafety(nextPlan);
+      if (val.valid && !bbPlanSaveBlockReason({ ...nextPlan, validation: val }, saf)) {
+        const playerDays = serializePlanToPlayerDays(nextPlan);
+        localStorage.setItem('he_pl_runtime', JSON.stringify({ days: playerDays, focus: nextPlan.pattern?.name || 'ББ-сплит', week: 1, track: 'bb', startDate: planAnchorIso() }));
+        notifyPlRuntimeSaved();
+      }
+    } catch { /* ignore */ }
+  };
+
   const handleWeightsPlanChange: React.Dispatch<React.SetStateAction<BBPlan | null>> = (action) => {
     setBuiltPlan(prev => {
       const next = typeof action === 'function' ? (action as (p: BBPlan | null) => BBPlan | null)(prev) : action;
-      // Калибровка меняет веса — обновляем validation/weeklyVolume/balance snapshots.
-      return next ? revalidateEditedPlan(next) : next;
+      const finalNext = next ? revalidateEditedPlan(next) : next;
+      if (finalNext) persistPlanAndRuntime(finalNext);
+      return finalNext;
     });
     setExerciseEdits({});
     setEditsHistory([]);
@@ -3338,22 +3577,8 @@ const [bbVolumeWave, setBbVolumeWave] = useState(false);
   }, [acwrData, srpeMonotony]);
   const safetyScore = useMemo<PlanSafetyScore | null>(() => {
     if (!effectivePlan) return null;
-    const personal = linked.profile?.settings?.personal;
-    const lifestyle = linked.profile?.settings?.lifestyle;
-    return calculatePlanSafetyScore(effectivePlan, {
-      acwrRatio: acwrData?.ratio,
-      bodyFat: personal?.bodyFat,
-      hrvMs: lifestyle?.morningHRV,
-      sleepHours: lifestyle?.sleepHours,
-      stressLevel: lifestyle?.stressLevel,
-      injuryCount: injuries.length,
-      injuries,
-      mobilityRestrictions,
-      balanceReport: (effectivePlan as any).balanceReport || null,
-      weeklySessions: effectivePlan.weeks[0]?.sessions.length ?? 4,
-      goal: bbGoal,
-    });
-  }, [effectivePlan, linked.profile, injuries, mobilityRestrictions, acwrData, bbGoal]);
+    return computePlanSafety(effectivePlan);
+  }, [effectivePlan, computePlanSafety]);
   // Понедельная оценка качества: факт выдачи × параметры плана (две шкалы, не суммируются).
   // A «Объём и соответствие» — факт недели vs собственные цели/капы/параметры плана.
   // B «PRO-техника» — факт исполнения недели (паттерны/углы/растяжка/техники).
@@ -3415,19 +3640,17 @@ const [bbVolumeWave, setBbVolumeWave] = useState(false);
     try {
       if (!effectivePlan) return;
       const planToSave = effectivePlan;
-      const saveSafety = calculatePlanSafetyScore(planToSave, {
-        acwrRatio: calculateACWR(),
-        injuries,
-        mobilityRestrictions,
-      });
+      const saveSafety = computePlanSafety(planToSave);
       // Волна 0, п.0.2 (исполнение валидатора): план с error-ами валидации или
       // SafetyScore < 60 НЕ сохраняется — раньше показывалось предупреждение,
       // но запись всё равно уходила в he_bb_plan_saved (небезопасный план мог
       // быть исполнен). Блокировка честная: причина + что править.
       const blockReason = bbPlanSaveBlockReason(planToSave, saveSafety);
       if (blockReason) { flash(blockReason); return; }
-      commitEffectivePlan(planToSave); localStorage.setItem('he_bb_plan_saved', JSON.stringify({ plan: planToSave, date: new Date().toISOString() })); flash('План сохранён');
+      commitEffectivePlan(planToSave);
+      const savedOk = persistSavedPlanSafe(planToSave);
       try { localStorage.removeItem('he_bb_plan_saved_prev'); localStorage.removeItem('he_bb_plan_history'); } catch { /* ignore */ }
+      flash(savedOk ? '💾 План сохранён в приложении и бэкапе' : '⚠ Память браузера заполнена — экспортируйте план в JSON-файл');
     } catch { flash('Ошибка сохранения'); }
   };
 
@@ -3435,7 +3658,7 @@ const [bbVolumeWave, setBbVolumeWave] = useState(false);
   const handleSaveToMyPlans = () => {
     if (!effectivePlan) return;
     const exportPlan = effectivePlan;
-    const saveSafety = calculatePlanSafetyScore(exportPlan, { acwrRatio: calculateACWR(), injuries, mobilityRestrictions });
+    const saveSafety = computePlanSafety(exportPlan);
     // Волна 0, п.0.2: небезопасный план не сохраняется (см. handleSavePlan).
     const blockReason = bbPlanSaveBlockReason(exportPlan, saveSafety);
     if (blockReason) { flash(blockReason); return; }
@@ -3482,11 +3705,7 @@ const [bbVolumeWave, setBbVolumeWave] = useState(false);
     if (!effectivePlan || !metrics) return;
     const exportPlan = effectivePlan;
     // Волна 0, п.0.2: вариант с ошибками валидации или низким SafetyScore не сохраняется.
-    const saveSafety = calculatePlanSafetyScore(exportPlan, {
-      acwrRatio: calculateACWR(),
-      injuries,
-      mobilityRestrictions,
-    });
+    const saveSafety = computePlanSafety(exportPlan);
     const blockReason = bbPlanSaveBlockReason(exportPlan, saveSafety);
     if (blockReason) { flash(blockReason); return; }
     const exportMetrics = calcBBPlanMetrics(exportPlan, pedAdapt.combinedMrvMultiplier);
@@ -3501,7 +3720,7 @@ const [bbVolumeWave, setBbVolumeWave] = useState(false);
           patternId: selectedSplitId,
            patternName: exportPlan.pattern.name,
           level: bbLevel, goal: bbGoal, weeks: bbWeeks, volumeGoal: bbVolGoal,
-          peds: effectivePeds, pedDoses, courseIntensity: courseIntensity as string,
+          peds: effectivePeds, pedDoses: effectivePedDoses, courseIntensity: courseIntensity as string,
            weakPoints, focusGroup: '', intensityTechnique: intensityTech,
            volumeRamp: bbVolumeRamp !== 'standard' ? bbVolumeRamp : undefined,
            volumeWave: bbVolumeWave ? true : undefined,
@@ -3559,6 +3778,8 @@ const [bbVolumeWave, setBbVolumeWave] = useState(false);
         };
         const updated = saveBBPlanVariant(name, exportPlan, params, planMetrics);
         setSavedPlans(updated);
+        const storeErr = getLastBBPlansStoreError();
+        if (storeErr) flash(`⚠ ${storeErr}`);
         setShowCompare(true);
         commitEffectivePlan(exportPlan);
       },
@@ -3570,15 +3791,24 @@ const [bbVolumeWave, setBbVolumeWave] = useState(false);
     setSavedPlans(updated);
   };
 
+  const handleRenameVariant = (id: string, currentName: string) => {
+    setNamePrompt({
+      title: '✏️ Переименовать вариант',
+      value: currentName,
+      onOk: (nextName) => {
+        const updated = renameBBPlanVariant(id, nextName);
+        setSavedPlans(updated);
+        const storeErr = getLastBBPlansStoreError();
+        flash(storeErr ? `⚠ ${storeErr}` : `✏️ Переименовано в «${nextName}»`);
+      },
+    });
+  };
+
   /** Сохранить собранный ББ-план в «Мои программы» (UserProgram) — канонический путь редактирования. */
   const handleSaveAsUserProgram = () => {
     if (!effectivePlan) return;
     const exportPlan = effectivePlan;
-    const saveSafety = calculatePlanSafetyScore(exportPlan, {
-      acwrRatio: calculateACWR(),
-      injuries,
-      mobilityRestrictions,
-    });
+    const saveSafety = computePlanSafety(exportPlan);
     const blockReason = bbPlanSaveBlockReason(exportPlan, saveSafety);
     if (blockReason) { flash(blockReason); return; }
     const fallbackName = `${exportPlan.pattern.name} ${bbWeeks}нед`;
@@ -3681,23 +3911,24 @@ const [bbVolumeWave, setBbVolumeWave] = useState(false);
     if (v.params.cycleId) setSelectedCycleId(v.params.cycleId);
     setAbRotation(v.params.abPatternRotation === true);
     setPackingV2(v.params.packingV2 === true);
-    // Аудит «дубли шаг 1-2»: недостающие настройки варианта (раньше терялись при загрузке).
-    // Legacy-варианты без полей — текущие настройки не трогаем (только явно сохранённое).
+    // Аудит «дубли шаг 1-2» + Wave 7: сбрасываем опциональные PRO-поля к дефолтам, если в варианте они отсутствуют,
+    // чтобы PRO-настройки предыдущего плана не протекали в загруженный вариант.
     const vp = v.params as any;
-    if (vp.proPreset) setProPreset(vp.proPreset);
-    if (vp.trainingVolumeMode) setTrainingVolumeMode(vp.trainingVolumeMode);
-    if (vp.volumeScheme) setVolumeScheme(vp.volumeScheme);
+    setProPreset(vp.proPreset || 'none');
+    setTrainingVolumeMode(vp.trainingVolumeMode || 'standard');
+    setVolumeScheme(vp.volumeScheme || 'standard');
     // G1: сценарий входа в мезоцикл из варианта (legacy = standard).
     const ramp = vp.volumeRamp ?? (v.plan as any)?.volumeRamp ?? (v.plan as any)?.inputSnapshot?.volumeRamp;
     setBbVolumeRamp(ramp === 'preloaded' || ramp === 'flat' ? ramp : 'standard');
     setBbVolumeWave(vp.volumeWave === true || (v.plan as any)?.volumeWave === true || (v.plan as any)?.inputSnapshot?.volumeWave === true);
-    if (vp.supersetMode) setSupersetMode(vp.supersetMode);
-    if (vp.intensityLevel) setIntensityLevel(vp.intensityLevel);
-    if (vp.rotationMode) setRotationMode(vp.rotationMode);
-    if (Number.isFinite(vp.calorieSurplus)) setCalorieSurplus(Number(vp.calorieSurplus));
-    if (Number.isFinite(vp.eccentricMult)) setEccentricMult(Number(vp.eccentricMult));
-    if (vp.bfrMode != null) setBfrMode(Boolean(vp.bfrMode));
-    if (vp.blastCruiseEnabled != null) setBlastCruiseEnabled(Boolean(vp.blastCruiseEnabled));
+    setSupersetMode(vp.supersetMode || 'none');
+    setIntensityLevel(vp.intensityLevel || 'moderate');
+    setRotationMode(vp.rotationMode || 'variety');
+    setCalorieSurplus(Number.isFinite(vp.calorieSurplus) ? Number(vp.calorieSurplus) : 0);
+    setEccentricMult(Number.isFinite(vp.eccentricMult) ? Number(vp.eccentricMult) : 1);
+    setBfrMode(Boolean(vp.bfrMode));
+    setBlastCruiseEnabled(Boolean(vp.blastCruiseEnabled));
+    setDcMode(Boolean(vp.dcMode));
     if (Number.isFinite(vp.blastWeeks)) setBlastWeeks(Number(vp.blastWeeks));
     if (Number.isFinite(vp.cruiseWeeks)) setCruiseWeeks(Number(vp.cruiseWeeks));
     if (vp.platePreset) setPlatePreset(vp.platePreset);
@@ -3809,6 +4040,59 @@ const [bbVolumeWave, setBbVolumeWave] = useState(false);
     });
   };
 
+  // Wave 7: Добавить / удалить упражнение в сессии выбранной недели.
+  const handleAddExercise = (si: number, muscleHint?: string) => {
+    if (!builtPlan) return;
+    const basePlan = applyEditsToPlan(builtPlan);
+    const w3 = structuredClone(basePlan.weeks);
+    const weekIdx = Math.min(bbWeekSel, w3.length) - 1;
+    const sess = w3[weekIdx]?.sessions[si];
+    if (!sess) return;
+    const muscle = muscleHint || sess.exercises[sess.exercises.length - 1]?.muscle || 'chest';
+    const existingNames = new Set(sess.exercises.map(e => String(e.name || '').toLowerCase()));
+    const candidate = EXERCISE_CATALOG.find(c => canonicalMuscleOf(c) === muscle && !existingNames.has(c.name.toLowerCase()))
+      || EXERCISE_CATALOG.find(c => !existingNames.has(c.name.toLowerCase()));
+    if (!candidate) { flash('⚠ Нет доступных упражнений в каталоге'); return; }
+    const wEst = estimatedWeightFor(candidate, bbWorkMax, 2);
+    const newEx: any = {
+      name: candidate.name,
+      exerciseName: candidate.name,
+      muscle: canonicalMuscleOf(candidate, muscle),
+      role: 'accessory',
+      character: sess.character || 'сред',
+      sets: 3,
+      repsRange: [10, 12],
+      rir: 2,
+      restSeconds: 90,
+      workSets: makeWorkSets(3, { reps: 10, rir: 2, weight: wEst, restSeconds: 90 }),
+      rationale: 'Добавлено вручную в редакторе шага 7',
+    };
+    sess.exercises.push(newEx);
+    setBuiltPlan(revalidateEditedPlan({ ...basePlan, weeks: w3 }));
+    flash(`＋ Добавлено: ${candidate.name}`);
+  };
+
+  const handleRemoveExercise = (si: number, ei: number) => {
+    if (!builtPlan) return;
+    const basePlan = applyEditsToPlan(builtPlan);
+    const w3 = structuredClone(basePlan.weeks);
+    const weekIdx = Math.min(bbWeekSel, w3.length) - 1;
+    const sess = w3[weekIdx]?.sessions[si];
+    if (!sess || !sess.exercises[ei]) return;
+    if (sess.exercises.length <= 1) { flash('⚠ В дне должно остаться минимум 1 упражнение'); return; }
+    const removed = sess.exercises.splice(ei, 1)[0];
+    setBuiltPlan(revalidateEditedPlan({ ...basePlan, weeks: w3 }));
+    setExerciseEdits(prev => {
+      const next = { ...prev };
+      const weekNo = Number(w3[weekIdx]?.week) || (weekIdx + 1);
+      for (const k of Object.keys(next)) {
+        if (k.startsWith(`${weekNo}-${si}-`)) delete next[k];
+      }
+      return next;
+    });
+    flash(`🗑 Удалено: ${removed?.name || 'упражнение'}`);
+  };
+
   const handleSendToExecution = () => {
     if (!effectivePlan) return;
     const executionPlan = effectivePlan;
@@ -3817,42 +4101,14 @@ const [bbVolumeWave, setBbVolumeWave] = useState(false);
       flash('⚠ План не отправлен: есть ошибки валидации. Исправьте их в шаге «План».');
       return;
     }
-    const executionSafety = calculatePlanSafetyScore(executionPlan, {
-      acwrRatio: calculateACWR(),
-      injuries,
-      mobilityRestrictions,
-    });
+    const executionSafety = computePlanSafety(executionPlan);
     const blockReason = bbPlanSaveBlockReason({ ...executionPlan, validation }, executionSafety);
     if (blockReason) { flash(blockReason); return; }
     commitEffectivePlan(executionPlan);
     try {
-      const playerDays = executionPlan.weeks.flatMap(w => w.sessions.map((s, si) => ({
-        label: 'Нед' + w.week + ' Д' + (si+1),
-        exercises: s.exercises.map(e => {
-          const targetSets = (e.workSets || []).map(ws => ({
-            weight: ws.weight || 0,
-            reps: ws.reps || 0,
-            rir: ws.rir ?? e.rir ?? 2,
-            technique: ws.technique,
-            // RIR/темп/отдых — поля подхода; без них плеер показывал дефолты.
-            tempo: ws.tempo || (e as any).tempoSpec,
-            restSeconds: ws.restSeconds ?? e.restSeconds ?? 90,
-          }));
-          return {
-            name: e.name,
-            muscleGroup: muscleLabel(e.muscle) || e.muscle,
-            notes: e.comment || e.rationale || '',
-            targetSets,
-            restSec: e.restSeconds ?? 90,
-            ...((e as any).supersetGroup != null ? {
-              supersetGroup: Number((e as any).supersetGroup),
-              supersetSlot: (Number((e as any).supersetSlot) === 1 ? 1 : 0) as 0 | 1,
-            } : {}),
-          };
-        }),
-      })));
-       localStorage.setItem('he_pl_runtime', JSON.stringify({ days: playerDays, focus: executionPlan.pattern?.name || 'ББ-сплит', week: 1, track: 'bb', startDate: planAnchorIso() }));
-       notifyPlRuntimeSaved();
+      const playerDays = serializePlanToPlayerDays(executionPlan);
+      localStorage.setItem('he_pl_runtime', JSON.stringify({ days: playerDays, focus: executionPlan.pattern?.name || 'ББ-сплит', week: 1, track: 'bb', startDate: planAnchorIso() }));
+      notifyPlRuntimeSaved();
       // План, ушедший в плеер, должен пережить закрытие/ремаунт конструктора:
       // раньше этот путь НЕ писал he_bb_plan_saved (в отличие от «Сохранить»), и
       // при следующем открытии восстанавливался прежний план из хранилища.
@@ -3870,14 +4126,10 @@ const [bbVolumeWave, setBbVolumeWave] = useState(false);
     } catch { flash('Ошибка при отправке плана на выполнение'); }
   };
 
-  /** PRO: печать плана в PDF через window.print() — HTML-таблица с упражнениями. */
+  /** PRO: печать плана в PDF через apk-share (APK-safe). */
   const handlePrintPlan = () => {
     if (!effectivePlan) return;
     const plan = effectivePlan;
-    const w = window.open('', '_blank');
-    if (!w) { flash('Разрешите всплывающие окна для печати'); return; }
-    // Аудит 2026-10: было только </> — `&` и кавычки не экранировались, из-за
-    // чего пользовательский текст ломал HTML-атрибуты/сущности в печати.
     const esc = (s: any) => String(s ?? '')
       .replace(/&/g, '&amp;')
       .replace(/</g, '&lt;')
@@ -3889,15 +4141,15 @@ const [bbVolumeWave, setBbVolumeWave] = useState(false);
         const exsHtml = s.exercises.map(e => {
           const feat = exerciseFeatureBadges(e).map(b => b.label).join(' · ');
           const chain = techniqueChainParts(e);
-          const sets = [...(e.workSets || []).map(ws => `${ws.reps}×${ws.weight}кг @RIR${ws.rir ?? e.rir}`), ...(chain ? [chain.label + ': ' + chain.parts.join(' → ')] : [])].join(', ');
+          const sets = [...(e.workSets || []).map(ws => `${ws.reps}×${ws.weight > 0 ? ws.weight + 'кг' : 'Свой вес'} @RIR${ws.rir ?? e.rir}`), ...(chain ? [chain.label + ': ' + chain.parts.join(' → ')] : [])].join(', ');
           const sub = e.muscle === 'back' ? backSubgroupLabel((e as any).backSubgroup) : ['biceps', 'triceps', 'forearms'].includes(e.muscle) ? armHeadLabel((e as any).movementPattern) : '';
-          // §5.2: подмышка/паттерн/пояснение — колонками (раньше подгруппа склеивалась с мышцей, пояснения не было)
           const expl = bbExerciseExplanation(e);
           const subLabel = sub || expl.subgroup || '';
-          return `<tr><td style="padding:4px 8px;border:1px solid #ddd">${esc(e.exerciseName || e.name || '')}</td><td style="padding:4px 8px;border:1px solid #ddd">${esc(muscleLabel(e.muscle))}</td><td style="padding:4px 8px;border:1px solid #ddd">${esc(subLabel)}</td><td style="padding:4px 8px;border:1px solid #ddd">${esc(expl.pattern)}</td><td style="padding:4px 8px;border:1px solid #ddd">${e.sets}</td><td style="padding:4px 8px;border:1px solid #ddd">${esc(sets)}</td><td style="padding:4px 8px;border:1px solid #ddd">${esc([expl.why, expl.how].filter(Boolean).join(' · '))}</td><td style="padding:4px 8px;border:1px solid #ddd">${esc(feat ? '💥 ' + feat : '')}${esc(e.comment || '')}</td></tr>`;
+          const commentCell = [feat ? '💥 ' + feat : '', e.comment || ''].filter(Boolean).join(' · ');
+          return `<tr><td style="padding:4px 8px;border:1px solid #ddd">${esc(e.exerciseName || e.name || '')}</td><td style="padding:4px 8px;border:1px solid #ddd">${esc(muscleLabel(e.muscle))}</td><td style="padding:4px 8px;border:1px solid #ddd">${esc(subLabel)}</td><td style="padding:4px 8px;border:1px solid #ddd">${esc(expl.pattern)}</td><td style="padding:4px 8px;border:1px solid #ddd">${e.sets}</td><td style="padding:4px 8px;border:1px solid #ddd">${esc(sets)}</td><td style="padding:4px 8px;border:1px solid #ddd">${esc([expl.why, expl.how].filter(Boolean).join(' · '))}</td><td style="padding:4px 8px;border:1px solid #ddd">${esc(commentCell)}</td></tr>`;
         }).join('');
         const restNote = s.exercises.length === 0 ? `<p style="font-size:11px;color:#888;margin:6px 0">😴 Полный отдых — позирование, растяжка, сон 8–9 ч.${(s as any).comment ? ' ' + esc((s as any).comment) : ''}</p>` : '';
-        return `<h3 style="margin:12px 0 4px">День ${si + 1}${s.sessionTag ? ' — ' + esc(sessionTagLabel(s.sessionTag)) : ''}${(s as any).peakWeekTraining ? ' — 🎭 памп' : ''}${(s as any).peakWeekRest ? ' — 😴 отдых' : ''}</h3>${restNote}<table style="width:100%;border-collapse:collapse;font-size:11px"><thead><tr style="background:#f0f0f0"><th style="padding:4px 8px;border:1px solid #ddd;text-align:left">Упражнение</th><th style="padding:4px 8px;border:1px solid #ddd;text-align:left">Мышца</th><th style="padding:4px 8px;border:1px solid #ddd;text-align:left">Подмышка</th><th style="padding:4px 8px;border:1px solid #ddd;text-align:left">Паттерн</th><th style="padding:4px 8px;border:1px solid #ddd">Сеты</th><th style="padding:4px 8px;border:1px solid #ddd;text-align:left">Вес/Reps</th><th style="padding:4px 8px;border:1px solid #ddd;text-align:left">Пояснение</th><th style="padding:4px 8px;border:1px solid #ddd;text-align:left">Коммент</th></tr></thead><tbody>${exsHtml}</tbody></table>`;
+        return `<h3 style="margin:12px 0 4px">День ${si + 1}${s.sessionTag ? ' — ' + esc(sessionTagLabel(s.sessionTag)) : ''}${(s as any).peakWeekTraining ? ' — 🎭 памп' : ''}${(s as any).peakWeekRest ? ' — 😴 отдых' : ''}</h3>${restNote}<table style="width:100%;border-collapse:collapse;font-size:11px"><thead><tr style="background:#f0f0f0"><th style="padding:4px 8px;border:1px solid #ddd;text-align:left">Упражнение</th><th style="padding:4px 8px;border:1px solid #ddd;text-align:left">Мышца</th><th style="padding:4px 8px;border:1px solid #ddd;text-align:left">Подгруппа</th><th style="padding:4px 8px;border:1px solid #ddd;text-align:left">Паттерн</th><th style="padding:4px 8px;border:1px solid #ddd">Сеты</th><th style="padding:4px 8px;border:1px solid #ddd;text-align:left">Вес/Reps</th><th style="padding:4px 8px;border:1px solid #ddd;text-align:left">Пояснение</th><th style="padding:4px 8px;border:1px solid #ddd;text-align:left">Коммент</th></tr></thead><tbody>${exsHtml}</tbody></table>`;
       }).join('');
       const peakNote = (wk as any).peakWeek === true ? ` — 🎭 ПИК-НЕДЕЛЯ (тапер ББ)` : '';
       const prepNote = (wk as any).prepProtocol ? `<p style="font-size:10px;color:#888;margin:2px 0">${esc((wk as any).prepProtocol)}</p>` : '';
@@ -3906,17 +4158,17 @@ const [bbVolumeWave, setBbVolumeWave] = useState(false);
       return `<h2 style="margin:16px 0 6px;color:${phaseColor};border-left:4px solid ${phaseColor};padding-left:8px">Неделя ${wk.week} (${phaseRu}${wk.deload ? ' — DELOAD' : ''})${peakNote}</h2>${prepNote}${sessionsHtml}`;
     }).join('');
     const rationaleHtml = (plan.rationale || []).map(r => `<div style="font-size:10px;color:#666;margin:2px 0">${esc(r)}</div>`).join('');
-    // П3: персист движений в печать (пусто — блока нет, печать байт-в-байт; сборка не тронута).
     let movementHtml = '';
     try { movementHtml = buildBbMovementPrintBlock(); } catch { /* тихо */ }
-    // Фаза 4.24: heatmap «мышца × неделя» в печати.
     const hm = buildBBMuscleHeatmap(plan);
     const hmWeeks = [...new Set(hm.map(h => h.week))].sort((a, b) => a - b);
     const hmMuscles = [...new Set(hm.map(h => h.muscle))];
     const hmColor: Record<string, string> = { below_mev: '#f87171', mev_mav: '#22c55e', above_mav: '#f59e0b', over_mrv: '#ef4444', none: '#e5e7eb' };
     const hmHtml = hmMuscles.length ? `<h2 style="font-size:14px;margin:16px 0 4px">🧬 Heatmap «мышца × неделя»</h2><table style="border-collapse:collapse;font-size:10px"><tr><th style="border:1px solid #ddd;padding:3px 6px;text-align:left">Мышца</th>${hmWeeks.map(ww => `<th style="border:1px solid #ddd;padding:3px 6px">Нед ${ww}</th>`).join('')}</tr>${hmMuscles.map(m => `<tr><td style="border:1px solid #ddd;padding:3px 6px">${esc(muscleLabel(m))}</td>${hmWeeks.map(ww => { const c = hm.find(h => h.muscle === m && h.week === ww); return `<td style="border:1px solid #ddd;text-align:center;background:${c ? hmColor[c.status] : '#fafafa'}">${c ? c.sets : ''}</td>`; }).join('')}</tr>`).join('')}</table>` : '';
-    w.document.write(`<!DOCTYPE html><html><head><title>${esc(plan.pattern?.name || 'BB-план')}</title><style>@media print{body{font-size:10px}h2{page-break-before:auto}}</style></head><body style="font-family:Arial,sans-serif;max-width:900px;margin:0 auto;padding:20px"><h1>${esc(plan.pattern?.name || 'BB-план')} — ${plan.weeks.length} нед</h1>${rationaleHtml}${movementHtml}${weeksHtml}${hmHtml}<script>window.print()</script></body></html>`);
-    w.document.close();
+    const html = `<!DOCTYPE html><html><head><meta charset="utf-8"><title>${esc(plan.pattern?.name || 'BB-план')}</title><style>@media print{body{font-size:10px}h2{page-break-before:auto}}</style></head><body style="font-family:Arial,sans-serif;max-width:900px;margin:0 auto;padding:20px"><h1>${esc(plan.pattern?.name || 'BB-план')} — ${plan.weeks.length} нед</h1>${rationaleHtml}${movementHtml}${weeksHtml}${hmHtml}</body></html>`;
+    void printHtmlApk(html, `bb-plan-${plan.pattern?.id || 'plan'}.html`).then(res => {
+      if (res === 'failed') flash('Разрешите всплывающие окна для печати');
+    });
   };
 
   /** Фаза 4.25: передать ББ-план в планировщик питания (калораж/белок/трен-дни/объём). */
@@ -3930,9 +4182,29 @@ const [bbVolumeWave, setBbVolumeWave] = useState(false);
       const weeksCount = Math.max(1, (plan.weeks || []).length);
       const totalWorkingSets = (plan.weeks || []).reduce((s, w) => s + (w.sessions || []).reduce((a, ses) => a + ses.exercises.filter((e: any) => !(e as any).warmupActivator).reduce((b, e) => b + (e.sets || 0), 0), 0), 0);
       const weeklySets = Math.round(totalWorkingSets / weeksCount);
-      // Трен-дни недели: индексы сессий с упражнениями (не отдых).
+      // Трен-дни недели: раскладываем активные сессии по реальным дням недели (Пн=1..Вс=7),
+      // а не [1,2,3] подряд для 3-дневного PPL.
       const w0 = plan.weeks[0];
-      const trainDays = (w0?.sessions || []).map((s, i) => ((s.exercises || []).some((e: any) => !(e as any).warmupActivator) ? i + 1 : 0)).filter(d => d > 0);
+      const activeSessions = (w0?.sessions || []).filter((s: any) => (s.exercises || []).some((e: any) => !(e as any).warmupActivator));
+      const WEEKDAY_TEMPLATES: Record<number, number[]> = {
+        1: [1],
+        2: [1, 4],
+        3: [1, 3, 5],
+        4: [1, 2, 4, 5],
+        5: [1, 2, 3, 5, 6],
+        6: [1, 2, 3, 4, 5, 6],
+        7: [1, 2, 3, 4, 5, 6, 7],
+      };
+      const defaultDays = WEEKDAY_TEMPLATES[Math.min(7, Math.max(1, activeSessions.length))] || [1, 3, 5];
+      const trainDays = activeSessions.map((s: any, idx: number) => {
+        const explicit = Number(s.dayOfWeek ?? s.weekday);
+        return (Number.isInteger(explicit) && explicit >= 1 && explicit <= 7) ? explicit : (defaultDays[idx] ?? ((idx % 7) + 1));
+      });
+      const heavyDays = activeSessions
+        .map((s: any, idx: number) => (s.character === 'тяж' ? trainDays[idx] : 0))
+        .filter((d: number) => d > 0);
+      const insIU = Number(effectivePedDoses?.insulin) || 0;
+      const insulinCarbsG = insIU > 0 ? Math.round(insIU * 10) : undefined;
       // Калораж/белок — от веса и цели профиля (раньше хардкод 2800/180 без веса/пола/цели);
       // без веса в профиле — прежний оценочный фолбэк.
       const pw = Number(linked.profile?.settings?.personal?.weight) || 0;
@@ -3947,34 +4219,26 @@ const [bbVolumeWave, setBbVolumeWave] = useState(false);
       applyToPlanner({
         kind: 'bb_nutrition',
         label: `ББ-план → питание (${trainDays.length} трен-дня, ~${ruCount(weeklySets, RU_SETS)}/нед в среднем)`,
-        data: { kcal, proteinG, trainDays, weeklySets, splitId: plan.pattern?.id, weightKg: pw > 0 ? pw : undefined, sex: linked.profile?.settings?.personal?.sex, goal: bbGoal },
+        data: { kcal, proteinG, trainDays, heavyDays, insulinIU: insIU > 0 ? insIU : undefined, insulinCarbsG, weeklySets, splitId: plan.pattern?.id, weightKg: pw > 0 ? pw : undefined, sex: linked.profile?.settings?.personal?.sex, goal: bbGoal },
       });
     } catch (e) {
       flash('⚠ Ошибка передачи в питание: ' + ((e as Error)?.message || e));
     }
   };
 
-  /** Фаза 4.24: экспорт обычного ББ-плана в .ics (календарь) по датам недель. */
+  /** Фаза 4.24: экспорт обычного ББ-плана в .ics (календарь) по датам недель (APK-safe). */
   const handleExportIcs = () => {
     if (!effectivePlan) return;
     const plan = effectivePlan;
     try {
       const startDate = startDateInput || localIsoDate();
       const ics = buildBBPlanIcs(plan, { startDate });
-      const blob = new Blob([ics], { type: 'text/calendar;charset=utf-8' });
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement('a');
-      a.href = url;
-      a.download = `bb-plan-${(plan.pattern?.id || 'plan')}.ics`;
-      a.click();
-      URL.revokeObjectURL(url);
-      flash('📅 Календарь .ics скачан (по неделям/дням от ' + startDate + ')');
+      void saveTextFileApk(`bb-plan-${(plan.pattern?.id || 'plan')}.ics`, ics, 'text/calendar;charset=utf-8');
+      flash('📅 Календарь .ics сохранён (по неделям/дням от ' + startDate + ')');
     } catch { flash('⚠ Не удалось сформировать .ics'); }
   };
 
-  /** 4.7: печать «таблицы мезоцикла» — единый движковый buildBBPlanPrintHtml (фазы/таблица/heatmap).
-   *  §6.4: без аргумента — весь мезоцикл с новой страницы на каждую неделю (для тренера),
-   *  с номером недели — только эта неделя (лист для зала). */
+  /** 4.7: печать «таблицы мезоцикла» (APK-safe). */
   const handlePrintMesocycleTable = (weekNo?: number) => {
     if (!effectivePlan) return;
     const plan = effectivePlan;
@@ -3984,10 +4248,9 @@ const [bbVolumeWave, setBbVolumeWave] = useState(false);
         pageBreakPerWeek: true,
         ...(weekNo ? { scope: 'week' as const, week: weekNo } : {}),
       });
-      const w = window.open('', '_blank');
-      if (!w) { flash('Разрешите всплывающие окна для печати'); return; }
-      w.document.write(html.replace('</body>', '<script>window.print()</script></body>'));
-      w.document.close();
+      void printHtmlApk(html, `bb-mesocycle-${plan.pattern?.id || 'plan'}${weekNo ? `-w${weekNo}` : ''}.html`).then(res => {
+        if (res === 'failed') flash('Разрешите всплывающие окна для печати');
+      });
     } catch { flash('⚠ Не удалось сформировать таблицу мезоцикла'); }
   };
 
@@ -4004,7 +4267,7 @@ const [bbVolumeWave, setBbVolumeWave] = useState(false);
         lines.push('', `КАЧЕСТВО: ${qualityReport.score}/100 (${qualityReport.riskLevel})`);
         for (const i of (qualityReport.issues || []).slice(0, 15)) lines.push(`  • [${i.source}]${i.week ? ` нед ${i.week}` : ''} ${i.message}`);
       }
-      const safety = calculatePlanSafetyScore(plan, { acwrRatio: acwrData?.ratio, injuries, mobilityRestrictions });
+      const safety = computePlanSafety(plan);
 
       lines.push('', `БЕЗОПАСНОСТЬ: ${safety.score}/100 (${safety.riskLevel})`);
       for (const r of (safety.recommendations || []).slice(0, 5)) lines.push(`  • ${r}`);
@@ -4017,14 +4280,8 @@ const [bbVolumeWave, setBbVolumeWave] = useState(false);
         for (const r of recs.slice(0, 10)) lines.push(`  (${r.priority}) ${r.action}`);
       }
       const text = lines.join('\n');
-      const blob = new Blob([text], { type: 'text/plain;charset=utf-8' });
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement('a');
-      a.href = url;
-      a.download = `bb-report-${plan.pattern?.id || 'plan'}.txt`;
-      a.click();
-      URL.revokeObjectURL(url);
-      flash('📄 Отчёт скачан: качество · безопасность · валидатор · рекомендации');
+      void saveTextFileApk(`bb-report-${plan.pattern?.id || 'plan'}.txt`, text, 'text/plain;charset=utf-8');
+      flash('📄 Отчёт сохранён: качество · безопасность · валидатор · рекомендации');
     } catch (e) { flash('⚠ Не удалось сформировать отчёт: ' + ((e as Error)?.message || e)); }
   };
 
@@ -4041,7 +4298,9 @@ const [bbVolumeWave, setBbVolumeWave] = useState(false);
    * тестами, но не имел точки входа в UI — пересборка остатка мезоцикла по факту
    * была мёртвой функцией. Кнопка доступна в плане, начиная со 2-й недели.
    */
+  const replanningRef = useRef(false);
   const handleReplanRemainder = async () => {
+    if (replanningRef.current) return;
     if (!effectivePlan) { flash('Сначала соберите план'); return; }
     const plan = effectivePlan;
     // Пересборка остатка работает только для плана, собранного из сплита:
@@ -4053,59 +4312,65 @@ const [bbVolumeWave, setBbVolumeWave] = useState(false);
     }
     const wk = Number(currentWeek?.week) || 0;
     if (wk < 2) { flash('Пересборка остатка доступна со 2-й недели мезоцикла (сейчас неделя 1)'); return; }
-    let sessions: any[] = [];
-    try { sessions = loadSessions() as any[]; } catch { sessions = []; }
-    // Пересборка = полная сборка плана (~190 мс) — считаем в воркере.
-    const result = await replanBBMesoAsync(plan as any, sessions as any, {
-      currentWeek: wk,
-      planStartWeek: startDateInput || (plan as any).planStartWeek,
-    });
-    if (!result) {
-      flash('Недостаточно данных для пересборки (нет снапшота входов или неделя вне диапазона)');
-      return;
+    replanningRef.current = true;
+    try {
+      let sessions: any[] = [];
+      try { sessions = loadSessions() as any[]; } catch { sessions = []; }
+      // Пересборка = полная сборка плана (~190 мс) — считаем в воркере.
+      const result = await replanBBMesoAsync(plan as any, sessions as any, {
+        currentWeek: wk,
+        planStartWeek: startDateInput || (plan as any).planStartWeek,
+      });
+      if (!result) {
+        flash('Недостаточно данных для пересборки (нет снапшота входов или неделя вне диапазона)');
+        return;
+      }
+      const notes = [`🔄 ${replanSummary(result)}`, ...result.changes.slice(0, 8).map(c => ` • ${c}`)];
+      const replanned = revalidateEditedPlan({
+        ...result.plan,
+        rationale: [...((result.plan as any).rationale || []), ...notes],
+      } as any);
+      setBuiltPlan(replanned);
+      persistPlanAndRuntime(replanned);
+      setExerciseEdits({});
+      setEditsHistory([]);
+      setRedosHistory([]);
+      setPrepApplied(false);
+      setPrepBasePlan(null);
+      flash(`🔄 ${replanSummary(result)}`);
+    } finally {
+      replanningRef.current = false;
     }
-    const notes = [`🔄 ${replanSummary(result)}`, ...result.changes.slice(0, 8).map(c => ` • ${c}`)];
-    setBuiltPlan(revalidateEditedPlan({
-      ...result.plan,
-      rationale: [...((result.plan as any).rationale || []), ...notes],
-    } as any));
-    setExerciseEdits({});
-    setEditsHistory([]);
-    setRedosHistory([]);
-    setPrepApplied(false);
-    setPrepBasePlan(null);
-    flash(`🔄 ${replanSummary(result)}`);
   };
 
-  /** PRO: CSV export — все сеты плана в CSV для Excel/Google Sheets. */
+  /** PRO: CSV export — все сеты плана в CSV для Excel/Google Sheets (APK-safe). */
   const handleExportCSV = () => {
     if (!effectivePlan) return;
     const plan = effectivePlan;
-    const rows: string[] = [['Неделя', 'День', 'Упражнение', 'Мышца', 'Подмышка', 'Роль', 'Сет', 'Повторы', 'Вес(кг)', 'RIR', 'Темп', 'Отдых(с)', 'Паттерн', 'Ключи техники', 'Растяжение', 'Пиковое сокращение', 'Ошибки', 'Комментарий', 'Техника/Схема', 'Пояснение'].join(',')];    for (const wk of plan.weeks) {
+    // Wave 7: UTF-8 BOM + точка с запятой (Excel RU-локаль), per-set tempo/rest и защита от формул.
+    const SEP = ';';
+    const csvCell = (v: any) => {
+      let s = String(v ?? '');
+      if (/^[=+\-@\t\r]/.test(s)) s = `'${s}`;
+      return `"${s.replace(/"/g, '""')}"`;
+    };
+    const rows: string[] = [['Неделя', 'День', 'Упражнение', 'Мышца', 'Подгруппа', 'Роль', 'Сет', 'Повторы', 'Вес(кг)', 'RIR', 'Темп', 'Отдых(с)', 'Паттерн', 'Ключи техники', 'Растяжение', 'Пиковое сокращение', 'Ошибки', 'Комментарий', 'Техника/Схема', 'Пояснение'].map(csvCell).join(SEP)];
+    for (const wk of plan.weeks) {
       for (let si = 0; si < wk.sessions.length; si++) {
         const s = wk.sessions[si];
         for (const ex of s.exercises) {
+          if ((ex as any).warmupActivator) continue;
           const ws = ex.workSets || [];
           const chain = techniqueChainParts(ex);
           const feat = [...exerciseFeatureBadges(ex).map(b => b.label), ...(chain ? [chain.label + ': ' + chain.parts.join(' -> ')] : [])].join('; ');
-          // §5.2: подмышка/пояснение — отдельными колонками (паттерн уже был)
           const expl = bbExerciseExplanation(ex);
           for (let i = 0; i < (ws.length || ex.sets); i++) {
-            const set = ws[i] || { reps: ex.repsRange?.[0] || 10, weight: 0, rir: ex.rir };
-            // Аудит 2026-10: защита от формульной инъекции Excel/Sheets
-            // (`=СУММ(...)`, `+1`, `-2`, `@x` в названии/комментарии выполнялись
-            // при открытии файла). Тот же приём, что в остальных CSV-экспортах
-            // проекта: префикс апострофа.
-            const csvCell = (v: any) => {
-              let s = String(v ?? '');
-              if (/^[=+\-@]/.test(s)) s = `'${s}`;
-              return `"${s.replace(/"/g, '""')}"`;
-            };
+            const set: any = ws[i] || { reps: ex.repsRange?.[0] || 10, weight: 0, rir: ex.rir };
             const esc = csvCell;
             rows.push([
               wk.week, si + 1, esc(ex.exerciseName || ex.name), esc(muscleLabel(ex.muscle)), esc(expl.subgroup),
-              ex.role, i + 1, set.reps, set.weight, set.rir,
-              esc(ex.tempoSpec || ''), ex.restSeconds || '',
+              esc(ex.role), i + 1, set.reps, set.weight, set.rir,
+              esc(set.tempo || ex.tempoSpec || ''), set.restSeconds ?? ex.restSeconds ?? '',
               esc(ex.executionProfile?.pattern || expl.pattern),
               esc(ex.executionProfile?.cues.join('; ') || ''),
               esc(ex.executionProfile?.stretch || ''),
@@ -4114,18 +4379,58 @@ const [bbVolumeWave, setBbVolumeWave] = useState(false);
               esc(ex.comment || ''),
               esc(feat),
               esc([expl.why, expl.how].filter(Boolean).join(' · ')),
-            ].join(','));
+            ].join(SEP));
           }
         }
       }
     }
-    const blob = new Blob(['\uFEFF' + rows.join('\n')], { type: 'text/csv;charset=utf-8;' });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = `bb-plan-${plan.pattern?.id || 'export'}-${plan.weeks.length}wk.csv`;
-    a.click();
-    URL.revokeObjectURL(url);
+    void saveCsvApk(`bb-plan-${plan.pattern?.id || 'export'}-${plan.weeks.length}wk.csv`, '\uFEFF' + rows.join('\r\n')).then(res => {
+      flash(res === 'failed' ? '⚠ Не удалось сохранить CSV в устройство' : `📥 CSV (${shareOutcomeLabel(res).toLowerCase()})`);
+    });
+  };
+
+  /** APK-совместимый экспорт и импорт полного бэкапа плана в JSON-файл. */
+  const handleExportPlanJson = () => {
+    if (!effectivePlan) return;
+    const plan = effectivePlan;
+    const payload = JSON.stringify({
+      format: 'bb-auto-plan-v1',
+      exportedAt: new Date().toISOString(),
+      startDate: startDateInput || (plan as any).planStartWeek || '',
+      plan,
+      edits: exerciseEdits,
+    }, null, 2);
+    const fname = `bb-plan-${plan.pattern?.id || 'plan'}-${plan.weeks.length}wk.json`;
+    void saveTextFileApk(fname, payload, 'application/json;charset=utf-8').then(res => {
+      flash(res === 'failed' ? '⚠ Не удалось сохранить JSON-файл плана' : `📦 Бэкап плана (${fname}): ${shareOutcomeLabel(res)}`);
+    });
+  };
+
+  const handleImportPlanJson = (rawText: string) => {
+    try {
+      const parsed = JSON.parse(rawText);
+      const rawPlan: any = parsed?.plan && Array.isArray(parsed.plan.weeks) ? parsed.plan : parsed;
+      if (!rawPlan || !Array.isArray(rawPlan.weeks) || rawPlan.weeks.length === 0) {
+        flash('⚠ Некорректный JSON плана (нет недель)');
+        return;
+      }
+      const nextPlan = revalidateEditedPlan(rawPlan as BBPlan);
+      setBuiltPlan(nextPlan);
+      setExerciseEdits(parsed?.edits && typeof parsed.edits === 'object' ? parsed.edits : {});
+      setEditsHistory([]);
+      setRedosHistory([]);
+      setWeightEntries([]);
+      setWeightsApplied(0);
+      if (typeof parsed?.startDate === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(parsed.startDate)) {
+        setStartDateInput(parsed.startDate);
+      }
+      persistPlanAndRuntime(nextPlan);
+      setBbWeekSel(1);
+      setStep('plan');
+      flash(`📂 План «${nextPlan.pattern?.name || 'ББ-план'}» (${nextPlan.weeks.length} нед) восстановлен`);
+    } catch {
+      flash('⚠ Не удалось прочитать JSON-файл плана');
+    }
   };
 
   const stepList: Step[] = planMode === 'programs' ? ['params','ped','plan','weights','quality','adjust','contest','annual','tools'] : ['params','ped','split','plan','weights','quality','adjust','contest','annual','tools'];
@@ -4169,11 +4474,7 @@ const [bbVolumeWave, setBbVolumeWave] = useState(false);
   const goAnnual = () => {
     if (effectivePlan && step !== 'annual') {
       try {
-        const annualSafety = calculatePlanSafetyScore(effectivePlan, {
-          acwrRatio: calculateACWR(),
-          injuries,
-          mobilityRestrictions,
-        });
+        const annualSafety = computePlanSafety(effectivePlan);
         const blockReason = bbPlanSaveBlockReason(effectivePlan, annualSafety);
         if (blockReason) {
           flash(`Цикл не автосохранён: ${blockReason}`);
@@ -4246,7 +4547,7 @@ const [bbVolumeWave, setBbVolumeWave] = useState(false);
             <div style={{ display:'flex', alignItems:'center', gap:6, flexWrap:'wrap', marginBottom:6 }}>
               <span style={{ fontSize:10, fontWeight:800, color:'#fbbf24' }}>Блок {idx + 1} · нед {blockWeekRange(idx, b.weeks)}</span>
               <PopupNumber label="" value={b.weeks} min={3} max={6} suffix=" нед" onChange={v => updateSpecBlock(b.id, { weeks: Math.max(3, Math.min(6, Math.round(v))) })} />
-              <button onClick={() => removeSpecBlock(b.id)} disabled={specBlocks.length <= 1} style={{ marginLeft:'auto', padding:'3px 8px', borderRadius:8, fontSize:10, fontWeight:700, cursor:specBlocks.length<=1?'default':'pointer', border:'1px solid rgba(239,68,68,0.35)', background:'rgba(239,68,68,0.08)', color:'#f87171', opacity:specBlocks.length<=1?0.4:1 }}>✕ Удалить</button>
+              <button onClick={() => removeSpecBlock(b.id)} style={{ marginLeft:'auto', padding:'3px 8px', borderRadius:8, fontSize:10, fontWeight:700, cursor:'pointer', border:'1px solid rgba(239,68,68,0.35)', background:'rgba(239,68,68,0.08)', color:'#f87171' }}>✕ Удалить</button>
             </div>
             <div style={{ display:'flex', flexWrap:'wrap', gap:4, marginBottom:6 }}>
               {WEAK_GROUPS.map(([id, l]) => {
@@ -4439,14 +4740,15 @@ const [bbVolumeWave, setBbVolumeWave] = useState(false);
       setUsePreviousPlan={setUsePreviousPlan}
       flash={flash}
       setStep={setStep}
+      onQuickBuild={buildBb}
     />
   );
 
   const renderPedWorkMax = () => (
     <BbPedWorkMaxStep
       peds={effectivePeds} setPeds={setPeds}
-      pedDoses={pedDoses} setPedDoses={setPedDoses}
-      courseIntensity={courseIntensity} setCourseIntensity={setCourseIntensity}
+      pedDoses={autoSyncCourse && courseSync.hasActiveCourse ? effectivePedDoses : pedDoses} setPedDoses={setPedDoses}
+      courseIntensity={effectiveCourseIntensity} setCourseIntensity={setCourseIntensity}
       pedAdapt={pedAdapt}
       level={bbLevel} goal={bbGoal} trainingFocus={bbTrainingFocus} weeks={bbWeeks}
       pedPhaseOverride={pedPhaseOverride} setPedPhaseOverride={setPedPhaseOverride}
@@ -4463,6 +4765,15 @@ const [bbVolumeWave, setBbVolumeWave] = useState(false);
       workMax={bbWorkMax} setWorkMax={setBbWorkMax}
       planMode={planMode}
       age={profileAge || undefined}
+      sex={linked.profile?.settings?.personal?.sex === 'female' ? 'female' : linked.profile?.settings?.personal?.sex === 'male' ? 'male' : undefined}
+      autoSyncCourse={autoSyncCourse}
+      onToggleAutoSyncCourse={v => {
+        setAutoSyncCourse(v);
+        flash(v ? '💉 Авто-синк активного курса включён' : '✍️ Ручной режим PED (курс не перезаписывает)');
+      }}
+      courseSummary={courseSync.summary}
+      coursePhase={courseSync.phase}
+      hasActiveCourse={courseSync.hasActiveCourse}
       onBuild={buildBb}
       onNext={() => setStep('split')}
       onBackToParams={() => setStep('params')}
@@ -4523,6 +4834,7 @@ const [bbVolumeWave, setBbVolumeWave] = useState(false);
       setStep={setStep}
       startDateInput={startDateInput}
       setStartDateInput={setStartDateInput}
+      onAutoFixVolume={() => { adjustVolume(0.9); flash('⚡ Объём снижен на 10% (проверьте баланс в шаге 6)'); }}
       actionRow={renderActionRow(false)}
     />
     {effectivePlan && (() => {
@@ -4787,9 +5099,14 @@ const [bbVolumeWave, setBbVolumeWave] = useState(false);
       handlePrintMesocycleTable={handlePrintMesocycleTable}
       handleExportQualityReport={handleExportQualityReport}
       handleExportCSV={handleExportCSV}
+      handleExportPlanJson={handleExportPlanJson}
+      handleImportPlanJson={handleImportPlanJson}
       handleLoadVariant={handleLoadVariant}
       handleDeleteVariant={handleDeleteVariant}
+      handleRenameVariant={handleRenameVariant}
       handleMoveExercise={handleMoveExercise}
+      handleAddExercise={handleAddExercise}
+      handleRemoveExercise={handleRemoveExercise}
       applyPeakWeekToCurrentPlan={applyPeakWeekToCurrentPlan}
       applyEditsToPlan={applyEditsToPlan}
     />
@@ -4827,12 +5144,12 @@ const [bbVolumeWave, setBbVolumeWave] = useState(false);
       <div>
         <BbContestPrepParams ctx={contestCtx} />
 
-        {/* Результат — wizard 5 Preview */}
+        {/* Результат — wizard 4 Trial & wizard 5 Preview (P0-2: шаг 4 раньше был скрыт в обёртке === 5) */}
         {prepPlan && (
-          <div style={{ display: contestWizard===5 ? 'block' : 'none', marginTop:10, padding:12, borderRadius:12, background:'rgba(236,72,153,0.05)', border:'1px solid rgba(236,72,153,0.2)' }}>
-            <BbContestPrepPreview ctx={contestCtx} />
+          <div style={{ display: (contestWizard===4 || contestWizard===5) ? 'block' : 'none', marginTop:10, padding:12, borderRadius:12, background:'rgba(236,72,153,0.05)', border:'1px solid rgba(236,72,153,0.2)' }}>
+            <div style={{ display: contestWizard===5 ? 'block' : 'none' }}><BbContestPrepPreview ctx={contestCtx} /></div>
             <BbContestPrepTrialSafety ctx={contestCtx} />
-            <BbContestPrepPost ctx={contestCtx} />
+            <div style={{ display: contestWizard===5 ? 'block' : 'none' }}><BbContestPrepPost ctx={contestCtx} /></div>
             </div>
           )}
           <div style={{ display:'flex', gap:8, marginTop:12 }}>
@@ -4846,7 +5163,12 @@ const [bbVolumeWave, setBbVolumeWave] = useState(false);
   // ── 🏁 Prep-цикл: отдельный режим подготовки к соревнованиям ──
   const minRec = recommendMinimalMode({ category: prepCat, enhanced: effectivePeds.length > 0, trainingYears: bbTrainingYears, level: bbLevel, minimalMuscles: prepMinimal });
   const prepPedContext = effectivePeds.length > 0
-    ? { ghIU: (pedDoses.GH ?? pedDoses.gh ?? 0) || undefined, trenMg: (pedDoses.tren ?? pedDoses.trenbolone ?? 0) || undefined, insulinIU: (pedDoses.insulin ?? 0) || undefined, diuretic: false }
+    ? {
+        ghIU: (effectivePedDoses.GH ?? effectivePedDoses.gh ?? 0) || undefined,
+        trenMg: (effectivePedDoses.tren ?? effectivePedDoses.trenbolone ?? 0) || undefined,
+        insulinIU: (effectivePedDoses.insulin ?? 0) || undefined,
+        diuretic: false,
+      }
     : undefined;
 
   const buildPrepCycleCfg = (): PrepCycleConfig => ({
@@ -4878,7 +5200,7 @@ const [bbVolumeWave, setBbVolumeWave] = useState(false);
     labWarnings: labAdjust?.warnings,
     labIntensityNote: labAdjust?.intensityNote,
     enhanced: effectivePeds.length > 0,
-    pedDoses,
+    pedDoses: effectivePedDoses,
     pedContext: prepPedContext,
     courseIntensity,
     trainingFocus: bbTrainingFocus,
@@ -5121,12 +5443,12 @@ const [bbVolumeWave, setBbVolumeWave] = useState(false);
   );
 
   return (
-    <div>
+    <div className="bb-auto-root">
       {/* Заголовок ББ-авто + кнопка «Начать заново» (как в ПЛ-авто) */}
-      <div style={PLANNER_HEAD_BAR}>
+      <div className="bb-auto-topbar" style={PLANNER_HEAD_BAR}>
         <span style={PLANNER_HEAD_TITLE}>💪 ББ-авто</span>
         <div style={{ display: 'flex', gap: 6, flexShrink: 0 }}>
-          <button onClick={() => { setPrepMode(true); setPrepResult(null); }} title="Отдельный режим подготовки к соревнованиям: категория, акценты/минимум, сплит 4-26 нед, тапер, даты" aria-label="Prep-цикл" style={{ padding: '5px 10px', borderRadius: 8, fontSize: 11, fontWeight: 800, cursor: 'pointer', border: '1px solid rgba(236,72,153,0.4)', background: prepMode ? 'linear-gradient(135deg,#ec4899,#be185d)' : 'rgba(236,72,153,0.1)', color: prepMode ? '#fff' : '#ec4899', minHeight: 30 }}>🏁 Prep-цикл</button>
+          <button onClick={() => { setPrepMode(true); setPrepResult(null); setPrepStep('params'); }} title="Отдельный режим подготовки к соревнованиям: категория, акценты/минимум, сплит 4-26 нед, тапер, даты" aria-label="Prep-цикл" style={{ padding: '5px 10px', borderRadius: 8, fontSize: 11, fontWeight: 800, cursor: 'pointer', border: '1px solid rgba(236,72,153,0.4)', background: prepMode ? 'linear-gradient(135deg,#ec4899,#be185d)' : 'rgba(236,72,153,0.1)', color: prepMode ? '#fff' : '#ec4899', minHeight: 30 }}>🏁 Prep-цикл</button>
           <button onClick={() => setResetAsk(true)} title="Сбросить сборку и начать заново" aria-label="Начать заново" style={{ padding: '5px 10px', borderRadius: 8, fontSize: 11, fontWeight: 700, cursor: 'pointer', border: '1px solid rgba(244,63,94,0.35)', background: 'rgba(244,63,94,0.08)', color: '#fb7185', minHeight: 30, flexShrink: 0 }}>🔄 Начать заново</button>
         </div>
       </div>
@@ -5205,6 +5527,36 @@ const [bbVolumeWave, setBbVolumeWave] = useState(false);
       {step === 'quality' && renderQuality()}
       {step === 'adjust' && renderAdjust()}
       {step === 'contest' && renderContestPrep()}
+      {!prepMode && (step === 'params' || step === 'ped' || step === 'split') && (
+        <div className="bb-auto-sticky-cta" data-bb="sticky-cta">
+          <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+            {step === 'params' && (
+              <>
+                <button type="button" style={{ ...BTN, flex: 1 }} onClick={buildBb} disabled={isBuilding}>
+                  {isBuilding ? '⏳ Сборка…' : '⚡ Собрать план'}
+                </button>
+                <button type="button" style={BTN_GHOST} onClick={() => setStep('ped')}>Далее: PED →</button>
+              </>
+            )}
+            {step === 'ped' && (
+              <>
+                <button type="button" style={BTN_GHOST} onClick={() => setStep('params')}>← Параметры</button>
+                <button type="button" style={{ ...BTN, flex: 1 }} onClick={() => planMode === 'programs' ? buildBb() : setStep('split')}>
+                  {planMode === 'programs' ? '⚡ Собрать план →' : 'Далее: Сплит →'}
+                </button>
+              </>
+            )}
+            {step === 'split' && (
+              <>
+                <button type="button" style={BTN_GHOST} onClick={() => setStep('ped')}>← PED</button>
+                <button type="button" style={{ ...BTN, flex: 1 }} onClick={buildBb} disabled={isBuilding}>
+                  {isBuilding ? '⏳ Сборка…' : `✅ Собрать план (${bbWeeks} нед)`}
+                </button>
+              </>
+            )}
+          </div>
+        </div>
+      )}
       {step === 'tools' && (
         <div style={{ minWidth: 0, maxWidth: '100%' }}>
           <div style={H}>🔧 Инструменты ББ</div>

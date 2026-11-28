@@ -1,15 +1,18 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
+import ReactDOM from 'react-dom';
 import { INJURY_LOCATIONS } from '../../../core/constants';
 
-const ACCENT = '#00e68a';
+const ACCENT = 'var(--accent, #00e68a)';
 
 const overlay: React.CSSProperties = {
   position: 'fixed', inset: 0, zIndex: 250, display: 'flex',
   alignItems: 'center', justifyContent: 'center', background: 'rgba(0,0,0,0.85)',
+  paddingBottom: 'env(safe-area-inset-bottom, 0px)',
 };
 const sheet: React.CSSProperties = {
   width: '88%', maxWidth: 400, maxHeight: '78vh', borderRadius: 16,
-  background: '#18181b', border: '1px solid rgba(255,255,255,0.1)', overflow: 'hidden',
+  background: 'var(--card-bg, #18181b)', color: 'var(--text, #fff)',
+  border: '1px solid var(--border, rgba(255,255,255,0.1))', overflow: 'hidden',
 };
 const topBar: React.CSSProperties = { height: 3, background: 'linear-gradient(90deg,#00e68a,#00c853)' };
 const sheetBody: React.CSSProperties = { padding: '14px 16px', maxHeight: 'calc(78vh - 3px)', overflowY: 'auto' };
@@ -98,6 +101,12 @@ export const InjurySelectCard: React.FC<Props> = ({ injuries, onChange }) => {
 
   const activeCount = injuries.filter(isActive).length;
   const totalCount = injuries.length;
+  useEffect(() => {
+    if (!open) return;
+    const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') setOpen(false); };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [open]);
 
   const addInjury = (muscle: string) => {
     if (injuries.some(i => i.muscle === muscle && isActive(i))) return;
@@ -144,8 +153,8 @@ export const InjurySelectCard: React.FC<Props> = ({ injuries, onChange }) => {
         </div>
       </button>
 
-      {open && (
-        <div style={overlay} onClick={() => setOpen(false)}>
+      {open && typeof document !== 'undefined' && ReactDOM.createPortal(
+        <div role="dialog" aria-modal="true" aria-label="Травмы и ограничения" style={overlay} onClick={() => setOpen(false)}>
           <div onClick={e => e.stopPropagation()} style={sheet}>
             <div style={topBar} />
             <div style={sheetBody}>
@@ -365,13 +374,14 @@ export const InjurySelectCard: React.FC<Props> = ({ injuries, onChange }) => {
 
               <button onClick={() => setOpen(false)}
                 style={{
-                  width: '100%', marginTop: 12, padding: '10px', borderRadius: 8, fontSize: 12,
+                  width: '100%', marginTop: 12, padding: '10px', borderRadius: 8, fontSize: 12, minHeight: 44,
                   fontWeight: 700, cursor: 'pointer', border: 'none',
-                  background: 'linear-gradient(135deg,#00e68a,#00c853)', color: '#000',
+                  background: 'var(--accent-gradient, linear-gradient(135deg,#00e68a,#00c853))', color: 'var(--accent-contrast, #000)',
                 }}>Готово</button>
             </div>
           </div>
-        </div>
+        </div>,
+        document.body,
       )}
     </div>
   );

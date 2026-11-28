@@ -145,7 +145,7 @@ export const BbQualityLoadOverview: React.FC<BbQualityLoadOverviewProps> = ({
                 borderRadius: 20,
                 background: 'rgba(255,255,255,0.04)',
                 border: '1px solid rgba(255,255,255,0.06)',
-                color: '#fff',
+                color: 'var(--text, #fff)',
               }}
             >
               Уровень {bbLevel} · Цель {bbGoal} · Фокус {bbTrainingFocus}
@@ -156,7 +156,7 @@ export const BbQualityLoadOverview: React.FC<BbQualityLoadOverviewProps> = ({
                 borderRadius: 20,
                 background: 'rgba(255,255,255,0.04)',
                 border: '1px solid rgba(255,255,255,0.06)',
-                color: '#fff',
+                color: 'var(--text, #fff)',
               }}
             >
               Методика {bbMethodology} · Объём {bbVolGoal}
@@ -168,7 +168,7 @@ export const BbQualityLoadOverview: React.FC<BbQualityLoadOverviewProps> = ({
                 borderRadius: 20,
                 background: 'rgba(255,255,255,0.04)',
                 border: '1px solid rgba(255,255,255,0.06)',
-                color: '#fff',
+                color: 'var(--text, #fff)',
               }}
             >
               Прогрессия {loadStrategy} · RIR{' '}
@@ -189,7 +189,7 @@ export const BbQualityLoadOverview: React.FC<BbQualityLoadOverviewProps> = ({
               </span>
             )}
           </div>
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 6, fontSize: 10, color: '#fff' }}>
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 6, fontSize: 10, color: 'var(--text, #fff)' }}>
             <div
               style={{
                 padding: '6px 8px',
@@ -220,8 +220,8 @@ export const BbQualityLoadOverview: React.FC<BbQualityLoadOverviewProps> = ({
                 border: '1px solid rgba(255,255,255,0.06)',
               }}
             >
-              <b>Оборудование:</b> {bbEquipment.slice(0, 3).join(', ') || 'всё'} · <b>Слабые:</b>{' '}
-              {specTargets.join(' + ') || 'баланс'}
+              <b>Оборудование:</b> {bbEquipment.slice(0, 3).join(', ') || 'всё'} · <b>Специализация:</b>{' '}
+              {specTargets.map(m => MUSCLE_LABEL_RU[m] || m).join(' + ') || 'баланс'}
             </div>
             <div
               style={{
@@ -236,7 +236,7 @@ export const BbQualityLoadOverview: React.FC<BbQualityLoadOverviewProps> = ({
               ×/нед
             </div>
           </div>
-          <div style={{ fontSize: 10, color: '#fff', opacity: 0.6, display: 'flex', flexWrap: 'wrap', gap: 6 }}>
+          <div style={{ fontSize: 10, color: 'var(--text, #fff)', opacity: 0.6, display: 'flex', flexWrap: 'wrap', gap: 6 }}>
             <span>Уровень «{bbLevel}»</span>
             <span>Цель «{bbGoal}»</span>
             <span>Фокус «{bbTrainingFocus}»</span>
@@ -256,7 +256,7 @@ export const BbQualityLoadOverview: React.FC<BbQualityLoadOverviewProps> = ({
         badge={`Объём ${quality.viewVolume}/100 · PRO ${quality.viewPro}/100 · ${quality.viewTag}`}
       >
         <div style={{ display: 'grid', gap: 8, fontSize: 11 }}>
-          <div style={{ fontSize: 10, color: '#fff', opacity: 0.6, lineHeight: 1.35 }}>
+          <div style={{ fontSize: 10, color: 'var(--text, #fff)', opacity: 0.6, lineHeight: 1.35 }}>
             Две отдельные шкалы (не суммируются): «Объём» — факт недели vs собственные цели/капы/параметры плана; «PRO»
             — факт исполнения (паттерны/углы/растяжка/техники). Каждая неделя — по правилам своей фазы; «Среднее» —
             среднее понедельных.
@@ -354,7 +354,7 @@ export const BbQualityLoadOverview: React.FC<BbQualityLoadOverviewProps> = ({
                 />
               </button>
             ))}
-            <span style={{ fontSize: 9, color: '#fff', opacity: 0.5, marginLeft: 6 }}>
+            <span style={{ fontSize: 9, color: 'var(--text, #fff)', opacity: 0.5, marginLeft: 6 }}>
               🟩 объём · 🟦 PRO · клик — неделя
             </span>
           </div>
@@ -399,8 +399,8 @@ export const BbQualityLoadOverview: React.FC<BbQualityLoadOverviewProps> = ({
                     fontSize: 10,
                   }}
                 >
-                  <span style={{ fontWeight: 700, color: '#fff' }}>{m.label || m.muscle}</span>
-                  <span style={{ color: '#fff' }}>
+                  <span style={{ fontWeight: 700, color: 'var(--text, #fff)' }}>{m.label || m.muscle}</span>
+                  <span style={{ color: 'var(--text, #fff)' }}>
                     {m.effectiveSets} эфф{' '}
                     <span style={{ opacity: 0.55 }}>
                       ({m.directSets} прям{m.targetSets > 0 ? ` · цель ${m.targetSets}` : ''})
@@ -422,12 +422,12 @@ export const BbQualityLoadOverview: React.FC<BbQualityLoadOverviewProps> = ({
               .filter((i: any) => i.severity !== 'info')
               .slice(0, 5)
               .map((i: any, idx: number) => (
-                <div key={'v' + idx} style={{ color: '#fff' }}>
+                <div key={'v' + idx} style={{ color: 'var(--text, #fff)' }}>
                   {i.severity === 'error' ? '🔴' : '🟡'} {i.message} <span style={{ opacity: 0.55 }}>[{i.source}]</span>
                 </div>
               ))}
             {quality.selPro.totalIssues.slice(0, 3).map((iss: string, idx: number) => (
-              <div key={'p' + idx} style={{ color: '#fff' }}>
+              <div key={'p' + idx} style={{ color: 'var(--text, #fff)' }}>
                 🔵 {iss}
               </div>
             ))}
@@ -435,7 +435,7 @@ export const BbQualityLoadOverview: React.FC<BbQualityLoadOverviewProps> = ({
               .filter((i: any) => i.severity === 'info')
               .slice(0, 2)
               .map((i: any, idx: number) => (
-                <div key={'n' + idx} style={{ color: '#fff', opacity: 0.55 }}>
+                <div key={'n' + idx} style={{ color: 'var(--text, #fff)', opacity: 0.55 }}>
                   ℹ️ {i.message} <span style={{ opacity: 0.7 }}>[{i.source}]</span>
                 </div>
               ))}
@@ -460,9 +460,9 @@ export const BbQualityLoadOverview: React.FC<BbQualityLoadOverviewProps> = ({
             <div
               style={{ padding: '6px 8px', borderRadius: 8, background: 'rgba(255,255,255,0.04)', textAlign: 'center' }}
             >
-              <div style={{ fontSize: 9, color: '#fff', opacity: 0.6 }}>Сетов пик</div>
+              <div style={{ fontSize: 9, color: 'var(--text, #fff)', opacity: 0.6 }}>Сетов пик</div>
               <div style={{ fontSize: 14, fontWeight: 800, color: '#00e68a' }}>{metrics.totalSets}</div>
-              <div style={{ fontSize: 9, color: '#fff', opacity: 0.5 }}>
+              <div style={{ fontSize: 9, color: 'var(--text, #fff)', opacity: 0.5 }}>
                 средн.{' '}
                 {Math.round(
                   W.reduce(
@@ -476,20 +476,20 @@ export const BbQualityLoadOverview: React.FC<BbQualityLoadOverviewProps> = ({
             <div
               style={{ padding: '6px 8px', borderRadius: 8, background: 'rgba(239,68,68,0.06)', textAlign: 'center' }}
             >
-              <div style={{ fontSize: 9, color: '#fff', opacity: 0.6 }}>Тяж</div>
+              <div style={{ fontSize: 9, color: 'var(--text, #fff)', opacity: 0.6 }}>Тяж</div>
               <div style={{ fontSize: 14, fontWeight: 800, color: '#ef4444' }}>
                 {(metrics.тяжPct * 100).toFixed(0)}%
               </div>
-              <div style={{ fontSize: 9, color: '#fff', opacity: 0.5 }}>RIR {metrics.avgRir.toFixed(1)}</div>
+              <div style={{ fontSize: 9, color: 'var(--text, #fff)', opacity: 0.5 }}>RIR {metrics.avgRir.toFixed(1)}</div>
             </div>
             <div
               style={{ padding: '6px 8px', borderRadius: 8, background: 'rgba(96,165,250,0.06)', textAlign: 'center' }}
             >
-              <div style={{ fontSize: 9, color: '#fff', opacity: 0.6 }}>Памп</div>
+              <div style={{ fontSize: 9, color: 'var(--text, #fff)', opacity: 0.6 }}>Памп</div>
               <div style={{ fontSize: 14, fontWeight: 800, color: '#60a5fa' }}>
                 {(metrics.пампPct * 100).toFixed(0)}%
               </div>
-              <div style={{ fontSize: 9, color: '#fff', opacity: 0.5 }}>
+              <div style={{ fontSize: 9, color: 'var(--text, #fff)', opacity: 0.5 }}>
                 {W.length} нед · {W[0]?.sessions.length || 0} дн/нед
               </div>
             </div>
@@ -552,14 +552,14 @@ export const BbQualityLoadOverview: React.FC<BbQualityLoadOverviewProps> = ({
                     {proQ.technique.ok ? '✅' : '⚠️ ' + (proQ.technique.issue || '')}
                   </div>
                 </div>
-                <div style={{ fontSize: 10, color: '#fff', opacity: 0.6 }}>
+                <div style={{ fontSize: 10, color: 'var(--text, #fff)', opacity: 0.6 }}>
                   Цель «{proQ.goalAlignment?.goal || bbGoal}» —{' '}
                   {proQ.goalAlignment?.ok ? 'согласована с фокусом ✅' : '⚠️ ' + (proQ.goalAlignment?.issue || '')} ·
                   техники {proQ.technique.pct}%
                   {proQ.goalAlignment?.recommendation ? ' · ' + proQ.goalAlignment.recommendation : ''}
                 </div>
                 {proQ.totalIssues.length > 0 && (
-                  <div style={{ fontSize: 10, color: '#fff' }}>
+                  <div style={{ fontSize: 10, color: 'var(--text, #fff)' }}>
                     {proQ.totalIssues.slice(0, 3).map((iss: any, i: number) => (
                       <div key={i}>• {iss}</div>
                     ))}
@@ -579,7 +579,7 @@ export const BbQualityLoadOverview: React.FC<BbQualityLoadOverviewProps> = ({
               </div>
             );
           })()}
-          <div style={{ fontSize: 10, color: '#fff', opacity: 0.5 }}>
+          <div style={{ fontSize: 10, color: 'var(--text, #fff)', opacity: 0.5 }}>
             Фаз: {Array.from(new Set(W.map((w: any) => (w as any).phase || 'accumulation'))).length} ·{' '}
             {W.map((w) => `${PHASE_LABELS[((w as any).phase || 'accumulation') as BBPhase] || (w as any).phase}`)
               .join(' → ')
@@ -598,9 +598,9 @@ export const BbQualityLoadOverview: React.FC<BbQualityLoadOverviewProps> = ({
         const acwrQ = ratio;
         const needsDeloadQ = autoDeload && acwrQ && acwrQ.ratio > 1.3;
         const wkExs = wkq.sessions.flatMap((s) => s.exercises);
-        const avgRirFact = wkExs.length
-          ? wkExs.reduce((a, e) => a + (Number.isFinite(e.rir) ? e.rir * e.sets : 0), 0) /
-              wkExs.reduce((a, e) => a + e.sets, 0) || 1
+        const totalSetsForRir = wkExs.reduce((a, e) => a + (Number.isFinite(e.rir) ? (e.sets || 0) : 0), 0);
+        const avgRirFact = totalSetsForRir > 0
+          ? wkExs.reduce((a, e) => a + (Number.isFinite(e.rir) ? e.rir * (e.sets || 0) : 0), 0) / totalSetsForRir
           : 0;
         const repsAll = wkExs.flatMap((e) => e.workSets?.map((ws: any) => ws.reps) ?? [e.repsRange?.[0] ?? 10]);
         const repMin = repsAll.length ? Math.min(...repsAll) : 0;
@@ -646,7 +646,7 @@ export const BbQualityLoadOverview: React.FC<BbQualityLoadOverviewProps> = ({
                   📌 Фаза (факт): {PHASE_LABELS[curPh]} · нед {wkq.week}/{Wq.length}
                 </span>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 8, flex: 1, minWidth: 220, maxWidth: 360 }}>
-                  <span style={{ fontSize: 10, color: '#fff', opacity: 0.6, whiteSpace: 'nowrap' }}>1</span>
+                  <span style={{ fontSize: 10, color: 'var(--text, #fff)', opacity: 0.6, whiteSpace: 'nowrap' }}>1</span>
                   <input
                     type="range"
                     min={1}
@@ -656,12 +656,12 @@ export const BbQualityLoadOverview: React.FC<BbQualityLoadOverviewProps> = ({
                     onChange={(e) => setBbWeekSel(Number(e.target.value))}
                     style={{ flex: 1, accentColor: PHASE_COLORS[curPh] }}
                   />
-                  <span style={{ fontSize: 10, color: '#fff', opacity: 0.6, whiteSpace: 'nowrap' }}>{Wq.length}</span>
+                  <span style={{ fontSize: 10, color: 'var(--text, #fff)', opacity: 0.6, whiteSpace: 'nowrap' }}>{Wq.length}</span>
                 </div>
                 <span
                   style={{
                     fontSize: 11,
-                    color: '#fff',
+                    color: 'var(--text, #fff)',
                     background: 'rgba(255,255,255,0.06)',
                     padding: '2px 8px',
                     borderRadius: 20,
@@ -717,7 +717,7 @@ export const BbQualityLoadOverview: React.FC<BbQualityLoadOverviewProps> = ({
                       display: 'grid',
                       gap: 2,
                       fontSize: 10,
-                      color: '#fff',
+                      color: 'var(--text, #fff)',
                       lineHeight: 1.35,
                       fontFamily: 'ui-monospace, monospace',
                     }}
@@ -750,7 +750,7 @@ export const BbQualityLoadOverview: React.FC<BbQualityLoadOverviewProps> = ({
                     border: '1px solid rgba(255,255,255,0.06)',
                   }}
                 >
-                  <div style={{ fontSize: 10, fontWeight: 800, color: '#fff', marginBottom: 4 }}>
+                  <div style={{ fontSize: 10, fontWeight: 800, color: 'var(--text, #fff)', marginBottom: 4 }}>
                     Факт недели {wkq.week} — расчёт
                   </div>
                   <div
@@ -758,7 +758,7 @@ export const BbQualityLoadOverview: React.FC<BbQualityLoadOverviewProps> = ({
                       display: 'grid',
                       gap: 2,
                       fontSize: 10,
-                      color: '#fff',
+                      color: 'var(--text, #fff)',
                       lineHeight: 1.35,
                       fontFamily: 'ui-monospace, monospace',
                     }}
@@ -780,7 +780,7 @@ export const BbQualityLoadOverview: React.FC<BbQualityLoadOverviewProps> = ({
                   </div>
                 </div>
               </div>
-              <div style={{ marginTop: 6, fontSize: 11, color: '#fff', lineHeight: 1.4 }}>
+              <div style={{ marginTop: 6, fontSize: 11, color: 'var(--text, #fff)', lineHeight: 1.4 }}>
                 {curPh === 'accumulation' &&
                   '🎯 Накопление: метаболический стресс, больший объём, умеренные веса. Дрифт RIR −1/2н, повторы −1/2н, объём ×1.0.'}
                 {curPh === 'intensification' &&
@@ -792,7 +792,7 @@ export const BbQualityLoadOverview: React.FC<BbQualityLoadOverviewProps> = ({
                 style={{
                   marginTop: 6,
                   fontSize: 10,
-                  color: '#fff',
+                  color: 'var(--text, #fff)',
                   opacity: 0.7,
                   display: 'flex',
                   flexWrap: 'wrap',
@@ -887,7 +887,7 @@ export const BbQualityLoadOverview: React.FC<BbQualityLoadOverviewProps> = ({
                       <div
                         style={{ textAlign: 'center', padding: 6, borderRadius: 8, background: 'rgba(34,197,94,0.06)' }}
                       >
-                        <div style={{ color: '#fff', fontSize: 10 }}>Объём</div>
+                        <div style={{ color: 'var(--text, #fff)', fontSize: 10 }}>Объём</div>
                         <div style={{ fontWeight: 700, color: '#22c55e' }}>
                           −{Math.round((1 - dp.volumeMultiplier) * 100)}%
                         </div>
@@ -895,7 +895,7 @@ export const BbQualityLoadOverview: React.FC<BbQualityLoadOverviewProps> = ({
                       <div
                         style={{ textAlign: 'center', padding: 6, borderRadius: 8, background: 'rgba(34,197,94,0.06)' }}
                       >
-                        <div style={{ color: '#fff', fontSize: 10 }}>Интенсивность</div>
+                        <div style={{ color: 'var(--text, #fff)', fontSize: 10 }}>Интенсивность</div>
                         <div style={{ fontWeight: 700, color: '#22c55e' }}>
                           −{Math.round((1 - dp.intensityMultiplier) * 100)}%
                         </div>
@@ -903,13 +903,13 @@ export const BbQualityLoadOverview: React.FC<BbQualityLoadOverviewProps> = ({
                       <div
                         style={{ textAlign: 'center', padding: 6, borderRadius: 8, background: 'rgba(34,197,94,0.06)' }}
                       >
-                        <div style={{ color: '#fff', fontSize: 10 }}>RIR</div>
+                        <div style={{ color: 'var(--text, #fff)', fontSize: 10 }}>RIR</div>
                         <div style={{ fontWeight: 700, color: '#22c55e' }}>→{dp.rirTarget}</div>
                       </div>
                       <div
                         style={{ textAlign: 'center', padding: 6, borderRadius: 8, background: 'rgba(34,197,94,0.06)' }}
                       >
-                        <div style={{ color: '#fff', fontSize: 10 }}>Повторения</div>
+                        <div style={{ color: 'var(--text, #fff)', fontSize: 10 }}>Повторения</div>
                         <div style={{ fontWeight: 700, color: '#22c55e' }}>
                           {dp.repRange[0]}-{dp.repRange[1]}
                         </div>
@@ -1010,7 +1010,7 @@ export const BbQualityLoadVolume: React.FC<BbQualityLoadVolumeProps> = ({
           };
           const GROUPS: Array<{ id: string; label: string; icon: string; muscles: string[] }> = [
             { id: 'chest', label: 'Грудь', icon: '🧱', muscles: ['chest'] },
-            { id: 'back', label: 'Спина', icon: '🦴', muscles: ['back'] },
+            { id: 'back', label: 'Спина', icon: '🦴', muscles: ['back', 'traps'] },
             { id: 'shoulders', label: 'Плечи', icon: '🤸', muscles: ['delt_front', 'delt_mid', 'delt_rear'] },
             { id: 'legs', label: 'Ноги', icon: '🦵', muscles: ['quads', 'hamstrings', 'glutes', 'calves'] },
             { id: 'arms', label: 'Руки', icon: '💪', muscles: ['biceps', 'triceps', 'forearms'] },
@@ -1050,13 +1050,13 @@ export const BbQualityLoadVolume: React.FC<BbQualityLoadVolumeProps> = ({
                   textAlign: 'left',
                 }}
               >
-                <span style={{ fontSize: 12, fontWeight: 900, color: '#fff' }}>📊 Тренировочный объём — PRO</span>
+                <span style={{ fontSize: 12, fontWeight: 900, color: 'var(--text, #fff)' }}>📊 Тренировочный объём — PRO</span>
                 <span
                   style={{
                     marginLeft: 'auto',
                     fontSize: 10,
                     fontWeight: 700,
-                    color: '#fff',
+                    color: 'var(--text, #fff)',
                     background: 'rgba(255,255,255,0.06)',
                     padding: '3px 8px',
                     borderRadius: 20,
@@ -1076,7 +1076,7 @@ export const BbQualityLoadVolume: React.FC<BbQualityLoadVolumeProps> = ({
                     justifyContent: 'center',
                     background: 'rgba(255,255,255,0.06)',
                     border: '1px solid rgba(255,255,255,0.08)',
-                    color: '#fff',
+                    color: 'var(--text, #fff)',
                     fontSize: 11,
                     transform: qualityVolumeOpen ? 'rotate(0deg)' : 'rotate(-90deg)',
                     transition: 'transform 0.2s',
@@ -1094,7 +1094,7 @@ export const BbQualityLoadVolume: React.FC<BbQualityLoadVolumeProps> = ({
                     borderBottom: '1px solid rgba(255,255,255,0.04)',
                   }}
                 >
-                  <div style={{ fontSize: 10, color: '#fff', opacity: 0.72, lineHeight: 1.35 }}>
+                  <div style={{ fontSize: 10, color: 'var(--text, #fff)', opacity: 0.72, lineHeight: 1.35 }}>
                     Пиковая неделя — максимум нагрузки · мезоцикл {totalWeeks} нед · прямой / косвенный / эффективный (с
                     учётом вторичной работы) · подмышцы · частота · статус MEV/MAV/MRV · паттерны/углы/растяжка
                     {pedAdapt.combinedMrvMultiplier > 1 && (
@@ -1112,7 +1112,7 @@ export const BbQualityLoadVolume: React.FC<BbQualityLoadVolumeProps> = ({
                       </span>
                     )}
                   </div>
-                  <div style={{ marginTop: 6, display: 'flex', gap: 6, flexWrap: 'wrap', fontSize: 10, color: '#fff' }}>
+                  <div style={{ marginTop: 6, display: 'flex', gap: 6, flexWrap: 'wrap', fontSize: 10, color: 'var(--text, #fff)' }}>
                     <span>
                       <span style={{ color: '#22c55e' }}>●</span> MEV минимум
                     </span>
@@ -1164,7 +1164,7 @@ export const BbQualityLoadVolume: React.FC<BbQualityLoadVolumeProps> = ({
                                 badge={`${Math.round(m.effectiveSets)} эфф`}
                                 headerStyle={{
                                   background: 'linear-gradient(135deg, rgba(255,255,255,0.06), rgba(255,255,255,0.02))',
-                                  color: '#fff',
+                                  color: 'var(--text, #fff)',
                                 }}
                               >
                                 <div style={{ padding: 0, borderRadius: 9, background: 'rgba(0,0,0,0.14)' }}>
@@ -1177,7 +1177,7 @@ export const BbQualityLoadVolume: React.FC<BbQualityLoadVolumeProps> = ({
                                       flexWrap: 'wrap',
                                     }}
                                   >
-                                    <span style={{ fontSize: 11, fontWeight: 800, color: '#fff' }}>{ru(m.muscle)}</span>
+                                    <span style={{ fontSize: 11, fontWeight: 800, color: 'var(--text, #fff)' }}>{ru(m.muscle)}</span>
                                     <span
                                       style={{
                                         fontSize: 10,
@@ -1199,7 +1199,7 @@ export const BbQualityLoadVolume: React.FC<BbQualityLoadVolumeProps> = ({
                                       gap: 6,
                                       flexWrap: 'wrap',
                                       fontSize: 10,
-                                      color: '#fff',
+                                      color: 'var(--text, #fff)',
                                       lineHeight: 1.35,
                                     }}
                                   >
@@ -1307,7 +1307,7 @@ export const BbQualityLoadVolume: React.FC<BbQualityLoadVolumeProps> = ({
                                       justifyContent: 'space-between',
                                       gap: 8,
                                       fontSize: 10,
-                                      color: '#fff',
+                                      color: 'var(--text, #fff)',
                                       marginTop: 4,
                                       flexWrap: 'wrap',
                                     }}
@@ -1366,7 +1366,7 @@ export const BbQualityLoadVolume: React.FC<BbQualityLoadVolumeProps> = ({
                                           background: 'rgba(255,255,255,0.03)',
                                           border: '1px solid rgba(255,255,255,0.05)',
                                           fontSize: 10,
-                                          color: '#fff',
+                                          color: 'var(--text, #fff)',
                                           lineHeight: 1.35,
                                         }}
                                       >
@@ -1407,7 +1407,7 @@ export const BbQualityLoadVolume: React.FC<BbQualityLoadVolumeProps> = ({
                                   })()}
                                   {isBack && Object.keys(backSubPeak).length > 0 && (
                                     <div style={{ marginTop: 6, display: 'grid', gap: 4 }}>
-                                      <div style={{ fontSize: 9, fontWeight: 700, color: '#fff', opacity: 0.6 }}>
+                                      <div style={{ fontSize: 9, fontWeight: 700, color: 'var(--text, #fff)', opacity: 0.6 }}>
                                         Подмышцы спины (пик / мезо) + паттерны/углы/растяжка:
                                       </div>
                                       {Object.entries(backSubPeak)
@@ -1415,15 +1415,9 @@ export const BbQualityLoadVolume: React.FC<BbQualityLoadVolumeProps> = ({
                                         .slice(0, 4)
                                         .map(([sub, v]) => {
                                           const subPro = (quality as any).proResult as any;
-                                          const subFindPat = subPro?.patterns.find(
-                                            (pp: any) => pp.muscle === 'back' && (pp as any).subgroup === sub,
-                                          );
-                                          const subFindAng = subPro?.angles.find(
-                                            (aa: any) => aa.muscle === 'back' && (aa as any).subgroup === sub,
-                                          );
-                                          const subFindStr = subPro?.stretches.find(
-                                            (ss: any) => ss.muscle === 'back' && (ss as any).subgroup === sub,
-                                          );
+                                          const subFindPat = subPro?.patterns?.find((pp: any) => pp.muscle === 'back');
+                                          const subFindAng = subPro?.angles?.find((aa: any) => aa.muscle === 'back');
+                                          const subFindStr = subPro?.stretches?.find((ss: any) => ss.muscle === 'back');
                                           return (
                                             <div
                                               key={sub}
@@ -1441,7 +1435,7 @@ export const BbQualityLoadVolume: React.FC<BbQualityLoadVolumeProps> = ({
                                                   display: 'flex',
                                                   justifyContent: 'space-between',
                                                   fontSize: 10,
-                                                  color: '#fff',
+                                                  color: 'var(--text, #fff)',
                                                 }}
                                               >
                                                 <span style={{ fontWeight: 700 }}>{SUB_LABEL[sub] || sub}</span>
@@ -1452,7 +1446,7 @@ export const BbQualityLoadVolume: React.FC<BbQualityLoadVolumeProps> = ({
                                               </div>
                                               {(subFindPat || subFindAng || subFindStr) && (
                                                 <div
-                                                  style={{ fontSize: 9, color: '#fff', lineHeight: 1.3, opacity: 0.85 }}
+                                                  style={{ fontSize: 9, color: 'var(--text, #fff)', lineHeight: 1.3, opacity: 0.85 }}
                                                 >
                                                   {subFindPat && (
                                                     <div>
@@ -1478,7 +1472,7 @@ export const BbQualityLoadVolume: React.FC<BbQualityLoadVolumeProps> = ({
                                                 </div>
                                               )}
                                               {!subFindPat && !subFindAng && !subFindStr && (
-                                                <div style={{ fontSize: 9, color: '#fff', opacity: 0.6 }}>
+                                                <div style={{ fontSize: 9, color: 'var(--text, #fff)', opacity: 0.6 }}>
                                                   Паттерны спины общие: тяги вертикаль/горизонталь · углы в норме ·
                                                   растяжка: тяга с паузой
                                                 </div>
@@ -1499,7 +1493,7 @@ export const BbQualityLoadVolume: React.FC<BbQualityLoadVolumeProps> = ({
                   <div
                     style={{
                       fontSize: 9,
-                      color: '#fff',
+                      color: 'var(--text, #fff)',
                       opacity: 0.5,
                       lineHeight: 1.35,
                       padding: '6px 8px',
@@ -1549,7 +1543,7 @@ export const BbQualityLoadVolume: React.FC<BbQualityLoadVolumeProps> = ({
             badge={`нед ${selW}/${totalW}`}
           >
             <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 10 }}>
-              <span style={{ fontSize: 10, color: '#fff', opacity: 0.6, whiteSpace: 'nowrap' }}>1</span>
+              <span style={{ fontSize: 10, color: 'var(--text, #fff)', opacity: 0.6, whiteSpace: 'nowrap' }}>1</span>
               <input
                 type="range"
                 min={1}
@@ -1559,7 +1553,7 @@ export const BbQualityLoadVolume: React.FC<BbQualityLoadVolumeProps> = ({
                 onChange={(e) => setBbWeekSel(Number(e.target.value))}
                 style={{ flex: 1, accentColor: '#f59e0b' }}
               />
-              <span style={{ fontSize: 10, color: '#fff', opacity: 0.6, whiteSpace: 'nowrap' }}>{totalW}</span>
+              <span style={{ fontSize: 10, color: 'var(--text, #fff)', opacity: 0.6, whiteSpace: 'nowrap' }}>{totalW}</span>
             </div>
             <div style={{ display: 'grid', gap: 6 }}>
               {top.map((ex) => {
@@ -1595,7 +1589,7 @@ export const BbQualityLoadVolume: React.FC<BbQualityLoadVolumeProps> = ({
                     <span
                       style={{
                         fontWeight: 600,
-                        color: '#fff',
+                        color: 'var(--text, #fff)',
                         fontSize: 11,
                         overflow: 'hidden',
                         textOverflow: 'ellipsis',
@@ -1605,8 +1599,8 @@ export const BbQualityLoadVolume: React.FC<BbQualityLoadVolumeProps> = ({
                     >
                       {ex.name.substring(0, 22)}
                     </span>
-                    <span style={{ fontSize: 10, color: '#fff', opacity: 0.55 }}>
-                      нед 1: <b style={{ color: '#fff' }}>{wStart || '—'}</b> кг
+                    <span style={{ fontSize: 10, color: 'var(--text, #fff)', opacity: 0.55 }}>
+                      нед 1: <b style={{ color: 'var(--text, #fff)' }}>{wStart || '—'}</b> кг
                     </span>
                     <span
                       style={{ fontSize: 11, fontWeight: 800, color: up ? '#22c55e' : down ? '#ef4444' : '#f59e0b' }}
@@ -1633,7 +1627,7 @@ export const BbQualityLoadVolume: React.FC<BbQualityLoadVolumeProps> = ({
                 );
               })}
             </div>
-            <div style={{ marginTop: 6, fontSize: 10, color: '#fff', display: 'flex', gap: 12 }}>
+            <div style={{ marginTop: 6, fontSize: 10, color: 'var(--text, #fff)', display: 'flex', gap: 12 }}>
               <span>🟢 +вес</span>
               <span>🟡 стабильно</span>
               <span>🔴 −вес (разгрузка)</span>
@@ -1761,7 +1755,7 @@ export const BbQualityLoadChecks: React.FC<BbQualityLoadChecksProps> = ({ ctx })
                     соответствует параметрам
                   </span>
                 </div>
-                <div style={{ fontSize: 11, color: '#fff', marginTop: 6, lineHeight: 1.5 }}>
+                <div style={{ fontSize: 11, color: 'var(--text, #fff)', marginTop: 6, lineHeight: 1.5 }}>
                   Дублей изоляций не найдено. Для слабых/фокусных групп повтор паттерна допустим — учтена каноника{' '}
                   <span
                     style={{
@@ -1782,7 +1776,7 @@ export const BbQualityLoadChecks: React.FC<BbQualityLoadChecksProps> = ({ ctx })
                       key={i}
                       style={{
                         fontSize: 10,
-                        color: '#fff',
+                        color: 'var(--text, #fff)',
                         background: 'rgba(255,255,255,0.04)',
                         border: '1px solid rgba(255,255,255,0.06)',
                         padding: '2px 7px',
@@ -1842,7 +1836,7 @@ export const BbQualityLoadChecks: React.FC<BbQualityLoadChecksProps> = ({ ctx })
                   несоответствие параметрам
                 </span>
               </div>
-              <div style={{ fontSize: 11, color: '#fff', marginTop: 6, lineHeight: 1.5 }}>
+              <div style={{ fontSize: 11, color: 'var(--text, #fff)', marginTop: 6, lineHeight: 1.5 }}>
                 Дублирование изоляций: план содержит повторы одного паттерна для одной мышцы в одной сессии — при
                 выбранных параметрах это избыточно. Для слабых/фокусных групп дубль <b>допустим</b> (учтена каноника),
                 для остальных — мусор. Проверено по: {paramChips.slice(0, 6).join(' · ')}
@@ -1880,14 +1874,14 @@ export const BbQualityLoadChecks: React.FC<BbQualityLoadChecksProps> = ({ ctx })
                       {i + 1}
                     </span>
                     <div style={{ flex: 1 }}>
-                      <div style={{ fontSize: 11, fontWeight: 700, color: '#fff' }}>
+                      <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--text, #fff)' }}>
                         {g.exerciseName}{' '}
                         <span style={{ fontWeight: 400, opacity: 0.7 }}>
                           · {ruMuscleG(g.muscle)} · {g.sessionTag || 'день'}
                         </span>
                       </div>
                       <div style={{ fontSize: 10, color: '#fbbf24', marginTop: 2 }}>{ruReason(g.reason)}</div>
-                      <div style={{ fontSize: 10, color: '#fff', opacity: 0.6, marginTop: 2 }}>
+                      <div style={{ fontSize: 10, color: 'var(--text, #fff)', opacity: 0.6, marginTop: 2 }}>
                         Исправление: заменить на другой угол/хват или убрать (для слабых — оставить, если цель —
                         специализация).
                       </div>
@@ -1896,7 +1890,7 @@ export const BbQualityLoadChecks: React.FC<BbQualityLoadChecksProps> = ({ ctx })
                 ))}
               </div>
               {garbage.length > 6 && (
-                <div style={{ marginTop: 6, fontSize: 11, color: '#fff', textAlign: 'center', opacity: 0.7 }}>
+                <div style={{ marginTop: 6, fontSize: 11, color: 'var(--text, #fff)', textAlign: 'center', opacity: 0.7 }}>
                   …и ещё {garbage.length - 6} — откройте план, проверьте сессии
                 </div>
               )}
@@ -1906,7 +1900,7 @@ export const BbQualityLoadChecks: React.FC<BbQualityLoadChecksProps> = ({ ctx })
                     key={i}
                     style={{
                       fontSize: 10,
-                      color: '#fff',
+                      color: 'var(--text, #fff)',
                       background: 'rgba(255,255,255,0.04)',
                       border: '1px solid rgba(255,255,255,0.06)',
                       padding: '2px 7px',
@@ -1940,7 +1934,7 @@ export const BbQualityLoadChecks: React.FC<BbQualityLoadChecksProps> = ({ ctx })
                 key={i}
                 style={{
                   fontSize: 11,
-                  color: '#fff',
+                  color: 'var(--text, #fff)',
                   marginBottom: 3,
                   paddingLeft: 4,
                   borderLeft: '2px solid #f59e0b',
@@ -2087,11 +2081,14 @@ export const BbQualityLoadChecks: React.FC<BbQualityLoadChecksProps> = ({ ctx })
                 (s, w) =>
                   s + w.sessions.reduce((ss, sess) => ss + sess.exercises.reduce((sss, e) => sss + e.sets, 0), 0),
                 0,
-              ) / W.length,
+              ) / Math.max(1, W.length),
             )}
-            startIntensityPct={0.7}
-            startRIR={2}
-            goal="hypertrophy"
+            startIntensityPct={bbTrainingFocus === 'strength' ? 0.78 : bbTrainingFocus === 'endurance' ? 0.62 : 0.7}
+            startRIR={(() => {
+              const exs = W[0]?.sessions.flatMap(s => s.exercises || []).filter((e: any) => !e.warmupActivator && Number.isFinite(e.rir)) || [];
+              return exs.length ? Math.round((exs.reduce((a, e) => a + e.rir, 0) / exs.length) * 10) / 10 : 2;
+            })()}
+            goal={bbTrainingFocus === 'strength' ? 'strength' : 'hypertrophy'}
             title="Прогрессия мезоцикла (ББ)"
             hideApply
           />

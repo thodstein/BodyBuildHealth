@@ -55,16 +55,17 @@ export const CollapsibleCard: React.FC<{
   headerStyle?: React.CSSProperties;
   badge?: string;
   children: React.ReactNode;
-}> = ({ title, defaultOpen = false, headerStyle, badge, children }) => {
+}> = React.memo(({ title, defaultOpen = false, headerStyle, badge, children }) => {
   const [open, setOpen] = useState(defaultOpen);
   return (
-    <div style={{ ...CARD, padding: 0, overflow: 'hidden', marginTop: 8 }}>
+    <div className="bb-auto-card bb-auto-collapsible" style={{ ...CARD, padding: 0, overflow: 'hidden', marginTop: 8 }}>
       <button
         type="button"
         onClick={() => setOpen(v => !v)}
         aria-expanded={open}
         style={{
           width: '100%',
+          minHeight: 44,
           display: 'flex',
           justifyContent: 'space-between',
           alignItems: 'center',
@@ -72,21 +73,21 @@ export const CollapsibleCard: React.FC<{
           cursor: 'pointer',
           background: headerStyle?.background || 'linear-gradient(135deg, rgba(96,165,250,0.10), rgba(96,165,250,0.03))',
           border: 'none',
-          borderBottom: open ? '1px solid rgba(255,255,255,0.06)' : 'none',
+          borderBottom: open ? '1px solid var(--border, rgba(255,255,255,0.08))' : 'none',
           textAlign: 'left',
           ...headerStyle,
         }}
       >
-        <span style={{ fontSize: 12, fontWeight: 800, color: headerStyle?.color || '#fff' }}>{title}</span>
+        <span style={{ fontSize: 12, fontWeight: 800, color: headerStyle?.color || 'var(--text, #fff)' }}>{title}</span>
         <span style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-          {badge && <span style={{ fontSize: 10, fontWeight: 700, padding: '2px 7px', borderRadius: 20, background: 'rgba(255,255,255,0.07)', color: '#fff', border: '1px solid rgba(255,255,255,0.08)' }}>{badge}</span>}
-          <span style={{ fontSize: 11, color: '#fff', transform: open ? 'rotate(180deg)' : 'rotate(0deg)', transition: 'transform 0.2s', display: 'inline-block' }}>▼</span>
+          {badge && <span style={{ fontSize: 10.5, fontWeight: 700, padding: '2px 7px', borderRadius: 20, background: 'var(--surface-subtle, rgba(255,255,255,0.07))', color: 'var(--text, #fff)', border: '1px solid var(--border, rgba(255,255,255,0.1))' }}>{badge}</span>}
+          <span style={{ fontSize: 11, color: 'var(--text, #fff)', transform: open ? 'rotate(180deg)' : 'rotate(0deg)', transition: 'transform 0.2s', display: 'inline-block' }}>▼</span>
         </span>
       </button>
       <div style={{ display: open ? 'block' : 'none', padding: '10px 12px' }}>{children}</div>
     </div>
   );
-};
+});
 
 export type Step = 'params' | 'ped' | 'split' | 'plan' | 'weights' | 'quality' | 'adjust' | 'contest' | 'annual' | 'tools';
 
@@ -98,6 +99,7 @@ export interface BBInlineEdit {
   reps: number;
   weight: number;
   rir?: number;
+  restSeconds?: number;
   tempo?: string;
   technique?: string;
   /** Имя упражнения-партнёра для ручного суперсета (или 'none'). */
@@ -177,7 +179,12 @@ export function computeBulkWeekEdits(args: {
         exerciseKey: bbExerciseIdentity(ex),
       };
       const cur = Number(base[args.field]) || 0;
-      const val = args.mode === 'mult' ? Math.round(cur * value * 10) / 10 : value;
+      const rawVal = args.mode === 'mult' ? cur * value : value;
+      const val = args.field === 'weight'
+        ? Math.max(0, Math.min(500, Math.round(rawVal * 10) / 10))
+        : args.field === 'reps'
+          ? Math.max(1, Math.min(30, Math.round(rawVal)))
+          : Math.max(0, Math.min(20, Math.round(rawVal)));
       next[key] = { ...base, [args.field]: val };
     }
   }

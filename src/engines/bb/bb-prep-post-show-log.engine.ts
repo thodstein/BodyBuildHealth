@@ -9,8 +9,8 @@
  */
 
 export interface PostShowWeekEntry {
-  /** Неделя после шоу 1..6. */
-  week: 1 | 2 | 3 | 4 | 5 | 6;
+  /** Неделя после шоу 1..12 (окно восстановления Buechel 2026). */
+  week: 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9 | 10 | 11 | 12;
   dateIso: string; // дата записи (ISO yyyy-mm-dd)
   weightKg?: number;
   sleepH?: number; // средний сон, ч
@@ -34,7 +34,7 @@ export interface PostShowRecoveryMarkers {
 }
 
 export const POST_SHOW_LOG_KEY = 'he_prep_postshow_v1';
-const POST_SHOW_LOG_CAP = 6; // 6 недель на план
+const POST_SHOW_LOG_CAP = 12; // 12 недель восстановления на план
 
 function isValidIsoDate(s: string): boolean {
   if (!/^\d{4}-\d{2}-\d{2}$/.test(s)) return false;
@@ -76,7 +76,7 @@ export function isPostShowWeekEntry(x: unknown): x is PostShowWeekEntry {
   if (!x || typeof x !== 'object') return false;
   const e = x as Record<string, unknown>;
   return (
-    Number.isInteger(e.week) && (e.week as number) >= 1 && (e.week as number) <= 6 &&
+    Number.isInteger(e.week) && (e.week as number) >= 1 && (e.week as number) <= 12 &&
     typeof e.dateIso === 'string' && isValidIsoDate(e.dateIso)
   );
 }

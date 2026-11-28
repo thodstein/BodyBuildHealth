@@ -1361,6 +1361,10 @@ export const IndividualPlanProvider: React.FC<{
           substance?.id?.includes('ghrp') ||
           substance?.id?.includes('cjc') ||
           substance?.id?.includes('sermorelin') ||
+          substance?.id?.includes('somatrop') ||
+          substance?.id?.includes('hgh') ||
+          substance?.id === 'gh' ||
+          substance?.class === 'hgh' ||
           substance?.class === 'peptide_ghrh' ||
           substance?.class === 'peptide_ghrp'
         ) {
@@ -1377,12 +1381,17 @@ export const IndividualPlanProvider: React.FC<{
           esterType = 'none';
         } else if (
           substance?.class &&
-          ['testosterone', 'trenbolone', 'nandrolone', 'boldenone', 'primobolan', 'drostanolone'].includes(
+          ['testosterone', 'trenbolone', 'nandrolone', 'boldenone', 'primobolan', 'drostanolone', 'oral_aas', 'sarm'].includes(
             substance.class,
-          )
+          ) ||
+          /dianabol|dbol|methand|anadrol|oxymeth|turinabol|tbol|winstrol|stan|anavar|oxan|superdrol|sdrol/i.test(String(substance?.id || ''))
         ) {
           type = 'ААС';
-          const esters = substance.esters || [];
+          const isOral = (Array.isArray(substance?.route) ? substance.route.includes('oral' as any) : String(substance?.route || '') === 'oral') || /dianabol|dbol|methand|anadrol|oxymeth|turinabol|tbol|winstrol|stan|anavar|oxan|superdrol|sdrol/i.test(String(substance?.id || ''));
+          const esters = substance?.esters || [];
+          if (isOral) esterType = 'short';
+          else if (esters.length > 0 && (halfLife > 72 || esters.some((e: string) => /enan|cyp|dec|undec/i.test(e)))) esterType = 'long';
+          else esterType = 'short';
           if (esters.some((e: string) => ['propionate', 'acetate', 'phenylpropionate'].includes(e)))
             esterType = 'short';
           else if (esters.some((e: string) => ['enanthate', 'cypionate'].includes(e))) esterType = 'long';
@@ -6011,8 +6020,25 @@ export const IndividualPlanProvider: React.FC<{
           };
 
           const buildOneDay = (offset: number): any => {
-            // Эпик 1: единая периодизация углеводов — одна функция, один селектор.
-            // Legacy cyclingMode/dietPauseMode/periodizationEnabled удалены из генерации.
+            // Эпик 1 + Wave 5: для многодневной генерации (3/7 дней) пересчитываем
+            // циклирование ББ-плана по РЕАЛЬНОМУ дню недели каждого дня (todayDow + offset),
+            // а не замораживаем результат «сегодня» на всю неделю. В manual-режиме locked=true.
+            const _dayDow = (((new Date().getDay() || 7) - 1 + offset) % 7) + 1;
+            const _dayBb = bbNutritionNote
+              ? applyBBNutritionToTargets({
+                  protein: dayTargets.protein,
+                  fats: dayTargets.fats,
+                  carbs: dayTargets.carbs,
+                  kcal: dayTargets.kcal,
+                  bbNote: bbNutritionNote,
+                  todayDow: _dayDow,
+                  locked: kbjuMode === 'manual',
+                })
+              : null;
+            const dayBaseGoalKcal = _dayBb ? Math.max(1200, _dayBb.kcal || baseGoalKcal) : baseGoalKcal;
+            const dayBaseGoalP = _dayBb ? Math.max(80, _dayBb.protein || baseGoalP) : baseGoalP;
+            const dayBaseGoalF = _dayBb ? Math.max(30, _dayBb.fats || baseGoalF) : baseGoalF;
+            const dayBaseGoalC = _dayBb ? Math.max(50, _dayBb.carbs || baseGoalC) : baseGoalC;
             const isTrain = isTrainDay(offset);
             const _perio = applyCarbPeriodizationMods(carbPeriodization, offset, isTrain);
             let dayKcalMod = _perio.dayKcalMod,
@@ -6221,7 +6247,7 @@ export const IndividualPlanProvider: React.FC<{
             // ограничена абсолютным пределом 12 г/кг (см. applyCarbWave). Дни явной
             // суперкомпенсации (рефид/карб-лоад) и ручной режим (пользователь сам задал
             // граммы, потолок в нём уже отключён через carbCapGPerKg = 0) — исключения.
-            const _waveC = applyCarbWave(baseGoalC, dayCarbMod, weight, {
+            const _waveC = applyCarbWave(dayBaseGoalC, dayCarbMod, weight, {
               allowSupercompensation: isRefeedDay || kbjuMode === 'manual',
             });
             if (_waveC.waveClipped) {
@@ -6236,11 +6262,11 @@ export const IndividualPlanProvider: React.FC<{
                     _bbPrepPlan,
                     {
                       kcal: Math.round(
-                        Math.max(1200, baseGoalKcal * dayKcalMod) + (_diaryActive ? diaryComp.delta.kcal * _dampK : 0),
+                        Math.max(1200, dayBaseGoalKcal * dayKcalMod) + (_diaryActive ? diaryComp.delta.kcal * _dampK : 0),
                       ),
-                      proteinG: Math.round(Math.max(80, baseGoalP) + (_diaryActive ? diaryComp.delta.p : 0)),
+                      proteinG: Math.round(Math.max(80, dayBaseGoalP) + (_diaryActive ? diaryComp.delta.p : 0)),
                       fatG: Math.round(
-                        Math.max(30, baseGoalF * (isRefeedDay ? 0.5 : 1)) + (_diaryActive ? diaryComp.delta.f : 0),
+                        Math.max(30, dayBaseGoalF * (isRefeedDay ? 0.5 : 1)) + (_diaryActive ? diaryComp.delta.f : 0),
                       ),
                       carbsG: Math.round(_waveC.carbsG + (_diaryActive ? diaryComp.delta.c * _dampC : 0)),
                       waterMl: 3000,
@@ -6253,12 +6279,12 @@ export const IndividualPlanProvider: React.FC<{
                       _prepDate,
                       {
                         kcal: Math.round(
-                          Math.max(1200, baseGoalKcal * dayKcalMod) +
+                          Math.max(1200, dayBaseGoalKcal * dayKcalMod) +
                             (_diaryActive ? diaryComp.delta.kcal * _dampK : 0),
                         ),
-                        proteinG: Math.round(Math.max(80, baseGoalP) + (_diaryActive ? diaryComp.delta.p : 0)),
+                        proteinG: Math.round(Math.max(80, dayBaseGoalP) + (_diaryActive ? diaryComp.delta.p : 0)),
                         fatG: Math.round(
-                          Math.max(30, baseGoalF * (isRefeedDay ? 0.5 : 1)) + (_diaryActive ? diaryComp.delta.f : 0),
+                          Math.max(30, dayBaseGoalF * (isRefeedDay ? 0.5 : 1)) + (_diaryActive ? diaryComp.delta.f : 0),
                         ),
                         carbsG: Math.round(_waveC.carbsG + (_diaryActive ? diaryComp.delta.c * _dampC : 0)),
                         waterMl: 3000,
@@ -6292,15 +6318,15 @@ export const IndividualPlanProvider: React.FC<{
               goalKcal: _applyPrepTargets
                 ? _peakTargets.kcal
                 : Math.round(
-                    Math.max(1200, baseGoalKcal * dayKcalMod) + (_diaryActive ? diaryComp.delta.kcal * _dampK : 0),
+                    Math.max(1200, dayBaseGoalKcal * dayKcalMod) + (_diaryActive ? diaryComp.delta.kcal * _dampK : 0),
                   ),
               goalProteinG: _applyPrepTargets
                 ? _peakTargets.proteinG
-                : Math.round(Math.max(80, baseGoalP) + (_diaryActive ? diaryComp.delta.p : 0)),
+                : Math.round(Math.max(80, dayBaseGoalP) + (_diaryActive ? diaryComp.delta.p : 0)),
               goalFatG: _applyPrepTargets
                 ? _peakTargets.fatG
                 : Math.round(
-                    Math.max(30, baseGoalF * (isRefeedDay ? 0.5 : 1)) + (_diaryActive ? diaryComp.delta.f : 0),
+                    Math.max(30, dayBaseGoalF * (isRefeedDay ? 0.5 : 1)) + (_diaryActive ? diaryComp.delta.f : 0),
                   ),
               goalCarbsG: _applyPrepTargets
                 ? _peakTargets.carbsG

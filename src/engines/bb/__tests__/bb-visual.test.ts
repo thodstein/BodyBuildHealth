@@ -130,8 +130,14 @@ describe('Фаза 4.24: print HTML + ics', () => {
     const events = ics.split('BEGIN:VEVENT').length - 1;
     const sessions = plan.weeks.reduce((n: number, w: any) => n + (w.sessions || []).filter((s: any) => (s.exercises || []).length > 0).length, 0);
     expect(events).toBe(sessions);
+    expect(ics).toContain('DTSTAMP:');
 
-    const pairs = [...ics.matchAll(/DTSTART:(\d{8})T(\d{6})Z\r\nDTEND:(\d{8})T(\d{6})Z\r\nUID:bb-(\d+)-/g)];
+    const blocks = ics.split('BEGIN:VEVENT').slice(1);
+    const pairs = blocks.map(blk => {
+      const u = blk.match(/UID:bb-[^\r\n]+-w(\d+)-/);
+      const s = blk.match(/DTSTART:(\d{8})T(\d{6})\r\nDTEND:(\d{8})T(\d{6})\r\n/);
+      return u && s ? [s[0], s[1], s[2], s[3], s[4], u[1]] : null;
+    }).filter((x): x is string[] => Boolean(x));
     expect(pairs.length).toBe(events);
     for (const p of pairs) {
       expect(p[3] > p[1] || (p[3] === p[1] && p[4] > p[2]), 'нулевая длительность события').toBe(true);

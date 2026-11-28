@@ -45,7 +45,7 @@ export const SPLIT_PATTERNS: SplitPattern[] = [
     // шаблон с ногами; на advanced/enhanced он лучше, чем 2-дневный FullBody
     // или Push/Pull без ног (селектор отдавал их из-за уровня). Объём сессии
     // у advanced/enhanced выше за счёт per-session капов, частота 3×/нед.
-    level: ['novice', 'intermediate', 'advanced', 'enhanced'],
+    level: ['beginner', 'novice', 'intermediate', 'advanced', 'enhanced'],
     description: 'Все группы 3×/нед. Максимальная частота стимуляции белка, лучший синтез для натуралов. Для advanced/enhanced — компромисс при 3 доступных днях: полное покрытие тела важнее специализации.',
     direction: 'both',
   },

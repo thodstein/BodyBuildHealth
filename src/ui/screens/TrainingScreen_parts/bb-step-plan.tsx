@@ -5,7 +5,7 @@
  * поэтому тело шага побайтово совпадает с оригиналом (кроме одной замены:
  * `{renderActionRow(false)}` → prop `actionRow`).
  */
-import React from 'react';
+import React, { useMemo } from 'react';
 import { EXERCISE_CATALOG } from '../../../core/exercise-catalog';
 import type { BBPlan } from '../../../engines/bb/bb-builder.engine';
 import { buildWarmup } from '../../../engines/bb/bb-builder.engine';
@@ -67,23 +67,36 @@ export interface BbPlanStepProps {
    *  Не передана (unit-рендер) — блок сдвига просто не показывается. */
   startDateInput?: string;
   setStartDateInput?: React.Dispatch<React.SetStateAction<string>>;
+  /** 1-клик авто-фикс объёма при предупреждении валидатора (Wave 7 C2). */
+  onAutoFixVolume?: () => void;
   /** `renderActionRow(false)` — низ шага (кнопки действий). */
   actionRow: React.ReactNode;
 }
 
-export const BbPlanStep: React.FC<BbPlanStepProps> = ({
+export const BbPlanStep: React.FC<BbPlanStepProps> = React.memo(({
   builtPlan, metrics, bbWeekSel, setBbWeekSel, bbWeeks, autoDeload, weakPoints, dupMode,
   exerciseEdits, setExerciseEdits, commitEdits, editMode, setEditMode,
   collapsedDays, setCollapsedDays, collapsedExercises, setCollapsedExercises,
   bbTrainingFocus, bbLevel, bbTrainingYears, onCourse, trainingVolumeMode, setSubTarget, handleSendToExecution,
-  setWeightEntries, setWeightsApplied, setStep, actionRow, startDateInput, setStartDateInput,
+  setWeightEntries, setWeightsApplied, setStep, actionRow, startDateInput, setStartDateInput, onAutoFixVolume,
 }) => {
+  const acwr = useMemo(() => {
+    try {
+      const srpe = loadSRPESessions();
+      return srpe.length >= 2 ? acuteChronicRatio(toDailyLoads(srpe)) : null;
+    } catch { return null; }
+  }, [builtPlan]);
+  const validationMeta = useMemo(() => {
+    if (!builtPlan) return null;
+    try {
+      const view = buildPlanValidationView(builtPlan);
+      return { view, badge: planValidationBadge(view), stats: planSessionStats(builtPlan) };
+    } catch { return null; }
+  }, [builtPlan]);
   if (!builtPlan || !metrics) return null;
   const W = builtPlan.weeks;
   const wk = W[Math.min(bbWeekSel, W.length) - 1] || W[0];
   const currentPhase = phaseForWeek(wk.week, bbWeeks);
-  const srpe = loadSRPESessions();
-  const acwr = srpe.length >= 2 ? acuteChronicRatio(toDailyLoads(srpe)) : null;
   const needsDeload = autoDeload && acwr && acwr.ratio > 1.3;
 
   return (
@@ -104,11 +117,8 @@ export const BbPlanStep: React.FC<BbPlanStepProps> = ({
       {/* 🧪 Валидация плана — адаптирована под выбор пользователя (аудит 2026-09):
           технические коды скрыты, повторы сгруппированы, мышцы по-русски, у
           каждой проблемы — действие; акцент специализации объяснён. */}
-      {(() => {
-        try {
-          const view = buildPlanValidationView(builtPlan);
-          const badge = planValidationBadge(view);
-          const stats = planSessionStats(builtPlan);
+      {validationMeta && (() => {
+          const { view, badge, stats } = validationMeta;
           return (
             <CollapsibleCard
               title="🧪 Проверка плана под ваши настройки"
@@ -116,7 +126,7 @@ export const BbPlanStep: React.FC<BbPlanStepProps> = ({
               headerStyle={{ background: badge.ok ? 'linear-gradient(135deg, rgba(34,197,94,0.14), rgba(34,197,94,0.04))' : 'linear-gradient(135deg, rgba(239,68,68,0.14), rgba(239,68,68,0.04))', color: badge.ok ? '#22c55e' : '#ef4444' }}
               badge={badge.label}
             >
-              <div style={{ fontSize: 10, color: '#fff', opacity: 0.85, marginBottom: 6, lineHeight: 1.45 }}>
+              <div style={{ fontSize: 10, color: 'var(--text, #fff)', opacity: 0.85, marginBottom: 6, lineHeight: 1.45 }}>
                 Учтены: уровень «{bbLevel}», {bbWeeks} нед, {bbTrainingFocus === 'strength' ? 'силовой' : bbTrainingFocus === 'endurance' ? 'выносливостный' : 'гипертрофийный'} фокус, лимиты сессии {(() => { try { const l = sessionLimitsFor({ level: bbLevel, trainingYears: bbTrainingYears, onCourse, trainingVolumeMode } as any, { id: builtPlan.pattern?.id } as any); return `${l.maxExercises} упр / ${ruCount(l.maxWorkingSets, RU_SETS)}`; } catch { return '—'; } })()}.
                 Максимум в плане: {stats.maxExercises} упр / {ruCount(stats.maxSets, RU_SETS)} за сессию.
               </div>
@@ -133,7 +143,7 @@ export const BbPlanStep: React.FC<BbPlanStepProps> = ({
                   {view.errors.map((e, k) => (
                     <div key={k} style={{ fontSize: 11, color: '#fca5a5', padding: '5px 8px', borderRadius: 6, background: 'rgba(239,68,68,0.08)', marginBottom: 3 }}>
                       ⛔ {e.text}{e.count > 1 ? ` (×${e.count})` : ''}
-                      {e.hint && <div style={{ fontSize: 10, color: '#fff', marginTop: 2 }}>→ {e.hint}</div>}
+                      {e.hint && <div style={{ fontSize: 10, color: 'var(--text, #fff)', marginTop: 2 }}>→ {e.hint}</div>}
                     </div>
                   ))}
                 </div>
@@ -143,20 +153,25 @@ export const BbPlanStep: React.FC<BbPlanStepProps> = ({
                   {view.warnings.slice(0, 8).map((w, k) => (
                     <div key={k} style={{ fontSize: 11, color: '#fcd34d', padding: '5px 8px', borderRadius: 6, background: 'rgba(245,158,11,0.07)', marginBottom: 3 }}>
                       ⚠ {w.text}{w.count > 1 ? ` (×${w.count})` : ''}
-                      {w.hint && <div style={{ fontSize: 10, color: '#fff', marginTop: 2 }}>→ {w.hint}</div>}
+                      {w.hint && <div style={{ fontSize: 10, color: 'var(--text, #fff)', marginTop: 2 }}>→ {w.hint}</div>}
                     </div>
                   ))}
-                  {view.warnings.length > 8 && <div style={{ fontSize: 10, color: '#fff' }}>… и ещё {view.warnings.length - 8} предупреждений</div>}
+                  {view.warnings.length > 8 && <div style={{ fontSize: 10, color: 'var(--text, #fff)' }}>… и ещё {view.warnings.length - 8} предупреждений</div>}
+                  <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginTop: 6 }}>
+                    {onAutoFixVolume && <button type="button" data-bb="validation-autofix-volume" onClick={onAutoFixVolume} style={{ ...BTN_GHOST, borderColor: 'rgba(0,230,138,0.4)', color: 'var(--accent, #00e68a)', padding: '4px 10px', fontSize: 10.5 }}>⚡ Снизить объём (−10%)</button>}
+                    <button type="button" data-bb="validation-autofix-adjust" onClick={() => setStep('adjust')} style={{ ...BTN_GHOST, padding: '4px 10px', fontSize: 10.5 }}>🛠 Исправить в коррекции</button>
+                    <button type="button" data-bb="validation-autofix-params" onClick={() => setStep('params')} style={{ ...BTN_GHOST, padding: '4px 10px', fontSize: 10.5 }}>⚙ Скорректировать параметры</button>
+                  </div>
                 </div>
               )}
               {view.infos.length > 0 && (
                 <details style={{ marginTop: 2 }}>
-                  <summary style={{ fontSize: 10, color: '#fff', cursor: 'pointer' }}>
+                  <summary style={{ fontSize: 10, color: 'var(--text, #fff)', cursor: 'pointer' }}>
                     ℹ️ Информационные заметки ({view.infos.length}) — не требуют правок
                   </summary>
                   <div style={{ marginTop: 3 }}>
                     {view.infos.map((i, k) => (
-                      <div key={k} style={{ fontSize: 10, color: '#fff', opacity: 0.9, padding: '3px 6px' }}>
+                      <div key={k} style={{ fontSize: 10, color: 'var(--text, #fff)', opacity: 0.9, padding: '3px 6px' }}>
                         · {i.text}{i.count > 1 ? ` (×${i.count})` : ''}
                       </div>
                     ))}
@@ -164,13 +179,12 @@ export const BbPlanStep: React.FC<BbPlanStepProps> = ({
                 </details>
               )}
               {view.hiddenCount > 0 && (
-                <div style={{ fontSize: 9, color: '#fff', opacity: 0.6, marginTop: 4 }}>
+                <div style={{ fontSize: 9, color: 'var(--text-dim, rgba(255,255,255,0.7))', marginTop: 4 }}>
                   Скрыто {view.hiddenCount} технических строк (классификация каталога, добивки малых мышц, движковые пороги) — они не влияют на выполнение.
                 </div>
               )}
             </CollapsibleCard>
           );
-        } catch { return null; }
       })()}
 
       {/* Верхняя инфо перенесена в шаг Качество — здесь только план упражнений */}
@@ -203,14 +217,14 @@ export const BbPlanStep: React.FC<BbPlanStepProps> = ({
                 const pct = landmark ? Math.min(100, Math.round((sets / (landmark.mrv || sets || 1)) * 100)) : 50;
                 return (
                   <div key={m} style={{ padding:'6px 8px', borderRadius:8, background:'rgba(0,0,0,0.2)', border:`2px solid ${color}` }}>
-                    <div style={{ fontSize:10, color:'#fff', fontWeight:600 }}>{MUSCLE_RU_H[m]}</div>
+                    <div style={{ fontSize:10, color: 'var(--text, #fff)', fontWeight:600 }}>{MUSCLE_RU_H[m]}</div>
                     <div style={{ fontSize:16, fontWeight:800, color }}>{direct}</div>
                     <div style={{ fontSize:9, color:'#60a5fa' }}>косв +{indirect} · эфф {effective}</div>
                     <div style={{ height:4, borderRadius:2, background:'rgba(255,255,255,0.1)', marginTop:4 }}>
                       <div style={{ height:'100%', borderRadius:2, background:color, width:`${pct}%` }} />
                     </div>
                     {landmark && (
-                      <div style={{ fontSize:8, color:'#fff', marginTop:2 }}>
+                      <div style={{ fontSize:8, color: 'var(--text, #fff)', marginTop:2 }}>
                         Мин {landmark.mev} · Опт {landmark.mav} · Макс {landmark.mrv}
                       </div>
                     )}
@@ -218,7 +232,7 @@ export const BbPlanStep: React.FC<BbPlanStepProps> = ({
                 );
               })}
             </div>
-            <div style={{ marginTop:6, fontSize:9, color:'#fff', display:'flex', gap:12, flexWrap:'wrap' }}>
+            <div style={{ marginTop:6, fontSize:9, color: 'var(--text, #fff)', display:'flex', gap:12, flexWrap:'wrap' }}>
               <span>🟢 MEV–MAV (оптимум)</span><span>🟡 Выше оптимума</span><span>🔴 Перегруз (выше максимума)</span><span>🔵 Ниже минимума</span>
               <span style={{ opacity:0.65 }}>· большое число — прямой объём · косв — вклад базы (жимы→трицепс/плечи, тяги→бицепс, присед→ягодицы/б.б.) · цвет — по эффективному</span>
             </div>
@@ -230,15 +244,15 @@ export const BbPlanStep: React.FC<BbPlanStepProps> = ({
         <div style={{ marginTop:8, padding:'10px 12px', borderRadius:12, background:'rgba(239,68,68,0.08)', border:'1px solid rgba(239,68,68,0.3)' }}>
           <div style={{ fontSize:12, fontWeight:800, color:'#ef4444', marginBottom:5 }}>🚫 План требует исправления</div>
           {builtPlan.validation.issues.filter((i: { level?: string }) => i.level === 'error').slice(0, 5).map((issue: { message: string }, i: number) => (
-            <div key={i} style={{ fontSize:11, color:'#fff', lineHeight:1.4 }}>{issue.message}</div>
+            <div key={i} style={{ fontSize:11, color: 'var(--text, #fff)', lineHeight:1.4 }}>{issue.message}</div>
           ))}
-          <div style={{ marginTop:5, fontSize:10, color:'#fff' }}>Подробности и действия — в карточке «🧪 Проверка плана под ваши настройки» выше.</div>
+          <div style={{ marginTop:5, fontSize:10, color: 'var(--text, #fff)' }}>Подробности и действия — в карточке «🧪 Проверка плана под ваши настройки» выше.</div>
         </div>
       )}
 
       {/* Week selector with phase colors */}
       <div style={{ marginTop:10 }}>
-        <div style={{ fontSize:11, color:'#fff', marginBottom:6, fontWeight:700 }}>
+        <div style={{ fontSize:11, color: 'var(--text, #fff)', marginBottom:6, fontWeight:700 }}>
           Неделя {wk.week} из {W.length} · <span style={{ color:PHASE_COLORS[currentPhase] }}>{PHASE_LABELS[currentPhase]}</span>
           {(() => {
             const cp = (wk as any).contestPhase as PrepPhaseKey | undefined;
@@ -278,7 +292,7 @@ export const BbPlanStep: React.FC<BbPlanStepProps> = ({
         headerStyle={{ background: 'linear-gradient(135deg, rgba(34,197,94,0.10), rgba(34,197,94,0.03))', color: '#22c55e' }}
         badge={methodologySpecFor(builtPlan.methodology).labelRu}
       >
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 5, fontSize: 10, color: '#fff', lineHeight: 1.5 }}>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 5, fontSize: 10, color: 'var(--text, #fff)', lineHeight: 1.5 }}>
           <div>🔁 <b>Двойная прогрессия:</b> сначала доведите все подходы до верхней границы повторов на целевом RIR, затем минимальный шаг веса вверх и возврат к нижней границе диапазона.</div>
           <div>📦 <b>Объём:</b> MEV → MAV → MRV по неделям (×0.85 → ×1.0 → ×1.10), делод ≈ ×0.6 с возвратом к рабочему весу.</div>
           {weakPoints.length > 0 && (
@@ -301,11 +315,46 @@ export const BbPlanStep: React.FC<BbPlanStepProps> = ({
             });
           };
           return (
-            <div style={{ marginTop: 8, paddingTop: 6, borderTop: '1px solid rgba(255,255,255,0.07)', display: 'flex', gap: 6, alignItems: 'center', flexWrap: 'wrap', fontSize: 10, color: '#fff' }}>
+            <div style={{ marginTop: 8, paddingTop: 6, borderTop: '1px solid var(--border, rgba(255,255,255,0.08))', display: 'flex', gap: 6, alignItems: 'center', flexWrap: 'wrap', fontSize: 10.5, color: 'var(--text, #fff)' }}>
               <span>🗓 Пропустили день или неделю? Сдвиньте даты плана:</span>
-              <button onClick={() => shift(1)} style={{ ...BTN_GHOST, fontSize: 10, padding: '2px 8px' }}>+1 день</button>
-              <button onClick={() => shift(7)} style={{ ...BTN_GHOST, fontSize: 10, padding: '2px 8px' }}>+1 неделя</button>
-              <span style={{ opacity: 0.65 }}>меняются только даты, упражнения и веса остаются; старт: {startDateInput}</span>
+              <button type="button" onClick={() => shift(-7)} style={{ ...BTN_GHOST, fontSize: 10, padding: '2px 8px' }}>−1 неделя</button>
+              <button type="button" onClick={() => shift(-1)} style={{ ...BTN_GHOST, fontSize: 10, padding: '2px 8px' }}>−1 день</button>
+              <button type="button" onClick={() => shift(1)} style={{ ...BTN_GHOST, fontSize: 10, padding: '2px 8px' }}>+1 день</button>
+              <button type="button" onClick={() => shift(7)} style={{ ...BTN_GHOST, fontSize: 10, padding: '2px 8px' }}>+1 неделя</button>
+              <span style={{ opacity: 0.72 }}>меняются только даты, упражнения и веса остаются; старт: {startDateInput}</span>
+            </div>
+          );
+        })()}
+        {/* Wave 6: компактная полоса прогрессии сетов по неделям */}
+        {W.length >= 2 && (() => {
+          const weekTotals = W.map(w => ({
+            week: w.week,
+            deload: !!(w as any).deload || w.phase === 'deload',
+            sets: w.sessions.reduce((a, s) => a + s.exercises.filter((e: any) => !(e as any).warmupActivator).reduce((b, e) => b + (e.sets || 0), 0), 0),
+          }));
+          const maxSets = Math.max(1, ...weekTotals.map(t => t.sets));
+          return (
+            <div data-bb="week-progression-bars" className="bb-auto-num" style={{ marginTop: 8, paddingTop: 6, borderTop: '1px solid var(--border, rgba(255,255,255,0.08))' }}>
+              <div style={{ fontSize: 10, fontWeight: 700, color: 'var(--text-dim, rgba(255,255,255,0.75))', marginBottom: 4 }}>📈 Прогрессия объёма по неделям (рабочие сеты)</div>
+              <div style={{ display: 'flex', alignItems: 'flex-end', gap: 4, height: 42 }}>
+                {weekTotals.map(t => {
+                  const pct = Math.max(14, Math.round((t.sets / maxSets) * 100));
+                  const active = t.week === wk.week;
+                  return (
+                    <button
+                      key={t.week}
+                      type="button"
+                      onClick={() => setBbWeekSel(t.week)}
+                      title={`Неделя ${t.week}: ${t.sets} сетов${t.deload ? ' (разгрузка)' : ''}`}
+                      style={{ flex: 1, minHeight: 42, display: 'flex', flexDirection: 'column', justifyContent: 'flex-end', alignItems: 'center', gap: 2, background: 'transparent', border: 'none', padding: 0, cursor: 'pointer' }}
+                    >
+                      <span style={{ fontSize: 9, color: active ? 'var(--accent, #00e68a)' : 'var(--text-dim, rgba(255,255,255,0.7))', fontWeight: active ? 800 : 600 }}>{t.sets}</span>
+                      <span style={{ width: '100%', height: `${Math.round(pct * 0.24)}px`, borderRadius: 4, background: t.deload ? '#38bdf8' : active ? 'var(--accent, #00e68a)' : 'rgba(168,85,247,0.55)' }} />
+                      <span style={{ fontSize: 8.5, opacity: active ? 1 : 0.65, color: 'var(--text, #fff)' }}>W{t.week}</span>
+                    </button>
+                  );
+                })}
+              </div>
             </div>
           );
         })()}
@@ -323,7 +372,7 @@ export const BbPlanStep: React.FC<BbPlanStepProps> = ({
               <div key={w.week} onClick={() => setBbWeekSel(w.week)} style={{ display:'flex', alignItems:'center', gap:4, padding:'3px 6px', borderRadius:8, cursor:'pointer', background:active ? PHASE_COLORS[ph] + '15' : 'transparent', borderLeft: '3px solid ' + PHASE_COLORS[ph] + '60' }}>
                 <span style={{ fontSize:11, fontWeight:700, color:active ? PHASE_COLORS[ph] : '#fff', minWidth:26 }}>Н{w.week}</span>
                 <div style={{ flex:1, display:'flex', gap:2 }}>{daySets.map((ds, di) => <div key={di} style={{ flex:1, height:14, borderRadius:3, background: `linear-gradient(180deg,${PHASE_COLORS[ph]},${PHASE_COLORS[ph]}88)`, opacity: 0.15 + 0.85 * (ds / maxD) }} />)}</div>
-                <span style={{ fontSize:11, color:'#fff', minWidth:30, textAlign:'right' }}>{daySets.reduce((a,b)=>a+b,0)}</span>
+                <span style={{ fontSize:11, color: 'var(--text, #fff)', minWidth:30, textAlign:'right' }}>{daySets.reduce((a,b)=>a+b,0)}</span>
               </div>
             );
           })}
@@ -347,15 +396,15 @@ export const BbPlanStep: React.FC<BbPlanStepProps> = ({
           <CollapsibleCard title="📊 Твоя фактическая нагрузка (из дневника)" defaultOpen={true} headerStyle={{ background: 'linear-gradient(135deg, rgba(96,165,250,0.12), rgba(96,165,250,0.04))', color: '#60a5fa' }} badge={`${zoneLabel}`}>
             <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr 1fr', gap:6, fontSize:11 }}>
               <div style={{ textAlign:'center', padding:6, borderRadius:8, background:'rgba(96,165,250,0.06)' }}>
-                <div style={{ color:'#fff', fontSize:10 }}>Сессий (7д)</div>
+                <div style={{ color: 'var(--text, #fff)', fontSize:10 }}>Сессий (7д)</div>
                 <div style={{ fontWeight:700, color:'#60a5fa' }}>{last7.length}</div>
               </div>
               <div style={{ textAlign:'center', padding:6, borderRadius:8, background:'rgba(96,165,250,0.06)' }}>
-                <div style={{ color:'#fff', fontSize:10 }}>Средний RPE</div>
+                <div style={{ color: 'var(--text, #fff)', fontSize:10 }}>Средний RPE</div>
                 <div style={{ fontWeight:700, color:'#60a5fa' }}>{avgRPE.toFixed(1)}</div>
               </div>
               <div style={{ textAlign:'center', padding:6, borderRadius:8, background: zoneColor + '10' }}>
-                <div style={{ color:'#fff', fontSize:10 }}>ACWR</div>
+                <div style={{ color: 'var(--text, #fff)', fontSize:10 }}>ACWR</div>
                 <div style={{ fontWeight:700, color: zoneColor }}>{acwrData.ratio.toFixed(2)} <span style={{ fontSize:11 }}>{zoneLabel}</span></div>
               </div>
             </div>
@@ -373,8 +422,11 @@ export const BbPlanStep: React.FC<BbPlanStepProps> = ({
         const wCurSets = wCur.sessions.reduce((s, sess) => s + sess.exercises.reduce((ss, e) => ss + e.sets, 0), 0);
         const w1Rir = w1.sessions.flatMap(s => s.exercises).reduce((s, e) => s + e.rir * e.sets, 0) / Math.max(1, w1Sets);
         const wCurRir = wCur.sessions.flatMap(s => s.exercises).reduce((s, e) => s + e.rir * e.sets, 0) / Math.max(1, wCurSets);
-        const w1Wt = w1.sessions.flatMap(s => s.exercises).reduce((s, e) => s + (e.workSets[0]?.weight || 80) * e.sets, 0);
-        const wCurWt = wCur.sessions.flatMap(s => s.exercises).reduce((s, e) => s + (e.workSets[0]?.weight || 80) * e.sets, 0);
+        const exTonnage = (e: any) => (e.workSets && e.workSets.length > 0)
+          ? e.workSets.reduce((sum: number, ws: any) => sum + (ws.weight ?? 0) * (ws.reps || 0), 0)
+          : (e.workSets?.[0]?.weight ?? 0) * (e.workSets?.[0]?.reps || 10) * (e.sets || 0);
+        const w1Wt = w1.sessions.flatMap(s => s.exercises).reduce((s, e) => s + exTonnage(e), 0);
+        const wCurWt = wCur.sessions.flatMap(s => s.exercises).reduce((s, e) => s + exTonnage(e), 0);
         const setsDiff = wCurSets - w1Sets;
         const rirDiff = wCurRir - w1Rir;
         const wtDiff = wCurWt - w1Wt;
@@ -384,15 +436,15 @@ export const BbPlanStep: React.FC<BbPlanStepProps> = ({
             full={
               <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr 1fr', gap:6, fontSize:11 }}>
                 <div style={{ padding:8, borderRadius:8, background:'rgba(255,255,255,0.03)' }}>
-                  <div style={{ color:'#fff', fontSize:10 }}>Объём (сеты)</div>
+                  <div style={{ color: 'var(--text, #fff)', fontSize:10 }}>Объём (сеты)</div>
                   <div style={{ fontWeight:700 }}>{w1Sets} → {wCurSets} <span style={{ color: setsDiff >= 0 ? '#22c55e' : '#ef4444' }}>({setsDiff >= 0 ? '+' : ''}{setsDiff})</span></div>
                 </div>
                 <div style={{ padding:8, borderRadius:8, background:'rgba(255,255,255,0.03)' }}>
-                  <div style={{ color:'#fff', fontSize:10 }}>Средний RIR</div>
+                  <div style={{ color: 'var(--text, #fff)', fontSize:10 }}>Средний RIR</div>
                   <div style={{ fontWeight:700 }}>{w1Rir.toFixed(1)} → {wCurRir.toFixed(1)} <span style={{ color: rirDiff <= 0 ? '#22c55e' : '#f59e0b' }}>({rirDiff >= 0 ? '+' : ''}{rirDiff.toFixed(1)})</span></div>
                 </div>
                 <div style={{ padding:8, borderRadius:8, background:'rgba(255,255,255,0.03)' }}>
-                  <div style={{ color:'#fff', fontSize:10 }}>Тоннаж (кг)</div>
+                  <div style={{ color: 'var(--text, #fff)', fontSize:10 }}>Тоннаж (кг)</div>
                   <div style={{ fontWeight:700 }}>{Math.round(w1Wt)} → {Math.round(wCurWt)} <span style={{ color: wtDiff >= 0 ? '#22c55e' : '#ef4444' }}>({wtDiff >= 0 ? '+' : ''}{Math.round(wtDiff)})</span></div>
                 </div>
               </div>
@@ -411,7 +463,9 @@ export const BbPlanStep: React.FC<BbPlanStepProps> = ({
           // P2-5: тоннаж = weight × reps × sets (реальный тоннаж, не weight × sets).
           // Раньше: weight × sets → 6 sessions×100kg=600 vs 1×200kg=200 — несравнимо.
           // Теперь: weight × reps × sets → нормализованный тоннаж для сравнения недель.
-          const totalWt = exs.reduce((s, e) => s + (e.workSets[0]?.weight || 80) * (e.workSets[0]?.reps || 10) * e.sets, 0);
+          const totalWt = exs.reduce((s, e) => s + ((e.workSets && e.workSets.length > 0)
+            ? e.workSets.reduce((sum, ws) => sum + (ws.weight ?? 0) * (ws.reps || 0), 0)
+            : (e.workSets?.[0]?.weight ?? 0) * (e.workSets?.[0]?.reps || 10) * e.sets), 0);
           return { week: w.week, phase: ph, sets, rir, tonnage: totalWt };
         });
         const maxSets = Math.max(1, ...wkStats.map(x => x.sets));
@@ -433,17 +487,17 @@ export const BbPlanStep: React.FC<BbPlanStepProps> = ({
                     <div style={{ fontSize:11, fontWeight:700, minWidth:20, textAlign:'center', color:x.rir <= 1 ? '#ef4444' : x.rir <= 2 ? '#f59e0b' : '#22c55e' }}>RIR{x.rir.toFixed(0)}</div>
                     <div style={{ flex: 1, display:'flex', gap:2, alignItems:'center' }}>
                       <div style={{ height:8, width: Math.round((x.sets / maxSets) * barW), borderRadius:3, background: PHASE_COLORS[x.phase], opacity:0.6, transition:'width 0.5s', minWidth: x.sets > 0 ? 4 : 0 }} />
-                      <span style={{ fontSize:11, fontWeight:600, color:'#fff', minWidth:16 }}>{x.sets}</span>
+                      <span style={{ fontSize:11, fontWeight:600, color: 'var(--text, #fff)', minWidth:16 }}>{x.sets}</span>
                     </div>
                     <div style={{ flex: 1, display:'flex', gap:2, alignItems:'center' }}>
                       <div style={{ height:6, width: Math.round((x.tonnage / maxTon) * barW), borderRadius:2, background:'#60a5fa', opacity:0.5, transition:'width 0.5s', minWidth: x.tonnage > 0 ? 4 : 0 }} />
-                      <span style={{ fontSize:11, fontWeight:600, color:'#fff', minWidth:24 }}>{(x.tonnage / 1000).toFixed(1)}k</span>
+                      <span style={{ fontSize:11, fontWeight:600, color: 'var(--text, #fff)', minWidth:24 }}>{(x.tonnage / 1000).toFixed(1)}k</span>
                     </div>
                   </div>
                 );
               })}
             </div>
-            <div style={{ display:'flex', gap:12, marginTop:4, fontSize:11, color:'#fff', borderTop:'1px solid rgba(255,255,255,0.05)', paddingTop:3 }}>
+            <div style={{ display:'flex', gap:12, marginTop:4, fontSize:11, color: 'var(--text, #fff)', borderTop:'1px solid rgba(255,255,255,0.05)', paddingTop:3 }}>
               <span><span style={{ width:8, height:8, borderRadius:2, background:'#22c55e', display:'inline-block', marginRight:2 }} /> сеты/нед</span>
               <span><span style={{ width:8, height:8, borderRadius:2, background:'#60a5fa', display:'inline-block', marginRight:2 }} /> тоннаж</span>
               <span>RIR: 🟢3+ 🟡1-2 🔴0</span>
@@ -475,7 +529,7 @@ export const BbPlanStep: React.FC<BbPlanStepProps> = ({
             headerStyle={{ background: 'linear-gradient(135deg, rgba(168,85,247,0.10), rgba(168,85,247,0.03))', color: '#a78bfa' }}
             badge={`${rows.length} замен`}
           >
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 3, fontSize: 10, color: '#fff', lineHeight: 1.5 }}>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 3, fontSize: 10, color: 'var(--text, #fff)', lineHeight: 1.5 }}>
               {rows.slice(0, 12).map((r, ri) => <div key={ri}>• {r}</div>)}
               {rows.length > 12 && <div style={{ opacity: 0.7 }}>… и ещё {rows.length - 12}</div>}
               <div style={{ marginTop: 4, opacity: 0.85 }}>
@@ -531,8 +585,8 @@ export const BbPlanStep: React.FC<BbPlanStepProps> = ({
                     background: dayColor, color:'#000', fontWeight:900, fontSize:14, flexShrink:0
                   }}>{si+1}</span>
                   <div style={{ flex:1, minWidth:0 }}>
-                    <div style={{ fontSize:15, fontWeight:800, color:'#fff', lineHeight:1.2 }}>День {si+1} · {sessionTagLabel(s.sessionTag)}</div>
-                    <div style={{ fontSize:11, color:'#fff', opacity:0.85, marginTop:2, display:'flex', gap:8, flexWrap:'wrap' }}>
+                    <div style={{ fontSize:15, fontWeight:800, color: 'var(--text, #fff)', lineHeight:1.2 }}>День {si+1} · {sessionTagLabel(s.sessionTag)}</div>
+                    <div style={{ fontSize:11, color: 'var(--text, #fff)', opacity:0.85, marginTop:2, display:'flex', gap:8, flexWrap:'wrap' }}>
                       <span style={{ padding:'2px 7px', borderRadius:6, background: dayColor+'22', color:dayColor, border:`1px solid ${dayColor}35`, fontWeight:700 }}>{PHASE_LABELS[currentPhase]}</span>
                       <span>{s.character} · {dayExCount} упр · {ruCount(daySets, RU_SETS)}</span>
                     </div>
@@ -540,7 +594,7 @@ export const BbPlanStep: React.FC<BbPlanStepProps> = ({
                 </div>
                 <span style={{
                   width:32, height:32, borderRadius:8, display:'inline-flex', alignItems:'center', justifyContent:'center',
-                  background:'rgba(255,255,255,0.06)', border:'1px solid rgba(255,255,255,0.1)', color:'#fff', fontSize:14, flexShrink:0,
+                  background:'rgba(255,255,255,0.06)', border:'1px solid rgba(255,255,255,0.1)', color: 'var(--text, #fff)', fontSize:14, flexShrink:0,
                   transform: isDayCollapsed ? 'rotate(-90deg)' : 'rotate(0deg)', transition:'transform 0.2s'
                 }}>▼</span>
               </button>
@@ -571,7 +625,7 @@ export const BbPlanStep: React.FC<BbPlanStepProps> = ({
                     <summary style={{ fontSize: 10, fontWeight: 700, color: 'rgba(96,165,250,0.85)', cursor: 'pointer', padding: '4px 6px', borderRadius: 6, background: 'rgba(96,165,250,0.06)' }}>
                       🧭 Почему упражнения идут именно в таком порядке
                     </summary>
-                    <div style={{ marginTop: 4, display: 'flex', flexDirection: 'column', gap: 3, fontSize: 10, color: '#fff', lineHeight: 1.5 }}>
+                    <div style={{ marginTop: 4, display: 'flex', flexDirection: 'column', gap: 3, fontSize: 10, color: 'var(--text, #fff)', lineHeight: 1.5 }}>
                       {notes.map((n, ni) => <div key={ni}>{n}</div>)}
                       {slots.length > 0 && (
                         <div style={{ marginTop: 4, paddingTop: 4, borderTop: '1px solid rgba(255,255,255,0.08)', display: 'flex', flexDirection: 'column', gap: 2, color: 'rgba(255,255,255,0.82)' }}>
@@ -592,7 +646,7 @@ export const BbPlanStep: React.FC<BbPlanStepProps> = ({
                   // движок уже применил его к плану (applyPostPhaseProcessing). Прежний
                   // код умножал вес/сеты ВТОРОЙ раз (показывал меньше, чем в плане) и в
                   // faithful-режиме показывал несуществующую коррекцию.
-                  const adjW = e.workSets[0]?.weight || 80;
+                  const adjW = e.workSets[0]?.weight ?? 0;
                   const adjSets0 = e.sets;
                   // 26.09.2026 (аудит): ключ правки привязан к НЕДЕЛЕ (wk.week) — иначе
                   // правка одной недели применялась ко ВСЕМ неделям (см. applyEditsToPlan).
@@ -638,10 +692,10 @@ export const BbPlanStep: React.FC<BbPlanStepProps> = ({
                         >
                           <div style={{ display:'flex', alignItems:'baseline', gap:8 }}>
                             <span style={{ minWidth:22, height:22, borderRadius:'50%', background:'rgba(0,230,138,0.15)', color:'#00e68a', fontSize:12, fontWeight:800, display:'inline-flex', alignItems:'center', justifyContent:'center', flexShrink:0 }}>{ei+1}</span>
-                            <span style={{ fontSize:14, fontWeight:800, color:'#fff', lineHeight:1.25, letterSpacing:'-0.2px', flex:1 }}>{e.name}</span>
+                            <span style={{ fontSize:14, fontWeight:800, color: 'var(--text, #fff)', lineHeight:1.25, letterSpacing:'-0.2px', flex:1 }}>{e.name}</span>
                             <span style={{
                               width:24, height:24, borderRadius:6, display:'inline-flex', alignItems:'center', justifyContent:'center',
-                              background:'rgba(255,255,255,0.06)', border:'1px solid rgba(255,255,255,0.1)', color:'#fff', fontSize:11, flexShrink:0,
+                              background:'rgba(255,255,255,0.06)', border:'1px solid rgba(255,255,255,0.1)', color: 'var(--text, #fff)', fontSize:11, flexShrink:0,
                               transform: exCollapsed ? 'rotate(-90deg)' : 'rotate(0deg)', transition:'transform 0.2s'
                             }}>▼</span>
                           </div>
@@ -691,7 +745,7 @@ export const BbPlanStep: React.FC<BbPlanStepProps> = ({
                             🔄
                           </button>
                           <button onClick={() => setEditMode(isEditing ? null : { dayIdx: si, exIdx: ei })} title="Править"
-                            style={{ padding:'3px 8px', borderRadius:8, fontSize:11, fontWeight:600, cursor:'pointer', border:'1px solid rgba(255,255,255,0.1)', background:'rgba(255,255,255,0.03)', color:'#fff' }}>
+                            style={{ padding:'3px 8px', borderRadius:8, fontSize:11, fontWeight:600, cursor:'pointer', border:'1px solid rgba(255,255,255,0.1)', background:'rgba(255,255,255,0.03)', color: 'var(--text, #fff)' }}>
                             {isEditing ? '✓' : '✎'}
                           </button>
                         </div>
@@ -715,7 +769,7 @@ export const BbPlanStep: React.FC<BbPlanStepProps> = ({
                       }}>
                         <Chip label="Подходы" value={edit.sets + '×' + edit.reps} color="#22c55e" />
                         <Chip label="RIR" value={String(e.rir)} color="#f59e0b" />
-                        <Chip label="Вес" value={edit.weight + ' кг'} color="#60a5fa" />
+                        <Chip label="Вес" value={edit.weight > 0 ? edit.weight + ' кг' : 'Свой вес'} color="#60a5fa" />
                         {e.workSets[0]?.restSeconds && <Chip label="Отдых" value={e.workSets[0].restSeconds + 'с'} color="#fff" />}
                         <Chip label="Группа" value={muscleLabel(e.muscle)} color="#fff" />
                       </div>
@@ -723,7 +777,7 @@ export const BbPlanStep: React.FC<BbPlanStepProps> = ({
                       {/* Разбивка по подходам (включая дроп-цепочки финального сета) */}
                       {(setLines.length > 0 || setChain) && (
                         <div style={{ marginTop:6, padding:'7px 9px', borderRadius:8, background:'rgba(255,255,255,0.03)', border:'0.5px solid rgba(255,255,255,0.07)' }}>
-                          <div style={{ fontSize:10, fontWeight:700, color:'#fff', marginBottom:4 }}>📋 Подходы</div>
+                          <div style={{ fontSize:10, fontWeight:700, color: 'var(--text, #fff)', marginBottom:4 }}>📋 Подходы</div>
                           <div style={{ display:'flex', gap:5, flexWrap:'wrap', alignItems:'center' }}>
                             {setLines.map((ln, li) => (
                               <span key={li} style={{ fontSize:11, fontFamily:'monospace', padding:'2px 7px', borderRadius:5, background:'rgba(34,197,94,0.1)', color:'#86efac', border:'0.5px solid rgba(34,197,94,0.25)' }}>{ln}</span>
@@ -739,109 +793,80 @@ export const BbPlanStep: React.FC<BbPlanStepProps> = ({
 
                       {/* D-1 (итерация C): правило прогрессии — что делать на следующей неделе */}
                       {e.progressionRule && (
-                        <div style={{ marginTop:6, padding:'6px 9px', borderRadius:8, background:'rgba(34,197,94,0.06)', border:'0.5px solid rgba(34,197,94,0.18)', fontSize:10, color:'#fff', lineHeight:1.45 }}>
+                        <div style={{ marginTop:6, padding:'6px 9px', borderRadius:8, background:'rgba(34,197,94,0.06)', border:'0.5px solid rgba(34,197,94,0.18)', fontSize:10, color: 'var(--text, #fff)', lineHeight:1.45 }}>
                           <b style={{ color:'#22c55e' }}>📈 Как прогрессировать:</b> {e.progressionRule}
                         </div>
                       )}
 
-                      {/* Комментарий и полная тренерская инструкция — разбивка по пунктам */}
-                      <details style={{ marginTop:6 }} open={false}>
-                        <summary style={{ fontSize:11, fontWeight:700, color:'rgba(0,230,138,0.8)', cursor:'pointer', padding:'5px 8px', borderRadius:8, background:'rgba(0,230,138,0.04)' }}>
-                          📖 Полная инструкция — развернуто
+                      {/* Единый компактный drawer деталей (вместо 6 отдельных <details> подряд) */}
+                      <details style={{ marginTop: 6 }} open={false}>
+                        <summary style={{ fontSize: 11, fontWeight: 700, color: 'var(--accent, #00e68a)', cursor: 'pointer', padding: '6px 10px', borderRadius: 8, background: 'var(--surface-subtle, rgba(0,230,138,0.05))', border: '1px solid var(--border, rgba(0,230,138,0.16))', minHeight: 36, display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                          <span>📖 Детали: инструкция · биомеханика · разминка · почему</span>
+                          {e.workSets[0]?.tempo && <span style={{ fontSize: 10, color: '#a855f7', fontWeight: 700 }}>⏱ {e.workSets[0].tempo}</span>}
                         </summary>
-                        <div style={{ marginTop:4, fontSize:10, color:'#fff', lineHeight:1.55, padding:'7px 9px', borderRadius:8, background:'rgba(255,255,255,0.025)', border:'1px solid rgba(255,255,255,0.05)' }}>
-                          {String(comment).split(' · ').map((part: string, idx: number) => (
-                            <div key={idx} style={{ display:'flex', gap:6, marginBottom:3, alignItems:'flex-start' }}>
-                              <span style={{ color:'#00e68a', fontWeight:800, flexShrink:0 }}>{idx+1}.</span>
-                              <span style={{ flex:1 }}>{part}</span>
-                            </div>
-                          ))}
-                        </div>
-                      </details>
-                      {(() => {
-                        const prof = e.executionProfile || buildExerciseInstructions({ exerciseName: e.name, muscle: e.muscle, role: e.role, trainingFocus: bbTrainingFocus, level: bbLevel, tempo: e.workSets[0]?.tempo, restSeconds: e.workSets[0]?.restSeconds });
-                        return (
-                        <details style={{ marginTop:4 }}>
-                          <summary style={{ fontSize:11, fontWeight:600, color:'#60a5fa', cursor:'pointer' }}>🧬 Биомеханика и мышечный акцент — {prof.pattern}</summary>
-                          <div style={{ marginTop:4, padding:'6px 8px', borderRadius:8, background:'rgba(96,165,250,0.05)', color:'#fff', fontSize:10, lineHeight:1.5 }}>
-                            <div><b>Паттерн:</b> {prof.pattern}</div>
-                            {prof.mmc && <div><b>Связь мышца-мозг:</b> {prof.mmc}</div>}
-                            {prof.stretch && <div><b>Растяжение:</b> {prof.stretch}</div>}
-                            {prof.peak && <div><b>Пиковое сокращение:</b> {prof.peak}</div>}
-                            {prof.cues.length > 0 && <div><b>Ключи:</b> {prof.cues.join('; ')}</div>}
-                            {prof.mistakes.length > 0 && <div><b>Ошибки:</b> {prof.mistakes.join('; ')}</div>}
-                            <div style={{ marginTop:4, fontSize:9, color:'#fff' }}>Источник: {prof.source === 'exercise-lab' ? 'лаборатория' : prof.source === 'catalog' ? 'каталог' : 'базовый шаблон'} · Темп {prof.tempo} · {prof.order}</div>
-                          </div>
-                        </details>
-                        );
-                      })()}
-                      {(() => {
-                        const profTech = e.executionProfile || buildExerciseInstructions({ exerciseName: e.name, muscle: e.muscle, role: e.role, trainingFocus: bbTrainingFocus, level: bbLevel, tempo: e.workSets[0]?.tempo, restSeconds: e.workSets[0]?.restSeconds });
-                        const tech = technique || (e as any).technique || (e.executionProfile as any)?.technique;
-                        const cues = profTech?.cues?.length ? profTech.cues : (tech ? [tech] : []);
-                        return (
-                        <details style={{ marginTop:4 }} open={false}>
-                          <summary style={{ fontSize:11, fontWeight:600, color:'rgba(0,230,138,0.75)', cursor:'pointer' }}>💡 Техника выполнения — пошагово</summary>
-                          <div style={{ fontSize:10, color:'#fff', padding:'6px 8px', lineHeight:1.5, marginTop:2, borderRadius:8, background:'rgba(0,230,138,0.05)', border:'1px solid rgba(0,230,138,0.1)' }}>
-                            {cues.length > 0 ? (
-                              <div style={{ display:'flex', flexDirection:'column', gap:4 }}>
-                                {cues.map((c: string, idx: number) => (
-                                  <div key={idx} style={{ display:'flex', gap:6, alignItems:'flex-start' }}>
-                                    <span style={{ minWidth:18, height:18, borderRadius:'50%', background:'rgba(0,230,138,0.15)', color:'#00e68a', fontSize:9, fontWeight:800, display:'inline-flex', alignItems:'center', justifyContent:'center', flexShrink:0 }}>{idx+1}</span>
-                                    <span style={{ flex:1 }}>{c}</span>
-                                  </div>
-                                ))}
-                                {profTech?.tempo && <div style={{ marginTop:4, padding:'4px 6px', background:'rgba(255,255,255,0.03)', borderRadius:6 }}><b>Темп:</b> {profTech.tempo} — {tempoExplain(profTech.tempo) || 'контролируйте каждую фазу'}</div>}
+                        <div style={{ marginTop: 6, display: 'flex', flexDirection: 'column', gap: 6, padding: '8px 10px', borderRadius: 8, background: 'var(--surface-subtle, rgba(255,255,255,0.025))', border: '1px solid var(--border, rgba(255,255,255,0.06))', fontSize: 10, color: 'var(--text, #fff)', lineHeight: 1.5 }}>
+                          <div>
+                            <div style={{ fontWeight: 700, color: 'var(--accent, #00e68a)', marginBottom: 3 }}>📖 Инструкция</div>
+                            {String(comment).split(' · ').map((part: string, idx: number) => (
+                              <div key={idx} style={{ display: 'flex', gap: 6, marginBottom: 2, alignItems: 'flex-start' }}>
+                                <span style={{ color: 'var(--accent, #00e68a)', fontWeight: 800, flexShrink: 0 }}>{idx + 1}.</span>
+                                <span style={{ flex: 1 }}>{part}</span>
                               </div>
-                            ) : (
-                              <div>{tech || 'Контролируйте эксцентрик 2-3с, без рывков, полная амплитуда, дыхание — выдох на усилии.'}</div>
-                            )}
-                            <div style={{ marginTop:6, fontSize:9, color:'#fff', opacity:0.85, lineHeight:1.35 }}>Дыхание: выдох на усилии, вдох на опускании. Кор держите напряжённым весь подход.</div>
-                          </div>
-                        </details>
-                        );
-                      })()}
-
-                      {/* Разминка */}
-                      {(e.warmupSets && e.warmupSets.length > 0 ? e.warmupSets : (e.role === 'primary' && e.character === 'тяж' ? buildWarmup(edit.weight, true) : [])).length > 0 && (
-                        <details style={{ marginTop:4 }}>
-                          <summary style={{ fontSize:11, fontWeight:600, color:'rgba(96,165,250,0.7)', cursor:'pointer' }}>🔥 Разминка ({(e.warmupSets && e.warmupSets.length > 0 ? e.warmupSets : buildWarmup(edit.weight, true)).length} подхода)</summary>
-                          <div style={{ display:'flex', gap:8, marginTop:4, flexWrap:'wrap' }}>
-                            {(e.warmupSets && e.warmupSets.length > 0 ? e.warmupSets : buildWarmup(edit.weight, true)).map((w, wi) => (
-                              <span key={wi} style={{ fontSize:10, color:'#fff', padding:'2px 6px', borderRadius:4, background:'rgba(96,165,250,0.08)' }}>
-                                {w.reps}×{w.load} кг
-                              </span>
                             ))}
                           </div>
-                        </details>
-                      )}
-
-                      {/* Rationale — подробно, без мусора */}
-                      {e.rationale && (() => {
-                        const targetNote = exerciseTargetNote(e as any);
-                        const cleanRationale = String(e.rationale || '').replace(/Опытный уровень:\s*/g, '').replace(/Малые группы:\s*/g, '').trim();
-                        return (
-                        <details style={{ marginTop:4 }} open={false}>
-                          <summary style={{ fontSize:11, fontWeight:600, color:'rgba(96,165,250,0.6)', cursor:'pointer' }}>🧠 Почему именно это упражнение?</summary>
-                          <div style={{ fontSize:10, color:'#fff', padding:'6px 8px', lineHeight:1.55, marginTop:2, background:'rgba(96,165,250,0.05)', borderRadius:8, border:'1px solid rgba(96,165,250,0.1)' }}>
-                            <div style={{ marginBottom:4 }}><b>Логика подбора:</b> {cleanRationale || e.rationale}</div>
-                            {targetNote && <div style={{ marginTop:6, padding:'6px 8px', background:'rgba(59,130,246,0.06)', borderRadius:6, border:'1px solid rgba(59,130,246,0.12)' }}>{targetNote}</div>}
-                            <div style={{ marginTop:6, fontSize:9, color:'#fff', opacity:0.9, lineHeight:1.4 }}>
-                              Роль: {e.role === 'primary' ? 'основное движение дня — даёт 60-70% стимула' : 'добивка/изоляция — добивает объём и формирует детали'} · 
-                              Характер: {e.character === 'тяж' ? 'тяж (6-10 повт, RIR 1-2)' : e.character === 'памп' ? 'памп (12-20, RIR 3)' : 'лёгкий'} · 
-                              Паттерн: {(SUMMARY_PATTERN_RU[(e as any).movementPattern || ''] || (e as any).movementPattern || 'силовой') }
-                            </div>
-                          </div>
-                        </details>
-                        );
-                      })()}
-                      {/* Темп — внизу карты */}
-                      {e.workSets[0]?.tempo && (
-                        <details style={{ marginTop:4 }}>
-                          <summary style={{ fontSize:11, fontWeight:600, color:'#a855f7', cursor:'pointer' }}>⏱ Темп: {e.workSets[0].tempo}</summary>
-                          <div style={{ fontSize:10, color:'#fff', padding:'4px 8px', lineHeight:1.4, marginTop:2 }}>{tempoExplain(e.workSets[0].tempo) ? `${e.workSets[0].tempo} — ${tempoExplain(e.workSets[0].tempo)}` : e.workSets[0].tempo}</div>
-                        </details>
-                      )}
+                          {(() => {
+                            const prof = e.executionProfile || buildExerciseInstructions({ exerciseName: e.name, muscle: e.muscle, role: e.role, trainingFocus: bbTrainingFocus, level: bbLevel, tempo: e.workSets[0]?.tempo, restSeconds: e.workSets[0]?.restSeconds });
+                            const tech = technique || (e as any).technique || (e.executionProfile as any)?.technique;
+                            const cues = prof?.cues?.length ? prof.cues : (tech ? [tech] : []);
+                            return (
+                              <>
+                                <div style={{ paddingTop: 6, borderTop: '1px solid var(--border, rgba(255,255,255,0.06))' }}>
+                                  <div style={{ fontWeight: 700, color: '#60a5fa', marginBottom: 3 }}>🧬 Биомеханика и техника — {prof.pattern}</div>
+                                  {prof.mmc && <div><b>Связь мышца-мозг:</b> {prof.mmc}</div>}
+                                  {prof.stretch && <div><b>Растяжение:</b> {prof.stretch}</div>}
+                                  {prof.peak && <div><b>Пиковое сокращение:</b> {prof.peak}</div>}
+                                  {cues.length > 0 && <div><b>Ключи:</b> {cues.join('; ')}</div>}
+                                  {prof.mistakes.length > 0 && <div><b>Ошибки:</b> {prof.mistakes.join('; ')}</div>}
+                                  <div style={{ marginTop: 3, fontSize: 9.5, opacity: 0.8 }}>
+                                    Источник: {prof.source === 'exercise-lab' ? 'лаборатория' : prof.source === 'catalog' ? 'каталог' : 'базовый шаблон'} · Темп {e.workSets[0]?.tempo || prof.tempo}
+                                    {e.workSets[0]?.tempo && tempoExplain(e.workSets[0].tempo) ? ` (${tempoExplain(e.workSets[0].tempo)})` : ''}
+                                  </div>
+                                </div>
+                              </>
+                            );
+                          })()}
+                          {(() => {
+                            const warmups = e.warmupSets && e.warmupSets.length > 0 ? e.warmupSets : (e.role === 'primary' && e.character === 'тяж' && edit.weight > 0 ? buildWarmup(edit.weight, true) : []);
+                            if (!warmups.length) return null;
+                            return (
+                              <div style={{ paddingTop: 6, borderTop: '1px solid var(--border, rgba(255,255,255,0.06))' }}>
+                                <div style={{ fontWeight: 700, color: '#60a5fa', marginBottom: 3 }}>🔥 Разминка ({warmups.length} подхода)</div>
+                                <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+                                  {warmups.map((w, wi) => (
+                                    <span key={wi} style={{ fontSize: 10, padding: '2px 6px', borderRadius: 4, background: 'rgba(96,165,250,0.1)' }}>
+                                      {w.reps}×{w.load} кг
+                                    </span>
+                                  ))}
+                                </div>
+                              </div>
+                            );
+                          })()}
+                          {e.rationale && (() => {
+                            const targetNote = exerciseTargetNote(e as any);
+                            const cleanRationale = String(e.rationale || '').replace(/Опытный уровень:\s*/g, '').replace(/Малые группы:\s*/g, '').trim();
+                            return (
+                              <div style={{ paddingTop: 6, borderTop: '1px solid var(--border, rgba(255,255,255,0.06))' }}>
+                                <div style={{ fontWeight: 700, color: '#60a5fa', marginBottom: 2 }}>🧠 Почему именно это упражнение?</div>
+                                <div><b>Логика подбора:</b> {cleanRationale || e.rationale}</div>
+                                {targetNote && <div style={{ marginTop: 4, padding: '4px 6px', background: 'rgba(59,130,246,0.08)', borderRadius: 6 }}>{targetNote}</div>}
+                                <div style={{ marginTop: 4, fontSize: 9.5, opacity: 0.85 }}>
+                                  Роль: {e.role === 'primary' ? 'основное движение дня — даёт 60-70% стимула' : 'добивка/изоляция — добивает объём и формирует детали'} · Характер: {e.character === 'тяж' ? 'тяж (6-10 повт, RIR 1-2)' : e.character === 'памп' ? 'памп (12-20, RIR 3)' : 'лёгкий'} · Паттерн: {SUMMARY_PATTERN_RU[(e as any).movementPattern || ''] || (e as any).movementPattern || 'силовой'}
+                                </div>
+                              </div>
+                            );
+                          })()}
+                        </div>
+                      </details>
                         </>
                       )}
                     </div>
@@ -877,4 +902,4 @@ export const BbPlanStep: React.FC<BbPlanStepProps> = ({
       {actionRow}
     </div>
   );
-};
+});

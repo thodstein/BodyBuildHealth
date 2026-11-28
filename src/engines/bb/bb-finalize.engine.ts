@@ -20,6 +20,31 @@ function indirectToMuscle(ex: any, muscle: string): number {
   }
   return v;
 }
+function finalizeSessionLimits(options: BBFinalizeOptions, plan?: any) {
+  const lim = centralizedSessionLimits(
+    {
+      level: options.level,
+      trainingYears: options.trainingYears,
+      patternId: (options as any).patternId || plan?.pattern?.id,
+      onCourse: (options as any).onCourse,
+      peds: (options as any).peds,
+      pedDoses: (options as any).pedDoses,
+      volumeRegime: (options as any).volumeRegime,
+      trainingVolumeMode: (options as any).trainingVolumeMode,
+    } as any,
+    plan?.pattern ? { id: plan.pattern.id } as any : undefined,
+  );
+  return {
+    ...lim,
+    maxWorkingSets: Number.isFinite(options.maxWorkingSets)
+      ? Math.max(lim.maxWorkingSets, options.maxWorkingSets as number)
+      : lim.maxWorkingSets,
+    maxExercises: Number.isFinite(options.maxExercises)
+      ? Math.max(lim.maxExercises, options.maxExercises as number)
+      : lim.maxExercises,
+  };
+}
+
 import { estimateBBSessionCost, fitBBSessionToBudget } from './bb-fatigue.engine';
 import { REP_SCHEMES, isWidowmakerExercise } from './bb-rep-schemes.engine';
 import { INTENSITY_TECHNIQUES, techniquesFor } from './bb-intensity-techniques';
@@ -50,6 +75,7 @@ import { isMobilityRestricted } from './bb-mobility.engine';
 import { expandDonorMuscles, isSpecializationFocus, isSpecializationWeak, specResForWeekSchedule, tradeoffForWeek, type SpecializationSchedule } from './bb-specialization.engine';
 import { ANGLE_CLASSES, lengthenedBonus } from './bb-exercise-selection.engine';
 import { SPLIT_PATTERNS } from './bb-split-patterns';
+import { normalizeEquipmentIds, equipmentAllows } from './bb-equipment';
 
 /** Слабая подгруппа → обязательный функциональный паттерн (специализация:
  *  не просто больше сетов, а целевое упражнение под слабое место).
@@ -272,21 +298,22 @@ function allocateExperiencedBackSession(session: any, week: any, options: BBFina
   const usedNames = new Set(current.map(e => e.name));
   const usedPatterns = new Set(current.map(e => annotateBackExercise(e).movementPattern));
   const template = current[0];
+  const normEqBack = normalizeEquipmentIds(options.equipment || []);
+  const excludedBack = new Set(options.excludedExercises || []);
   const allowed = (candidate: any) => {
     if (trueMuscleOf(candidate) !== 'back') return false;
     if (usedNames.has(candidate.name)) return false;
+    if (excludedBack.has(candidate.id) || excludedBack.has(candidate.name)) return false;
     if (options.avoidAxialLoad && isAxialLoadExercise(candidate)) return false;
+    if (isMobilityRestricted(candidate, options.mobilityRestrictions)) return false;
     // Bodyweight capability: без подтверждённой способности подтягивания не
     // выбираются как primary — берём pulldown/машину вместо.
     if (/подтяг|pull.?up|chin/i.test(candidate.name || '')) {
       const cap = options.bodyweightCapability;
-      const canPullUp = cap && ((cap.pullUpsStrict ?? 0) >= 5 || (cap.chinUpsStrict ?? 0) >= 5 || (cap.weightedPullUpLoad ?? 0) > 0);
+      const canPullUp = cap && ((cap.pullUpsStrict ?? 0) >= 5 || (cap.chinUpsStrict ?? 0) >= 5 || (cap.weightedPullUpLoad ?? 0) > 0 || (cap.assistedPullUpLoad ?? 0) > 0);
       if (!canPullUp) return false;
     }
-    if (options.equipment?.length) {
-      const eq = Array.isArray(candidate.equipment) ? candidate.equipment : [String(candidate.equipment || '')];
-      if (eq.length && !eq.some((x: string) => options.equipment!.includes(x))) return false;
-    }
+    if (normEqBack.length > 0 && !equipmentAllows(normEqBack, candidate.equipment as any)) return false;
     return true;
   };
 
@@ -920,10 +947,7 @@ function ensureLegsCoverageForUpperOnlySplits(plan: any, options: BBFinalizeOpti
   };
   let maxEx = 14, maxSets = 24;
   try {
-    const lim = centralizedSessionLimits(
-      { level: options.level, trainingYears: options.trainingYears, patternId: pattern?.id } as any,
-      { id: pattern?.id } as any,
-    );
+    const lim = finalizeSessionLimits(options, plan);
     maxEx = lim.maxExercises; maxSets = lim.maxWorkingSets;
   } catch { /* фолбэк-лимиты */ }
   const totalWeeks = plan.weeks.length;
@@ -1099,10 +1123,7 @@ function ensureChestBackBalance(plan: any, options: BBFinalizeOptions): void {
   };
   let maxSets = 24;
   try {
-    const lim = centralizedSessionLimits(
-      { level: options.level, trainingYears: options.trainingYears, patternId: (plan as any)?.pattern?.id } as any,
-      { id: (plan as any)?.pattern?.id } as any,
-    );
+    const lim = finalizeSessionLimits(options, plan);
     maxSets = lim.maxWorkingSets;
   } catch { /* фолбэк-лимит */ }
   const backExCap = perExerciseCap(options.level, 'back', options.trainingYears, options.onCourse);
@@ -1971,10 +1992,7 @@ export function ensureBodybuildingMinimums(plan: any, options: BBFinalizeOptions
   let maxSets = 24;
   let maxEx = 10;
   try {
-    const lim = centralizedSessionLimits(
-      { level: options.level, trainingYears: options.trainingYears, patternId } as any,
-      { id: patternId } as any,
-    );
+    const lim = finalizeSessionLimits(options, plan);
     maxSets = lim.maxWorkingSets; maxEx = lim.maxExercises;
   } catch { /* фолбэк-лимиты */ }
   const totalWeeks = plan.weeks.length;
@@ -2084,10 +2102,7 @@ export function ensureFemaleHamstringFloor(plan: any, options: BBFinalizeOptions
   const profile = bbMinimumProfile(patternId, options.level || '', options.sex);
   let maxSets = 24; let maxEx = 10;
   try {
-    const lim = centralizedSessionLimits(
-      { level: options.level, trainingYears: options.trainingYears, patternId } as any,
-      { id: patternId } as any,
-    );
+    const lim = finalizeSessionLimits(options, plan);
     maxSets = lim.maxWorkingSets; maxEx = lim.maxExercises;
   } catch { /* фолбэк-лимиты */ }
   const excluded = new Set([...(options.excludedMuscles || []), ...(options.gradedMuscles || [])]);
@@ -3847,7 +3862,7 @@ export function applySpecializationPass(plan: BBPlan, options: BBFinalizeOptions
           );
           if (target) {
             const working = target.exercises.filter((e: any) => !(e as any).warmupActivator);
-            const centralizedLimits = centralizedSessionLimits({ level: options.level, trainingYears: options.trainingYears });
+            const centralizedLimits = finalizeSessionLimits(options, plan);
             const maxEx = options.maxExercises ?? centralizedLimits.maxExercises;
             const maxSessionSets = options.maxWorkingSets ?? centralizedLimits.maxWorkingSets;
             const sessionSets = working.reduce((a: number, e: any) => a + (e.sets || 0), 0);
@@ -3942,7 +3957,7 @@ function enforceSessionExerciseLimit(plan: BBPlan, options: BBFinalizeOptions): 
     maxEx = options.maxExercises;
   } else {
     try {
-      const lim = centralizedSessionLimits({ level: options.level, trainingYears: options.trainingYears, patternId: (options as any).patternId } as any, (plan as any).pattern ? { id: (plan as any).pattern.id } as any : undefined);
+      const lim = finalizeSessionLimits(options, plan);
       maxEx = lim.maxExercises;
     } catch {
       maxEx = options.level === 'enhanced' && (options.trainingYears ?? 0) >= 3 ? 18 : options.level === 'enhanced' && (options.trainingYears ?? 0) >= 1 ? 14 : 10;
@@ -4022,7 +4037,7 @@ export function enforceSessionRealism(plan: BBPlan, options: BBFinalizeOptions =
   if (options.maxExercises != null) maxEx = options.maxExercises;
   else {
     try {
-      maxEx = centralizedSessionLimits({ level: options.level, trainingYears: options.trainingYears } as any, (plan as any).pattern ? { id: (plan as any).pattern.id } as any : undefined).maxExercises;
+      maxEx = finalizeSessionLimits(options, plan).maxExercises;
     } catch {
       maxEx = options.level === 'enhanced' && (options.trainingYears ?? 0) >= 3 ? 15 : options.level === 'enhanced' ? 13 : 10;
     }
@@ -4031,7 +4046,7 @@ export function enforceSessionRealism(plan: BBPlan, options: BBFinalizeOptions =
   if (options.maxWorkingSets != null) maxSets = options.maxWorkingSets;
   else {
     try {
-      maxSets = centralizedSessionLimits({ level: options.level, trainingYears: options.trainingYears } as any, (plan as any).pattern ? { id: (plan as any).pattern.id } as any : undefined).maxWorkingSets;
+      maxSets = finalizeSessionLimits(options, plan).maxWorkingSets;
     } catch {
       maxSets = options.level === 'enhanced' && (options.trainingYears ?? 0) >= 3 ? 40 : options.level === 'enhanced' ? 34 : 24;
     }
@@ -4296,8 +4311,8 @@ export function markPreExhaustPairs(plan: BBPlan): void {
     for (const session of week.sessions) {
       const working = session.exercises.filter((e: any) => !(e as any).warmupActivator);
       if (working.length < 2) continue;
-      // Целевой компаунд дня = первый primary+тяж compound.
-      const compound = working.find(e => e.role === 'primary' && e.character === 'тяж' && isCompoundEx(e));
+      // Целевой компаунд дня = первый primary+тяж compound (не занятый другим суперсетом).
+      const compound = working.find(e => e.role === 'primary' && e.character === 'тяж' && isCompoundEx(e) && !e.supersetWith);
       if (!compound) continue;
       const muscle = compound.muscle;
       // Изоляция той же мышцы, идущая ПЕРЕД компаундом (pre-exhaust).
@@ -4352,9 +4367,15 @@ export function markGiantSets(plan: BBPlan): void {
         const isos = others.filter(e => !isCompoundEx(e));
         const members = [compound, ...(isos.length >= 2 ? isos.slice(0, 2) : others.slice(0, 2))];
         const label = members.map(e => e.name).join(' → ');
-        for (const m of members) {
+        const groupId = week.week * 100 + (session.weekOffset || 0) * 10 + 70;
+        members.forEach((m, idx) => {
+          m.supersetGroup = groupId;
+          m.supersetSlot = idx;
+          if (idx < members.length - 1 && Array.isArray(m.workSets)) {
+            for (const ws of m.workSets) ws.restSeconds = 0;
+          }
           m.comment = (m.comment || '') + (m.comment ? ' · ' : '') + `🔄 Гигант-сет: ${label} — 3 упражнения одной группы без отдыха`;
-        }
+        });
         done = true;
       }
     }
@@ -4439,12 +4460,23 @@ export function applyVolumeScheme(plan: BBPlan, scheme: string, opts?: { fst7Sev
     // Схемы объёма (FST-7/GVT/8×8) — это памп/метаболический стиль: применяем их
     // в ПАМП-сессиях в первую очередь (если мышца тренируется и в тяж, и в памп,
     // памп-день несёт схему, а не «крадёт» первый попавшийся тяж-день).
+    const musclesWithPumpAccessory = new Set<string>();
+    for (const s of week.sessions) {
+      for (const e of s.exercises) {
+        if (!(e as any).warmupActivator && e.role === 'accessory' && e.character === 'памп') {
+          musclesWithPumpAccessory.add(e.muscle);
+        }
+      }
+    }
     const sessionsByPref = [...week.sessions.filter(s => s.character === 'памп'), ...week.sessions.filter(s => s.character !== 'памп')];
     for (const session of sessionsByPref) {
       const byMuscle: Record<string, any[]> = {};
       for (const ex of session.exercises) {
         if ((ex as any).warmupActivator) continue;
-        if (ex.role !== 'accessory' || ex.character !== 'памп') continue;
+        if (ex.role !== 'accessory') continue;
+        // P1-8: на тяж-сплитах (fullbody_3/bro_5/female_glute_3) нет явных памп-дней;
+        // если у мышцы на неделе есть памп-изоляция — используем её, иначе допускаем accessory.
+        if (ex.character !== 'памп' && musclesWithPumpAccessory.has(ex.muscle)) continue;
         // Схемы объёма — для крупных мышц: мелкие (икры/предплечья/пресс/трапеции)
         // имеют малые капы MRV, и 7-10 сетов изоляций туда не влезают.
         if (['forearms', 'abs', 'calves', 'traps'].includes(ex.muscle)) continue;
@@ -4546,17 +4578,14 @@ function addAdaptiveMEVFeeders(plan: BBPlan, options: BBFinalizeOptions): void {
   const excluded = new Set(options.excludedExercises || []);
   const excludedMuscles = new Set(options.excludedMuscles || []);
   const gradedMuscles = new Set(options.gradedMuscles || []);
-  const equipment = options.equipment || [];
+  const equipment = normalizeEquipmentIds(options.equipment || []);
   const candidates = EXERCISE_CATALOG.filter(candidate => {
     if (candidate.type !== 'isolation' && (candidate as any).exerciseType !== 'isolation' || bbExerciseTier(candidate) > 2) return false;
     if (excluded.has(candidate.id) || excluded.has(candidate.name)) return false;
     if (excludedMuscles.has(candidate.group) || excludedMuscles.has(trueMuscleOf(candidate) || '')) return false;
     if (options.avoidAxialLoad && isAxialLoadExercise(candidate as any)) return false;
     if (isMobilityRestricted(candidate, options.mobilityRestrictions)) return false;
-    if (equipment.length > 0) {
-      const candidateEquipment = Array.isArray(candidate.equipment) ? candidate.equipment : [String(candidate.equipment || '')];
-      if (candidateEquipment.length > 0 && !candidateEquipment.some(item => equipment.includes(item))) return false;
-    }
+    if (equipment.length > 0 && !equipmentAllows(equipment, candidate.equipment as any)) return false;
     return trueMuscleOf(candidate) !== null;
   });
   const muscles = [...new Set(candidates.map(candidate => trueMuscleOf(candidate) || ''))].filter(Boolean);
@@ -5536,21 +5565,25 @@ export function repairSingleSetExercises(next: BBPlan): void {
     return at === bt;
   };
   const moveOne = (donor: any, target: any): void => {
-    // Переносим РОВНО один рабочий сет: donor −1, target +1. Не подрезаем
-    // workSets до sets (в плане бывают техники/мини-сеты, и slice менял
-    // недельный объём — zero-state snapshot chest 13→15, hamstrings 12→10).
+    // Переносим РОВНО один рабочий сет: donor −1, target +1.
+    // P1-3: копируем СОБСТВЕННЫЙ workSet target (а не вес/повторы донора!), иначе
+    // разводка гантелей 15кг×15 получала сет от жима лёжа 100кг×6.
     const hasDonorSets = Array.isArray(donor.workSets) && donor.workSets.length > 0;
-    const transfer = hasDonorSets
-      ? donor.workSets.pop()
-      : { reps: donor.repsRange?.[0] || 8, rir: donor.rir ?? 2, weight: 0 };
-    if (hasDonorSets) donor.sets = Math.max(2, donor.workSets.length);
-    else donor.sets = Math.max(2, Number(donor.sets) - 1);
+    if (hasDonorSets) {
+      donor.workSets.pop();
+      donor.sets = Math.max(2, donor.workSets.length);
+    } else {
+      donor.sets = Math.max(2, Number(donor.sets) - 1);
+    }
     if (!Array.isArray(target.workSets)) target.workSets = [];
-    target.workSets.push({ ...transfer });
-    const template = target.workSets[0]
-      || donor.workSets?.[donor.workSets.length - 1]
-      || { reps: target.repsRange?.[0] || 8, rir: target.rir ?? 2, weight: 0 };
-    while (target.workSets.length < 2) target.workSets.push({ ...template });
+    const template = target.workSets[target.workSets.length - 1]
+      || target.workSets[0]
+      || { reps: target.repsRange?.[0] || 10, rir: target.rir ?? 2, weight: 0, restSeconds: target.restSeconds ?? 90 };
+    const clone = { ...template };
+    // Не дублируем технику последнего подхода при клонировании
+    if ((clone as any).technique) delete (clone as any).technique;
+    target.workSets.push(clone);
+    while (target.workSets.length < 2) target.workSets.push({ ...clone });
     target.sets = target.workSets.length;
   };
   for (const week of next.weeks as any[]) {
@@ -6005,8 +6038,10 @@ for (const week of next.weeks) {
   // со спиной, как и ноги/спина защищены от fit-резки. Добиваем грудь до target
   // (14-18 сетов/сессию), иначе fit урезал её после diversify (спина 22, грудь 9).
   if (!options.preserveSource && options.level === 'enhanced' && (options.trainingYears ?? 0) >= 3) {
+    const eqNorm = normalizeEquipmentIds(options.equipment || []);
     for (const week of next.weeks) {
-      if (isPrepControlled(week)) continue;
+      // P1-5: chest co-main invariant не должен раздувать грудь в делод/тапер-неделях!
+      if (isPrepControlled(week) || isGenericTaperWeek(week) || (week as any).deload || (week as any).phase === 'deload') continue;
       for (const session of week.sessions) {
         if (!/^(Push|Chest|ChestBack|Upper|UpperPower|UpperHyp|Torso)$/i.test(session.sessionTag || '')) continue;
         const donorSet = tradeoffDonorsForWeek(options, (week as any)?.week ?? 0);
@@ -6030,7 +6065,16 @@ for (const week of next.weeks) {
         }
         // 2) Если всё ещё мало — добавить одно грудное упражнение.
         if (added < targetSets - current) {
-          const cand = EXERCISE_CATALOG.find((x: any) => trueMuscleOf(x) === 'chest' && !usedNames.has(x.name) && !session.exercises.some((e: any) => e.name === x.name) && !options.excludedExercises?.includes(x.id) && !options.excludedExercises?.includes(x.name));
+          const cand = EXERCISE_CATALOG.find((x: any) =>
+            trueMuscleOf(x) === 'chest'
+            && !usedNames.has(x.name)
+            && !session.exercises.some((e: any) => e.name === x.name)
+            && !options.excludedExercises?.includes(x.id)
+            && !options.excludedExercises?.includes(x.name)
+            && equipmentAllows(eqNorm, x.equipment as any)
+            && (!options.avoidAxialLoad || !isAxialLoadExercise(x))
+            && (!options.mobilityRestrictions || !isMobilityRestricted(x, options.mobilityRestrictions)),
+          );
           if (cand) {
             const wm = options.workMax?.chest || 100;
             const sets = Math.min(4, targetSets - current - added);
@@ -6362,10 +6406,7 @@ for (const week of next.weeks) {
     // P0-6 (аудит 2026-09): единый источник сессионных лимитов — centralizedSessionLimits
     // (level/стаж/PPL-оверрайд), а не локальный хардкод 18/14/10 и 60/40/24, который
     // разошёлся бы при изменении капов (tier 6+ = 65/20, PPL = 36/11).
-    const execLimits = centralizedSessionLimits(
-      { level: options.level, trainingYears: options.trainingYears, patternId: (options as any).patternId } as any,
-      (next as any).pattern ? { id: (next as any).pattern.id } as any : undefined,
-    );
+    const execLimits = finalizeSessionLimits(options, next);
     for (const week of next.weeks) {
       // Ф1.1: deload-недели не добираются fill'ом — иначе pump-разгрузка (×0.5
       // сетов) откатывается добором до паритета с рабочей неделей (73=73).
@@ -6418,14 +6459,19 @@ for (const week of next.weeks) {
         // Пресс/предплечья — «при наличии сил» (optional, вне капа сессии).
         const isOptionalSmall = muscle === 'abs' || muscle === 'forearms';
         if (!isOptionalSmall && sessionSets() + addSets > maxSessionSets) continue;
+        const fillEqNorm = normalizeEquipmentIds(options.equipment || []);
+        const fillExcl = new Set(options.excludedExercises || []);
         const candidate = EXERCISE_CATALOG.find((x: any) => {
           if (trueMuscleOf(x) !== muscle) return false;
+          if (fillExcl.has(x.id) || fillExcl.has(x.name)) return false;
           if (options.avoidAxialLoad && isAxialLoadExercise(x)) return false;
           if (isMobilityRestricted(x, options.mobilityRestrictions)) return false;
-          if (options.equipment?.length) {
-            const eq = Array.isArray(x.equipment) ? x.equipment : [String(x.equipment || '')];
-            if (eq.length && !eq.includes('bodyweight') && !eq.some((e: string) => options.equipment!.includes(e))) return false;
+          if (/подтяг|pull.?up|chin.?up/i.test(x.name || '')) {
+            const cap = options.bodyweightCapability;
+            const canPull = cap && ((cap.pullUpsStrict ?? 0) >= 5 || (cap.chinUpsStrict ?? 0) >= 5 || (cap.weightedPullUpLoad ?? 0) > 0 || (cap.assistedPullUpLoad ?? 0) > 0);
+            if (!canPull) return false;
           }
+          if (fillEqNorm.length > 0 && !equipmentAllows(fillEqNorm, x.equipment as any)) return false;
           return true;
         });
         if (!candidate) continue;
@@ -6550,10 +6596,7 @@ for (const week of next.weeks) {
   // Optional-добивки («при наличии сил») в кап не входят.
   const finMaxSets = options.maxWorkingSets ?? (() => {
     try {
-      return centralizedSessionLimits(
-        { level: options.level, trainingYears: options.trainingYears, patternId: (options as any).patternId } as any,
-        (next as any).pattern ? { id: (next as any).pattern.id } as any : undefined,
-      ).maxWorkingSets;
+      return finalizeSessionLimits(options, next).maxWorkingSets;
     } catch { return 24; }
   })();
   for (const week of next.weeks) {
@@ -6932,10 +6975,7 @@ for (const week of next.weeks) {
   if (!options.preserveSource && (next as any).pattern?.id && options.level !== 'beginner' && isPPLPattern(options, next)) {
     let sessCap = 30;
     try {
-      sessCap = centralizedSessionLimits(
-        { level: options.level, trainingYears: options.trainingYears, patternId: (options as any).patternId } as any,
-        (next as any).pattern ? { id: (next as any).pattern.id } as any : undefined,
-      ).maxWorkingSets;
+      sessCap = finalizeSessionLimits(options, next).maxWorkingSets;
     } catch { sessCap = 30; }
     for (const week of next.weeks) {
       if ((week as any).phase === 'deload' || (week as any).deload || isTaperPrepOrPeakWeek(week)) continue;
@@ -7140,15 +7180,22 @@ for (const week of next.weeks) {
           && s.exercises.filter((e: any) => !(e as any).warmupActivator).length < 10);
         if (!target) continue;
         const used = new Set(target.exercises.map((e: any) => e.name));
+        const freqEqNorm = normalizeEquipmentIds(options.equipment || []);
+        const freqExclMuscles = new Set(options.excludedMuscles || []);
+        if (freqExclMuscles.has(m)) continue;
         const cand = EXERCISE_CATALOG.find((x: any) => {
           if (trueMuscleOf(x) !== m) return false;
           if (x.type !== 'isolation' && (x as any).exerciseType !== 'isolation') return false;
           if (used.has(x.name)) return false;
           if (options.excludedExercises?.includes(x.id) || options.excludedExercises?.includes(x.name)) return false;
-          if (options.equipment?.length) {
-            const eq = Array.isArray(x.equipment) ? x.equipment : [String(x.equipment || '')];
-            if (eq.length > 0 && !eq.some((q: string) => options.equipment!.includes(q))) return false;
+          if (options.avoidAxialLoad && isAxialLoadExercise(x)) return false;
+          if (isMobilityRestricted(x, options.mobilityRestrictions)) return false;
+          if (/подтяг|pull.?up|chin.?up/i.test(x.name || '')) {
+            const cap = options.bodyweightCapability;
+            const canPull = cap && ((cap.pullUpsStrict ?? 0) >= 5 || (cap.chinUpsStrict ?? 0) >= 5 || (cap.weightedPullUpLoad ?? 0) > 0 || (cap.assistedPullUpLoad ?? 0) > 0);
+            if (!canPull) return false;
           }
+          if (freqEqNorm.length > 0 && !equipmentAllows(freqEqNorm, x.equipment as any)) return false;
           return true;
         });
         if (!cand) continue;
@@ -7185,6 +7232,7 @@ for (const week of next.weeks) {
         const isWide = (e: any) => /широк|wide|параллел|parallel|v.?bar/i.test(e.name || '');
         verts.sort((a: any, b: any) => (isWide(b) ? 1 : 0) - (isWide(a) ? 1 : 0));
         const used = new Set(s.exercises.map((e: any) => e.name));
+        const bvEqNorm = normalizeEquipmentIds(options.equipment || []);
         for (const dup of verts.slice(1)) {
           const rep = EXERCISE_CATALOG.find((x: any) => {
             if (trueMuscleOf(x) !== 'back') return false;
@@ -7196,10 +7244,9 @@ for (const week of next.weeks) {
             if (rp === 'vertical_pull') return false;
             if (!['heavy_row', 'supported_row', 'unilateral_row', 'lat_isolation'].includes(rp)) return false;
             if (options.excludedExercises?.includes(x.id) || options.excludedExercises?.includes(x.name)) return false;
-            if (options.equipment?.length) {
-              const eq = Array.isArray(x.equipment) ? x.equipment : [String(x.equipment || '')];
-              if (eq.length > 0 && !eq.some((q: string) => options.equipment!.includes(q))) return false;
-            }
+            if (options.avoidAxialLoad && isAxialLoadExercise(x)) return false;
+            if (isMobilityRestricted(x, options.mobilityRestrictions)) return false;
+            if (bvEqNorm.length > 0 && !equipmentAllows(bvEqNorm, x.equipment as any)) return false;
             return true;
           });
           if (!rep) continue;
@@ -7222,6 +7269,14 @@ for (const week of next.weeks) {
     for (const e of s.exercises as any[]) {
       if (e.supersetWith && !remaining.has(e.supersetWith)) {
         delete e.supersetWith;
+        delete e.supersetGroup;
+        delete e.supersetSlot;
+        if (Array.isArray(e.workSets)) {
+          const baseRest = Number(e.restSeconds) || 90;
+          for (const ws of e.workSets) {
+            if (ws && Number(ws.restSeconds) === 0) ws.restSeconds = baseRest;
+          }
+        }
         if (e.comment) e.comment = e.comment.replace(/\s*\[Суперсет с:[^\]]*\]/, '').replace(/Суперсет с\s*“[^”]*”\s*·?/g, '').trim();
         if (e.comment) e.comment = e.comment.replace(/🔗 Суперсет с[^·]*·?/g, '').trim();
       }
@@ -7236,9 +7291,21 @@ for (const week of next.weeks) {
     let lateCap = 30;
     try {
       lateCap = centralizedSessionLimits(
-        { level: options.level, trainingYears: options.trainingYears, patternId: (options as any).patternId } as any,
+        {
+          level: options.level,
+          trainingYears: options.trainingYears,
+          patternId: (options as any).patternId,
+          onCourse: (options as any).onCourse,
+          peds: (options as any).peds,
+          pedDoses: (options as any).pedDoses,
+          volumeRegime: (options as any).volumeRegime,
+          trainingVolumeMode: (options as any).trainingVolumeMode,
+        } as any,
         (next as any).pattern ? { id: (next as any).pattern.id } as any : undefined,
       ).maxWorkingSets;
+      if (Number.isFinite(options.maxWorkingSets) && (options.maxWorkingSets as number) > lateCap) {
+        lateCap = options.maxWorkingSets as number;
+      }
     } catch { lateCap = 30; }
     const lateCaps = (next as any).mrvByMuscle || {};
     for (const week of next.weeks) {
@@ -7347,17 +7414,47 @@ for (const week of next.weeks) {
     let lateCap = 34;
     try {
       lateCap = centralizedSessionLimits(
-        { level: options.level, trainingYears: options.trainingYears, patternId: (options as any).patternId } as any,
+        {
+          level: options.level,
+          trainingYears: options.trainingYears,
+          patternId: (options as any).patternId,
+          onCourse: (options as any).onCourse,
+          peds: (options as any).peds,
+          pedDoses: (options as any).pedDoses,
+          volumeRegime: (options as any).volumeRegime,
+          trainingVolumeMode: (options as any).trainingVolumeMode,
+        } as any,
         (next as any).pattern ? { id: (next as any).pattern.id } as any : undefined,
       ).maxWorkingSets;
+      if (Number.isFinite(options.maxWorkingSets) && (options.maxWorkingSets as number) > lateCap) {
+        lateCap = options.maxWorkingSets as number;
+      }
     } catch { lateCap = 34; }
     for (const week of next.weeks) {
       if ((week as any).phase === 'deload' || (week as any).deload) continue;
+      const includeOptionalInCap = /fullbody/i.test(String((next as any).pattern?.id || (options as any).patternId || ''));
       for (const s of week.sessions) {
         const tag = s.sessionTag || '';
-        const workingEx = s.exercises.filter((e: any) => !(e as any).warmupActivator && !(e as any).optional);
+        const allWorking = s.exercises.filter((e: any) => !(e as any).warmupActivator);
+        const workingEx = includeOptionalInCap
+          ? allWorking
+          : allWorking.filter((e: any) => !(e as any).optional);
         let total = workingEx.reduce((a: number, e: any) => a + (e.sets || 0), 0);
         if (total <= lateCap) continue;
+        // FullBody: все группы сидят в одной сессии, поэтому optional-добивки (abs/forearms)
+        // входят в жёсткий потолок lateCap (60). Сначала подрезаем optional до пола 2 сета,
+        // сохраняя покрытие малых групп, а далее режем лишний не-optional объём до lateCap.
+        if (includeOptionalInCap) {
+          for (const e of allWorking.filter((x: any) => (x as any).optional && (x.sets || 0) > 2)) {
+            while (total > lateCap && e.sets > 2) {
+              e.sets -= 1;
+              if (Array.isArray(e.workSets) && e.workSets.length > e.sets) e.workSets = e.workSets.slice(0, e.sets);
+              total -= 1;
+            }
+            if (total <= lateCap) break;
+          }
+          if (total <= lateCap) continue;
+        }
         const sessTotals: Record<string, number> = {};
         for (const x of workingEx) sessTotals[x.muscle] = (sessTotals[x.muscle] || 0) + (x.sets || 0);
         const sessMin: Record<string, number> = /Pull|Back/i.test(tag)
@@ -7365,13 +7462,14 @@ for (const week of next.weeks) {
           : /Push|Chest/i.test(tag) ? { triceps: 8 }
           : /Legs|Lower/i.test(tag) ? { calves: 9 } : {};
         const prot = (x: any): boolean => {
+          if (includeOptionalInCap && (x as any).optional) return (x.sets || 0) <= 2;
           const f = sessMin[x.muscle];
           if (x.muscle === 'calves' && /Legs|Lower/i.test(tag)) return (x.sets || 0) <= (/стоя|standing|жим.*ног|leg.?press|ослик/i.test(x.name || '') ? 5 : 4);
           if (x.muscle === 'traps' && /шраг|shrug/i.test(x.name || '')) return (x.sets || 0) <= 5;
           if (f == null) return false;
           return (sessTotals[x.muscle] || 0) <= f;
         };
-        for (const e of workingEx.filter((x: any) => x.role === 'accessory' && x.sets > 2 && !prot(x) && !/FST-7/.test(String((x as any).comment || '')))) {
+        for (const e of workingEx.filter((x: any) => !(x as any).optional && x.role === 'accessory' && x.sets > 2 && !prot(x) && !/FST-7/.test(String((x as any).comment || '')))) {
           const isSchemeLate = /GVT|Gironda|8\s*[x×]\s*8/.test(String((e as any).comment || ''));
           while (total > lateCap && e.sets > 2 && !prot(e)) {
             if (isSchemeLate && e.sets <= 4) break; // GVT/Gironda держат форму ≥4
@@ -7920,7 +8018,12 @@ export function autoAssignIntensityTechniques(plan: BBPlan, level: string, prior
   // M-3: уровень решают ДАННЫЕ (`INTENSITY_TECHNIQUES[].level`), а не эта функция.
   // Раньше здесь была одна проверка `beginner → return`, и intermediate мог получить
   // rest-pause/myo-rep, которые в данных помечены как advanced+ — две правды в репо.
-  const allowedTechs = new Set<string>(techniquesFor('памп', level).map(t => t.technique));
+  // P1-8: включаем техники для обоих характеров ('памп' + 'тяж'), иначе rest_pause (appliesTo:'тяж')
+  // всегда отфильтровывался и тихо подменялся dropset даже для advanced/enhanced.
+  const allowedTechs = new Set<string>([
+    ...techniquesFor('памп', level).map(t => t.technique),
+    ...techniquesFor('тяж', level).map(t => t.technique),
+  ]);
   if (beginner) allowedTechs.add('dropset');
   /** Честная замена, если уровень не разрешает выбранную по имени технику. */
   const levelFallback: Record<string, string[]> = {

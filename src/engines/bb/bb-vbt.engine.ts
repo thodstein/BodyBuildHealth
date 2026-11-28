@@ -33,8 +33,34 @@ export interface BBVbtGoalOpts {
  * - 25-40%: метаболический стресс → снизить вес (RIR+1);
  * - >40%: отказ близко → стоп/снизить (RIR+2).
  */
+/** Прочитать персональный LVP-профиль из localStorage (`he_bb_lvp_profile`), если есть. */
+function readPersonalLvpE1rm(lift: string, lastVelocity: number, weightKg?: number): number | null {
+  if (!weightKg || weightKg <= 0 || !Number.isFinite(lastVelocity) || lastVelocity <= 0) return null;
+  try {
+    if (typeof localStorage === 'undefined') return null;
+    const raw = localStorage.getItem('he_bb_lvp_profile');
+    if (!raw) return null;
+    const parsed = JSON.parse(raw);
+    const key = String(lift || '').toLowerCase();
+    const entry = parsed?.[key] || parsed?.[lift] || (parsed?.lift === lift ? parsed : null);
+    if (!entry || !Number.isFinite(entry.slope) || !Number.isFinite(entry.intercept) || entry.slope === 0) return null;
+    const v1rm = Number.isFinite(entry.v1rm) ? Number(entry.v1rm) : 0.17;
+    // Линейная LVP: load(v) = (v - intercept) / slope → доля 1RM по скорости
+    const est1rmLoad = (v1rm - entry.intercept) / entry.slope;
+    const curPredLoad = (lastVelocity - entry.intercept) / entry.slope;
+    if (!Number.isFinite(est1rmLoad) || !Number.isFinite(curPredLoad) || curPredLoad <= 0 || est1rmLoad <= 0) return null;
+    const ratio = est1rmLoad / curPredLoad;
+    if (ratio < 0.8 || ratio > 2.5) return null;
+    return Math.round(weightKg * ratio * 10) / 10;
+  } catch {
+    return null;
+  }
+}
+
 export function bbVbtRecommendation(lift: string, bestVelocity: number, lastVelocity: number, weightKg?: number, opts?: BBVbtGoalOpts): BBVbtRecommendation {
   const d = diagnoseVelocity(lift as never, bestVelocity, lastVelocity, weightKg);
+  const personalE1rm = readPersonalLvpE1rm(lift, lastVelocity, weightKg);
+  const effectiveE1rm = personalE1rm ?? d.e1RMByVelocity;
   const loss = d.lossPct;
   let rirShift = 0;
   let rec: string;
@@ -53,7 +79,7 @@ export function bbVbtRecommendation(lift: string, bestVelocity: number, lastVelo
     rec = `Потеря ${loss.toFixed(0)}% — отказ близко (${d.zone}), остановитесь/снизьте вес, RIR+2.`;
   }
   if (d.exceeded && d.suggestedPhase) rec += ` Вероятная фаза срыва: «${d.suggestedPhase}».`;
-  if (d.e1RMByVelocity) rec += ` e1RM по скорости ≈ ${d.e1RMByVelocity} кг (популяционный LVP).`;
+  if (effectiveE1rm) rec += ` e1RM по скорости ≈ ${effectiveE1rm} кг (${personalE1rm ? 'персональный LVP' : 'популяционный LVP'}).`;
   // PRO-3 R5: акцент под цель (базовые зоны не меняются — только строка)
   const goal = opts?.goal;
   if (goal === 'strength' && loss >= 20) {
@@ -61,7 +87,7 @@ export function bbVbtRecommendation(lift: string, bestVelocity: number, lastVelo
   } else if (goal === 'mass' && loss >= 10 && loss < 20) {
     rec += ' Для массы можно допустить потерю 20–30% в последних сетах.';
   }
-  return { lossPct: loss, zone: d.zone, exceeded: d.exceeded, recommendation: rec, suggestedRirShift: rirShift, e1RMByVelocity: d.e1RMByVelocity };
+  return { lossPct: loss, zone: d.zone, exceeded: d.exceeded, recommendation: rec, suggestedRirShift: rirShift, e1RMByVelocity: effectiveE1rm };
 }
 
 /** Зона VBT для бейджа. */

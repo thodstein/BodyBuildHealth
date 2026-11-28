@@ -335,7 +335,7 @@ export function applyPEDMethodologyToPlan(
       }
       for (const t of Object.keys(dayMap)) {
         const days = [...dayMap[t]].sort((a, b) => a - b);
-        if (days.length) copy.rationale.push(`💉 MGF dayMap: ${t} — памп-дни недели: дни ${days.join(', ')} (колите post-workout в дни цели; IGF1 строго с углеводами)`);
+        if (days.length) copy.rationale.push(`⚠ MGF dayMap: ${t} — памп-дни недели: дни ${days.join(', ')} (маркеры метаболического/памп-акцента; не является инъекционной или дозировочной инструкцией).`);
       }
     }
   }

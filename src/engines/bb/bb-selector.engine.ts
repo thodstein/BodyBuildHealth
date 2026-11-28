@@ -9,6 +9,7 @@ import { TAG_MUSCLES } from './bb-day-types';
 import { WEAK_TO_MUSCLE } from './bb-builder.engine';
 import { sessionLimitsFor } from './bb-volume.engine';
 import { highVolumeDemandOf, pedProfileOf } from './bb-ped-profile';
+import { normalizeEquipmentIds } from './bb-equipment';
 
 export type BBGoal = 'mass' | 'cut' | 'recomp' | 'maintenance' | 'strength_mass';
 export type BBLevel = 'beginner' | 'intermediate' | 'advanced' | 'enhanced';
@@ -368,9 +369,10 @@ export function rankBBSplits(input: BBSelectorInput): BBRankedPattern[] {
 
     // Оборудование — ограниченный инвентарь (только bodyweight/гантели) → FullBody/UpperLower предпочтительнее, изолированные сплиты штрафуются
     if (input.equipment && input.equipment.length>0) {
-      const hasBarbell = input.equipment.includes('barbell');
-      const hasMachine = input.equipment.includes('machine');
-      const hasCable = input.equipment.includes('cable');
+      const normEq = normalizeEquipmentIds(input.equipment);
+      const hasBarbell = normEq.includes('barbell');
+      const hasMachine = normEq.includes('machine');
+      const hasCable = normEq.includes('cable');
       const limited = !hasBarbell && !hasMachine;
       if (limited) {
         if (['fullbody_2','fullbody_3','fullbody_4','upper_lower_3','upper_lower_4'].includes(p.id)) { score += 4; rationale.push('оборудование ограничено → FullBody/UpperLower предпочтителен'); }
@@ -378,6 +380,13 @@ export function rankBBSplits(input: BBSelectorInput): BBRankedPattern[] {
       }
     }
     // Травмы и мобильность — сплиты с высокой частотой травмированной группы штрафуются
+    const MOBILITY_TO_MUSCLES: Record<string, string[]> = {
+      shoulder: ['shoulders'],
+      hip: ['glutes', 'quads'],
+      ankle: ['calves'],
+      wrist: ['forearms'],
+      lower_back: ['back', 'hamstrings'],
+    };
     const injuredMuscles = new Set<string>();
     for (const inj of (input.injuries || [])) {
       const m = String(inj.muscle || '').toLowerCase();
@@ -387,8 +396,13 @@ export function rankBBSplits(input: BBSelectorInput): BBRankedPattern[] {
     }
     for (const mr of (input.mobilityRestrictions || [])) {
       const m = String(mr || '').toLowerCase();
-      const canon = (WEAK_TO_MUSCLE as any)[m] || m;
-      injuredMuscles.add(canon);
+      const mapped = MOBILITY_TO_MUSCLES[m];
+      if (mapped) {
+        for (const mm of mapped) injuredMuscles.add(mm);
+      } else {
+        const canon = (WEAK_TO_MUSCLE as any)[m] || m;
+        injuredMuscles.add(canon);
+      }
     }
     if (injuredMuscles.size>0) {
       let injFreq = 0;

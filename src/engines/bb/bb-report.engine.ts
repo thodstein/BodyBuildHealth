@@ -137,7 +137,7 @@ export function checkBBExerciseAppropriateness(plan: BBPlan): string[] {
     if ((ex as any).warmupActivator) continue;
     const n = ex.name || '';
     // Decline-жим: низкая практическая ценность (горизонталь+наклон покрывают грудь).
-    if (/отриц|decline|отрицательн/.test(n)) {
+    if (/отриц|decline|отрицательн/i.test(n)) {
       issues.push(`Жим в негативном наклоне «${n}» — низкая ценность для гипертрофии груди (лучше заменить на горизонтальный/наклонный жим).`);
       continue;
     }
@@ -155,10 +155,16 @@ export function checkBBExerciseAppropriateness(plan: BBPlan): string[] {
   return issues;
 }
 
-/** Прогрессия нагрузки: средний прирост рабочего веса от недели 1 к пиковой неделе. */
-function progressionSummary(plan: BBPlan): string {  const byName = new Map<string, { w1: number; pk: number; muscle: string }>();
+/** Прогрессия нагрузки: средний прирост рабочего веса от недели 1 к пиковой рабочей неделе (без делода/тапера). */
+function progressionSummary(plan: BBPlan): string {
+  const byName = new Map<string, { w1: number; pk: number; muscle: string }>();
+  const workingWeeks = plan.weeks.filter(w => !(w as any).deload && String((w as any).phase || '').toLowerCase() !== 'deload' && !(w as any).taper);
+  const reportPeak = plan.report?.peakWeek;
+  const peakWeek = (reportPeak && workingWeeks.some(w => w.week === reportPeak))
+    ? reportPeak
+    : (workingWeeks[workingWeeks.length - 1]?.week ?? plan.weeks[plan.weeks.length - 1]?.week ?? 1);
   for (const week of plan.weeks) {
-    const isPeak = week.week === plan.report?.peakWeek || week.week === plan.weeks.length;
+    const isPeak = week.week === peakWeek;
     for (const s of week.sessions || []) for (const ex of s.exercises || []) {
       if ((ex as any).warmupActivator || ex.role !== 'primary') continue;
       const w = ex.workSets?.[0]?.weight ?? 0;
@@ -173,7 +179,6 @@ function progressionSummary(plan: BBPlan): string {  const byName = new Map<stri
   if (!rows.length) return '';
   const gains = rows.map(r => (r.pk / r.w1 - 1) * 100);
   const avg = gains.reduce((a, b) => a + b, 0) / gains.length;
-  const peakWeek = plan.report?.peakWeek || plan.weeks.length;
   if (Math.abs(avg) < 0.5) return `Прогрессия: веса стабильны (нед 1 → пик нед ${peakWeek}, Δ ~0%)`;
   const dir = avg > 0 ? '↑' : '↓';
   return `Прогрессия: рабочие веса ${dir} ~${Math.abs(Math.round(avg))}% к пику (нед 1 → нед ${peakWeek}, первичных упражнений: ${rows.length})`;
@@ -379,7 +384,7 @@ export function buildBBPlanReportText(plan: BBPlan): string {
         seen.add(key);
         const muscle = ruMuscle(ex.muscle);
         const w = ex.workSets?.[0]?.weight ?? 0;
-        const r = ex.workSets?.[0]?.reps ?? ex.sets;
+        const r = ex.workSets?.[0]?.reps ?? ex.repsRange?.[0] ?? 10;
         const opt = (ex as any).optional ? ' ⚡' : '';
         lines.push(`  ${muscle}: ${ex.name}${opt} — ${ex.sets}×${r} @ ${w}кг RIR ${ex.rir}`);
       }

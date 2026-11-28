@@ -258,25 +258,68 @@ export async function shareText(payload: SharePayload): Promise<boolean> {
 }
 
 /**
- * Сохранить текстовый файл: native — Filesystem (Documents) + Share-диалог,
- * web/telegram — классическое скачивание через <a download>.
+ * Сохранить текстовый файл: native — Filesystem (Documents, UTF-8) + гарантированный
+ * Share через FileProvider (Documents или Cache fallback), web/telegram — <a download>.
  */
 export async function saveTextFile(filename: string, text: string): Promise<boolean> {
   if (isCapacitorNative()) {
     try {
-      const { Filesystem, Directory } = await import('@capacitor/filesystem');
-      const res = await Filesystem.writeFile({
-        path: filename,
-        data: text,
-        directory: Directory.Documents,
-      });
+      const { Filesystem, Directory, Encoding } = await import('@capacitor/filesystem');
+      let savedUri: string | undefined;
+      let cacheShareUri: string | undefined;
       try {
-        const { Share } = await import('@capacitor/share');
-        await Share.share({ title: filename, url: res.uri });
+        const perm = await Filesystem.checkPermissions();
+        if (perm?.publicStorage !== 'granted') {
+          await Filesystem.requestPermissions().catch(() => undefined);
+        }
       } catch {
-        /* файл уже сохранён — диалог шаринга опционален */
+        /* на новых версиях Android publicStorage permission может не требоваться */
       }
-      return true;
+      try {
+        const res = await Filesystem.writeFile({
+          path: filename,
+          data: text,
+          directory: Directory.Documents,
+          encoding: Encoding.UTF8,
+          recursive: true,
+        });
+        savedUri = res.uri;
+      } catch {
+        /* Android Scoped Storage может блокировать Documents — пишем в Cache/Data ниже */
+      }
+      try {
+        // file_paths.xml включает <cache-path path="."/>, поэтому Share с Cache URI работает на 100% устройств Android.
+        const cRes = await Filesystem.writeFile({
+          path: filename,
+          data: text,
+          directory: Directory.Cache,
+          encoding: Encoding.UTF8,
+          recursive: true,
+        });
+        cacheShareUri = cRes.uri;
+      } catch {
+        /* ignore */
+      }
+      if (!savedUri && !cacheShareUri) {
+        const dRes = await Filesystem.writeFile({
+          path: filename,
+          data: text,
+          directory: Directory.Data,
+          encoding: Encoding.UTF8,
+          recursive: true,
+        });
+        savedUri = dRes.uri;
+      }
+      const shareUri = cacheShareUri || savedUri;
+      if (shareUri) {
+        try {
+          const { Share } = await import('@capacitor/share');
+          await Share.share({ title: filename, url: shareUri });
+        } catch {
+          /* файл уже сохранён на устройстве — отмена системного шаринга не считается ошибкой */
+        }
+      }
+      return Boolean(savedUri || cacheShareUri);
     } catch {
       return false;
     }
@@ -300,6 +343,41 @@ export async function saveTextFile(filename: string, text: string): Promise<bool
     return true;
   } catch {
     return false;
+  }
+}
+
+/** Сохранить JSON-бэкап во внутреннее хранилище APK (Directory.Data, UTF-8). Вне APK — no-op. */
+export async function saveNativeJsonBackup(filename: string, data: unknown): Promise<boolean> {
+  if (!isCapacitorNative()) return false;
+  try {
+    const { Filesystem, Directory, Encoding } = await import('@capacitor/filesystem');
+    await Filesystem.writeFile({
+      path: filename,
+      data: JSON.stringify(data),
+      directory: Directory.Data,
+      encoding: Encoding.UTF8,
+      recursive: true,
+    });
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+/** Прочитать JSON-бэкап из внутреннего хранилища APK (Directory.Data, UTF-8). Вне APK — null. */
+export async function loadNativeJsonBackup<T = unknown>(filename: string): Promise<T | null> {
+  if (!isCapacitorNative()) return null;
+  try {
+    const { Filesystem, Directory, Encoding } = await import('@capacitor/filesystem');
+    const res = await Filesystem.readFile({
+      path: filename,
+      directory: Directory.Data,
+      encoding: Encoding.UTF8,
+    });
+    if (typeof res?.data !== 'string' || !res.data) return null;
+    return JSON.parse(res.data) as T;
+  } catch {
+    return null;
   }
 }
 

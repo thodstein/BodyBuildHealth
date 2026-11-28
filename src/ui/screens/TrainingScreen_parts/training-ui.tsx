@@ -9,11 +9,11 @@
 import React from 'react';
 import { VOLUME_STATUS_META } from './volume-recommendation';
 
-export const ACCENT = '#00e68a';
-export const ACCENT_SOFT = 'rgba(0,230,138,0.14)';
-export const ACCENT_LINE = 'rgba(0,230,138,0.45)';
-export const DIM = 'var(--text-dim, #fff)';
-export const DIM_STRONG = 'var(--text-light, #fff)';
+export const ACCENT = 'var(--accent, #00e68a)';
+export const ACCENT_SOFT = 'var(--accent-soft, rgba(0,230,138,0.14))';
+export const ACCENT_LINE = 'var(--accent-line, rgba(0,230,138,0.45))';
+export const DIM = 'var(--text-dim, rgba(255,255,255,0.78))';
+export const DIM_STRONG = 'var(--text, #fff)';
 
 /** Радиусы — единая шкала (крупнее для мобильных тап-зон). */
 export const R = { card: 16, pill: 18, btn: 12, in: 10, chip: 10, bar: 6 } as const;
@@ -70,11 +70,11 @@ export const BTN_GHOST: React.CSSProperties = {
 
 /** Шаговая пилюля (активная / неактивная) — современно, с подъёмом. */
 export const STEP_PILL = (active: boolean): React.CSSProperties => ({
-  padding: '8px 14px', borderRadius: R.pill, fontSize: 11,
+  padding: '8px 14px', borderRadius: R.pill, fontSize: 11, minHeight: 38,
   fontWeight: active ? 800 : 500, cursor: 'pointer',
-  border: active ? `1px solid ${ACCENT}` : '1px solid rgba(255,255,255,0.08)',
-  background: active ? `linear-gradient(135deg,${ACCENT} 0%, #00c8a0 100%)` : 'rgba(255,255,255,0.04)',
-  color: active ? '#06281c' : '#fff', flexShrink: 0,
+  border: active ? `1px solid ${ACCENT}` : '1px solid var(--border, rgba(255,255,255,0.1))',
+  background: active ? 'var(--accent-gradient, linear-gradient(135deg,#00e68a 0%, #00c8a0 100%))' : 'var(--surface-subtle, rgba(255,255,255,0.04))',
+  color: active ? 'var(--accent-contrast, #06281c)' : 'var(--text, #fff)', flexShrink: 0,
   boxShadow: active ? '0 2px 10px rgba(0,230,138,0.25), inset 0 1px 0 rgba(255,255,255,0.2)' : 'none',
   backdropFilter: 'blur(8px)', transition: 'all 0.2s ease', transform: active ? 'translateY(-1px)' : 'none',
 });
@@ -138,30 +138,37 @@ export function mrvBadge(status: 'below_mev' | 'optimal' | 'approaching_mrv' | '
 /** Общая обвязка карточки кита (фон/рамка/радиус/верхняя кромка) — единый
  *  источник для BbCard/BbFoldCard и выносных fold-карточек (TrainingPopups). */
 export function bbCardChrome(accent: string): React.CSSProperties {
+  const isHex = accent.startsWith('#');
   return {
     marginBottom: 10, padding: '10px 12px', borderRadius: 14, boxSizing: 'border-box',
-    background: 'rgba(255,255,255,0.025)',
-    border: `1px solid ${accent}2e`, borderTop: `2px solid ${accent}55`,
+    background: 'var(--card-bg, rgba(255,255,255,0.025))',
+    border: isHex ? `1px solid ${accent}2e` : '1px solid var(--border, rgba(255,255,255,0.1))',
+    borderTop: isHex ? `2px solid ${accent}55` : `2px solid ${accent}`,
   };
 }
 
 /** Иконка-тайл карточки кита (26×26, акцентная подложка). */
 export function bbIconTile(accent: string): React.CSSProperties {
+  const isHex = accent.startsWith('#');
   return {
     width: 26, height: 26, borderRadius: 9, flexShrink: 0, fontSize: 14,
     display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
-    background: `${accent}1f`, border: `1px solid ${accent}44`,
+    background: isHex ? `${accent}1f` : 'var(--accent-soft, rgba(0,230,138,0.14))',
+    border: isHex ? `1px solid ${accent}44` : '1px solid var(--accent-line, rgba(0,230,138,0.45))',
   };
 }
 
 /** Заголовок карточки кита (12.5/800). */
-export const bbCardTitle: React.CSSProperties = { fontSize: 12.5, fontWeight: 800, color: '#fff', letterSpacing: 0.2 };
+export const bbCardTitle: React.CSSProperties = { fontSize: 12.5, fontWeight: 800, color: 'var(--text, #fff)', letterSpacing: 0.2 };
 
 /** Бейдж карточки кита (справа, акцентный). */
 export function bbCardBadge(accent: string): React.CSSProperties {
+  const isHex = accent.startsWith('#');
   return {
     marginLeft: 'auto', fontSize: 10, fontWeight: 800, padding: '2px 8px', borderRadius: 999,
-    background: `${accent}1a`, color: accent, border: `1px solid ${accent}44`,
+    background: isHex ? `${accent}1a` : 'var(--accent-soft, rgba(0,230,138,0.14))',
+    color: accent,
+    border: isHex ? `1px solid ${accent}44` : '1px solid var(--accent-line, rgba(0,230,138,0.45))',
   };
 }
 
@@ -179,7 +186,7 @@ export const BbCard: React.FC<{
   style?: React.CSSProperties;
   children?: React.ReactNode;
 }> = ({ icon, title, desc, accent = '#a855f7', badge, right, id, className, style, children }) => (
-  <section id={id} className={className} style={{ ...bbCardChrome(accent), ...style }}>
+  <section id={id} className={['bb-auto-card', className].filter(Boolean).join(' ')} style={{ ...bbCardChrome(accent), ...style }}>
     <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap', marginBottom: desc || children ? 8 : 0 }}>
       {icon && <span aria-hidden style={bbIconTile(accent)}>{icon}</span>}
       <span style={bbCardTitle}>{title}</span>
@@ -190,7 +197,7 @@ export const BbCard: React.FC<{
         </span>
       )}
     </div>
-    {desc && <div style={{ fontSize: 10.5, color: '#fff', lineHeight: 1.45, marginBottom: children ? 8 : 0 }}>{desc}</div>}
+    {desc && <div style={{ fontSize: 10.5, color: 'var(--text-dim, rgba(255,255,255,0.82))', lineHeight: 1.45, marginBottom: children ? 8 : 0 }}>{desc}</div>}
     {children}
   </section>
 );
@@ -407,6 +414,7 @@ export const BbRowSwitch: React.FC<{
 }> = ({ checked, onChange, title, desc, icon, accent = ACCENT, ariaLabel, disabled }) => (
   <button
     type="button"
+    className="bb-auto-switch"
     role="switch"
     aria-checked={checked}
     aria-label={ariaLabel}
@@ -416,17 +424,17 @@ export const BbRowSwitch: React.FC<{
       width: '100%', display: 'flex', alignItems: 'center', gap: 10, margin: '0 0 6px',
       padding: '10px 12px', minHeight: 44, borderRadius: 12, cursor: disabled ? 'not-allowed' : 'pointer', textAlign: 'left',
       boxSizing: 'border-box', fontFamily: 'inherit', opacity: disabled ? 0.5 : 1,
-      background: checked ? `linear-gradient(135deg, ${accent}1e, rgba(24,24,27,0.35))` : 'rgba(255,255,255,0.03)',
-      border: checked ? `1px solid ${accent}66` : '1px solid rgba(255,255,255,0.08)',
+      background: checked ? (accent.startsWith('#') ? `linear-gradient(135deg, ${accent}1e, var(--card-bg, rgba(24,24,27,0.35)))` : 'var(--accent-soft, rgba(0,230,138,0.14))') : 'var(--surface-subtle, rgba(255,255,255,0.03))',
+      border: checked ? (accent.startsWith('#') ? `1px solid ${accent}66` : `1px solid ${ACCENT_LINE}`) : '1px solid var(--border, rgba(255,255,255,0.08))',
       transition: 'all .15s',
     }}
   >
     {icon && <span style={{ fontSize: 16, flexShrink: 0 }}>{icon}</span>}
     <span style={{ flex: 1, minWidth: 0 }}>
-      <span style={{ display: 'block', fontSize: 12, fontWeight: 700, color: checked ? accent : '#fff', lineHeight: 1.25 }}>{title}</span>
-      {desc && <span style={{ display: 'block', fontSize: 10, color: '#fff', lineHeight: 1.35, marginTop: 2 }}>{desc}</span>}
+      <span style={{ display: 'block', fontSize: 12, fontWeight: 700, color: checked ? accent : 'var(--text, #fff)', lineHeight: 1.25 }}>{title}</span>
+      {desc && <span style={{ display: 'block', fontSize: 10.5, color: 'var(--text-dim, rgba(255,255,255,0.78))', lineHeight: 1.35, marginTop: 2 }}>{desc}</span>}
     </span>
-    <span style={{ marginLeft: 'auto', width: 36, height: 20, borderRadius: 10, flexShrink: 0, position: 'relative', background: checked ? accent : 'rgba(255,255,255,0.15)', transition: 'background .2s' }}>
+    <span style={{ marginLeft: 'auto', width: 36, height: 20, borderRadius: 10, flexShrink: 0, position: 'relative', background: checked ? accent : 'var(--border, rgba(255,255,255,0.18))', transition: 'background .2s' }}>
       <span style={{ position: 'absolute', top: 2, left: checked ? 18 : 2, width: 16, height: 16, borderRadius: '50%', background: '#fff', transition: 'left .2s' }} />
     </span>
   </button>

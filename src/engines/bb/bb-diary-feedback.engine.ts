@@ -132,34 +132,56 @@ export function computeBBDiaryFeedback(plan: BBPlan | null | undefined, sessions
     };
   }
 
-  // planned totals
+  // planned totals (P1-13: умножаем на reps в каждом рабочем подходе, пропускаем warmupActivator)
   const plannedSessions = (plan as BBPlan).weeks.reduce((s, w) => s + (w.sessions?.length || 0), 0);
   for (const w of (plan as BBPlan).weeks) {
     const plannedSets = w.sessions.reduce((s, sess) => s + sess.exercises.filter(e => !(e as any).warmupActivator).reduce((a, e) => a + (e.sets || 0), 0), 0);
-    const plannedVolume = w.sessions.reduce((s, sess) => s + sess.exercises.reduce((a, e) => a + (e.sets || 0) * ((e.workSets?.[0]?.weight || 0) || 0), 0), 0);
+    const plannedVolume = w.sessions.reduce((s, sess) => s + sess.exercises.filter(e => !(e as any).warmupActivator).reduce((a, e) => {
+      const ws = Array.isArray(e.workSets) ? e.workSets : [];
+      if (ws.length > 0) return a + ws.reduce((sum, st) => sum + (Number(st?.weight) || 0) * (Number(st?.reps) || 0), 0);
+      return a + (e.sets || 0) * (e.repsRange?.[0] || 10) * 0;
+    }, 0), 0);
     totalPlannedSets += plannedSets;
-    // completed for this week: sessions whose date falls into week index
-    // fallback: distribute completedSessions proportionally if no dates
     weekly.push({ week: w.week, phase: (w as any).phase, plannedSets, completedSets: 0, plannedVolume, completedVolume: 0, adherencePct: null });
   }
 
-  // completed totals: план без календаря раскладывает сессии по порядку недель
-  const completedSessions = sessions.length;
-  totalCompletedSets = sessions.reduce((s, sess) => s + (sess.exercises?.reduce((a, e) => a + (e.sets?.length || 0), 0) || 0), 0);
-
-  if (plannedSessions > 0) {
-    adherencePct = Math.round((completedSessions / plannedSessions) * 100);
+  // P1-13: если у плана известна дата старта, учитываем только сессии внутри окна плана [start, end]
+  const planStartIso = String((plan as any)?.inputSnapshot?.planStartWeek || (plan as any)?.planStartWeek || '');
+  const hasStartIso = /^\d{4}-\d{2}-\d{2}$/.test(planStartIso);
+  let planSessions = sessions;
+  if (hasStartIso) {
+    const [yy, mm, dd] = planStartIso.split('-').map(Number);
+    const endDate = new Date(yy, mm - 1, dd + (plan as BBPlan).weeks.length * 7 - 1, 12, 0, 0);
+    const planEndIso = `${endDate.getFullYear()}-${String(endDate.getMonth() + 1).padStart(2, '0')}-${String(endDate.getDate()).padStart(2, '0')}`;
+    planSessions = sessions.filter(s => {
+      const d = String(s?.date || '').slice(0, 10);
+      return !!d && d >= planStartIso && d <= planEndIso;
+    });
   }
 
-  // weekly adherence via date-bucket if plan has dates, else simple distribution
-  // For BB rolling plans without calendar, distribute sessions round-robin by week index
-  if (hasPlan && hasSessions) {
+  // completed totals
+  const completedSessions = planSessions.length;
+  totalCompletedSets = planSessions.reduce((s, sess) => s + (sess.exercises?.reduce((a, e) => a + (e.sets?.length || 0), 0) || 0), 0);
+
+  if (plannedSessions > 0) {
+    adherencePct = Math.min(150, Math.round((completedSessions / plannedSessions) * 100));
+  }
+
+  // weekly adherence via date-bucket if plan has dates, else chronological distribution
+  if (hasPlan && planSessions.length > 0) {
     const totalWeeks = (plan as BBPlan).weeks.length;
     const byWeek: Record<number, number> = {};
-    // bucket by ISO week vs plan order: assume sessions chronological → week assignment
-    const sorted = [...sessions].sort((a, b) => (a.date || '').localeCompare(b.date || ''));
+    const sorted = [...planSessions].sort((a, b) => (a.date || '').localeCompare(b.date || ''));
+    const startMs = hasStartIso ? (() => { const [yy, mm, dd] = planStartIso.split('-').map(Number); return new Date(yy, mm - 1, dd, 12, 0, 0).getTime(); })() : 0;
     sorted.forEach((sess, idx) => {
-      const wkIdx = Math.min(totalWeeks - 1, Math.floor((idx / Math.max(1, completedSessions)) * totalWeeks));
+      let wkIdx: number;
+      if (hasStartIso && sess.date) {
+        const [sy, sm, sd] = String(sess.date).slice(0, 10).split('-').map(Number);
+        const sessMs = new Date(sy, sm - 1, sd, 12, 0, 0).getTime();
+        wkIdx = Math.max(0, Math.min(totalWeeks - 1, Math.floor((sessMs - startMs) / (7 * 86400000))));
+      } else {
+        wkIdx = Math.min(totalWeeks - 1, Math.floor((idx / Math.max(1, completedSessions)) * totalWeeks));
+      }
       const w = weekly[wkIdx];
       if (!w) return;
       const sets = sess.exercises?.reduce((a, e) => a + (e.sets?.length || 0), 0) || 0;
@@ -169,7 +191,7 @@ export function computeBBDiaryFeedback(plan: BBPlan | null | undefined, sessions
       byWeek[wkIdx] = (byWeek[wkIdx] || 0) + 1;
     });
     for (const w of weekly) {
-      if (w.plannedSets > 0) w.adherencePct = Math.round((w.completedSets / w.plannedSets) * 100);
+      if (w.plannedSets > 0) w.adherencePct = Math.min(150, Math.round((w.completedSets / w.plannedSets) * 100));
     }
   }
 

@@ -30,6 +30,7 @@ import {
   type ActiveSession,
   type ActiveSessionSummary,
 } from '../../../engines/workout-logger.engine';
+import { normalizeBBMuscle } from '../../../engines/bb/bb-volume.engine';
 import {
   generateWarmup,
   upsertWarmupLog,
@@ -236,14 +237,29 @@ export interface PlayerSet {
   rir: number;
   tempo?: string | TempoPhase;
   technique?: string;
+  /** Плановый отдых конкретного подхода (сек) из he_pl_runtime v2. */
+  restSeconds?: number;
 }
 const tempoText = (tempo: PlayerSet['tempo']): string | undefined =>
   tempo ? (typeof tempo === 'string' ? tempo : formatTempo(tempo)) : undefined;
 export interface PlayerExercise {
   name: string;
   muscleGroup: string;
+  /** Канонический EN-ключ мышцы (P0-18) — чтобы дневник/диагностика/темп не ломались на русских лейблах. */
+  muscle?: string;
   targetSets: PlayerSet[];
   restSec?: number; // целевой отдых между подходами (сек), из presc
+  /** Тренерская заметка / комментарий к упражнению (P1-22). */
+  notes?: string;
+  /** Разминочный активатор — не считается в рабочие подходы/дневник (P1-22). */
+  warmupActivator?: boolean;
+  /** Плановые разминочные подходы. */
+  warmupSets?: { load: number; reps: number }[];
+  /** Правило прогрессии упражнения. */
+  progressionRule?: string;
+  /** Сторона для унилатеральной добивки (слабая сторона первой). */
+  side?: 'left' | 'right' | 'both';
+  unilateral?: boolean;
   // Поля метрик (передаются из плана; иначе — эвристика).
   pm?: number; // предельный максимум упражнения (кг)
   coef?: number; // Коэф. тяжести (1.2 / 1.0 / 0.3)
@@ -259,6 +275,8 @@ export interface PlayerExercise {
 }
 export interface PlayerDay {
   label: string;
+  /** Реальный номер недели из плана (P1-22: вместо захардкоженного week: 1). */
+  weekNumber?: number;
   exercises: PlayerExercise[];
 }
 
@@ -838,16 +856,17 @@ export const SessionPlayer: React.FC<SessionPlayerProps> = ({
   }, [phase]);
 
   const getRestTime = useCallback(
-    (ei: number): number => {
+    (ei: number, si?: number): number => {
       if (timerPreset === 'custom') return customRestSec;
       const ex = day?.exercises[ei];
       if (!ex) return 90;
-      const isCompound = ['chest', 'back', 'quads', 'hamstrings', 'shoulders', 'legs'].includes(
-        ex.muscleGroup?.toLowerCase() || '',
-      );
+      const canonMuscle = normalizeBBMuscle(ex.muscle || ex.muscleGroup || '');
+      const isCompound = ['chest', 'back', 'quads', 'hamstrings', 'shoulders', 'legs', 'glutes'].includes(canonMuscle);
       if (timerPreset === 'compound') return isCompound ? 180 : 90;
       if (timerPreset === 'isolation') return isCompound ? 120 : 60;
       if (timerPreset === 'pump') return 45;
+      const setRest = si != null ? ex.targetSets?.[si]?.restSeconds : ex.targetSets?.[0]?.restSeconds;
+      if (Number.isFinite(setRest) && (setRest as number) > 0) return setRest as number;
       return ex.restSec || 90;
     },
     [day, timerPreset, customRestSec],
@@ -861,16 +880,21 @@ export const SessionPlayer: React.FC<SessionPlayerProps> = ({
   }, [circuitMode]);
 
   const startRestTimer = useCallback(
-    (ei: number) => {
-      // В режиме суперсета или круга проверяем, нужно ли запускать таймер
+    (ei: number, si?: number) => {
+      // В режиме суперсета или круга проверяем границы КОНКРЕТНОЙ суперсет-группы (P1-22:
+      // 2 пары A1/B1 + A2/B2 не сливаются в один 4-упражненческий гигант-сет).
       if (supersetMode || circuitMode) {
         const isInSuperset = supersetExercises.includes(ei);
         if (isInSuperset && supersetExercises.length > 1) {
-          const currentIdx = supersetExercises.indexOf(ei);
-          const isLastInSuperset = currentIdx === supersetExercises.length - 1;
+          const exs = day?.exercises || [];
+          const grp = exs[ei]?.supersetGroup;
+          const groupIndices = grp != null
+            ? supersetExercises.filter((idx) => exs[idx]?.supersetGroup === grp)
+            : supersetExercises;
+          const currentIdx = groupIndices.indexOf(ei);
+          const isLastInSuperset = currentIdx < 0 || currentIdx === groupIndices.length - 1;
           if (!isLastInSuperset) {
             setRestAddSec(0);
-            // Ещё не все упражнения суперсета выполнены - короткий отдых или без отдыха
             const rest = circuitMode ? 0 : getSupersetRestTime();
             if (rest > 0) {
               setTimerExIdx(ei);
@@ -881,7 +905,7 @@ export const SessionPlayer: React.FC<SessionPlayerProps> = ({
           }
         }
       }
-      const rest = getRestTime(ei);
+      const rest = getRestTime(ei, si);
       setTimerExIdx(ei);
       setRestAddSec(0);
       setTimerSec(rest);
@@ -955,6 +979,10 @@ export const SessionPlayer: React.FC<SessionPlayerProps> = ({
       setSupersetExercises(idx);
       setSupersetMode(true);
       setCircuitMode(false);
+    } else {
+      // P1-22: при переключении на день без суперсетов сбрасываем прошлый режим суперсета
+      setSupersetExercises([]);
+      setSupersetMode(false);
     }
   }, [day]);
 
@@ -1129,43 +1157,62 @@ export const SessionPlayer: React.FC<SessionPlayerProps> = ({
     }
     setActual({});
     setPrefill({});
-    let s = startSession(focus || day.label, weekNumber);
+    const effectiveWeekNum = Number.isFinite(day.weekNumber) && (day.weekNumber as number) > 0 ? (day.weekNumber as number) : weekNumber;
+    let s = startSession(focus || day.label, effectiveWeekNum);
     day.exercises.forEach((ex) => {
-      s = addExerciseToSession(s, { id: ex.name, name: ex.name, pattern: ex.muscleGroup, muscleGroup: ex.muscleGroup });
+      // P1-22: разминочные активаторы не логируются в дневник как рабочие подходы
+      if (ex.warmupActivator) return;
+      const canonMuscle = normalizeBBMuscle(ex.muscle || ex.muscleGroup || '');
+      s = addExerciseToSession(s, { id: ex.name, name: ex.name, pattern: canonMuscle || ex.muscleGroup, muscleGroup: canonMuscle || ex.muscleGroup });
     });
     setSession(s);
     setPhase('main');
     // Явный старт — живая копия сразу: автосейв без allowEmpty пустой черновик не пишет,
     // и после убийства WebView «Продолжить» не появилось бы (метки startedWithoutSets нет).
     try {
-      const planned = day.exercises.reduce((n, ex) => n + (Array.isArray(ex.targetSets) ? ex.targetSets.length : 0), 0);
+      const planned = day.exercises
+        .filter((ex) => !ex.warmupActivator)
+        .reduce((n, ex) => n + (Array.isArray(ex.targetSets) ? ex.targetSets.length : 0), 0);
       saveActiveSession(s, planned, { allowEmpty: true });
     } catch {
       /* хранилище недоступно — сессия остаётся в памяти */
     }
-    // авто-подтягивание весов из последней сессии (double progression)
+    // P1-22: авто-подтягивание весов по последним N сессиям дневника (на PPL/Upper-Lower
+    // одно упражнение повторяется раз в 3-7 дней, а не в единственной вчерашней сессии).
     const hydratePrevious = async () => {
-      let prevSession: WorkoutSession | null = null;
+      const recentSessions: WorkoutSession[] = [];
       try {
-        prevSession = await new StrengthDiary().getLastSession();
-      } catch {
-        prevSession = getLastSession();
+        const localAll = loadSessions();
+        if (Array.isArray(localAll) && localAll.length > 0) {
+          recentSessions.push(...localAll.slice(-14).reverse());
+        }
+      } catch { /* ignore */ }
+      if (recentSessions.length === 0) {
+        try {
+          const prevSession = await new StrengthDiary().getLastSession();
+          if (prevSession) recentSessions.push(prevSession);
+        } catch {
+          const fallback = getLastSession();
+          if (fallback) recentSessions.push(fallback);
+        }
       }
-      if (!prevSession || prevSession.exercises.length === 0) {
+      if (recentSessions.length === 0) {
         setPrefill({});
         return;
       }
       const prevMap: Record<string, { weightKg: number; reps: number; rir: number; tempo?: string }[]> = {};
-      prevSession.exercises.forEach((ex) => {
-        if (ex.exerciseName && Array.isArray(ex.sets)) {
-          prevMap[ex.exerciseName.toLowerCase()] = ex.sets.map((st) => ({
+      for (const prevSession of recentSessions) {
+        for (const ex of prevSession.exercises || []) {
+          const key = (ex.exerciseName || '').toLowerCase();
+          if (!key || prevMap[key] || !Array.isArray(ex.sets) || ex.sets.length === 0) continue;
+          prevMap[key] = ex.sets.map((st) => ({
             weightKg: st.weightKg,
             reps: st.reps,
             rir: st.rir,
             tempo: st.actualTempo || st.plannedTempo,
           }));
         }
-      });
+      }
       const prefilled: Record<string, SessionSetValue> = {};
       day.exercises.forEach((ex, ei) => {
         const prevSets = prevMap[ex.name.toLowerCase()];
@@ -4711,16 +4758,40 @@ export const SessionPlayer: React.FC<SessionPlayerProps> = ({
                       ) : null;
                     })()}
                     {(() => {
-                      const isCompound = ['chest', 'back', 'quads', 'hamstrings', 'shoulders', 'legs'].includes(
-                        ex.muscleGroup?.toLowerCase() || '',
-                      );
+                      const plannedTempo = tempoText(ex.targetSets?.[0]?.tempo);
+                      if (plannedTempo) {
+                        return (
+                          <span style={{ fontSize: 10, color: 'var(--text-faint)', marginLeft: 6 }} title="Плановый темп упражнения">
+                            ⏱ {plannedTempo}
+                          </span>
+                        );
+                      }
+                      const canonMuscle = normalizeBBMuscle(ex.muscle || ex.muscleGroup || '');
+                      const isCompound = ['chest', 'back', 'quads', 'hamstrings', 'shoulders', 'legs', 'glutes'].includes(canonMuscle);
                       const t = TEMPO_PRESETS[recommendTempo('hypertrophy', isCompound ? 'compound' : 'isolation')];
                       return (
-                        <span style={{ fontSize: 9, color: 'var(--text-faint)', marginLeft: 6 }} title={t?.nameRu}>
+                        <span style={{ fontSize: 10, color: 'var(--text-faint)', marginLeft: 6 }} title={t?.nameRu}>
                           ⏱ {formatTempo(t?.tempo)}
                         </span>
                       );
                     })()}
+                    {ex.warmupActivator && (
+                      <span style={{ fontSize: 10, marginLeft: 6, color: '#38bdf8', fontWeight: 700 }}>
+                        🔥 Активация (не в раб. объём)
+                      </span>
+                    )}
+                    {ex.side && ex.side !== 'both' && (
+                      <span style={{ fontSize: 10, marginLeft: 6, color: '#fbbf24', fontWeight: 700 }}>
+                        ↔ Слабая: {ex.side === 'left' ? 'левая' : 'правая'} первой
+                      </span>
+                    )}
+                    {(ex.progressionRule || ex.notes) && (
+                      <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.68)', fontWeight: 400, marginTop: 2, lineHeight: 1.35 }}>
+                        {ex.progressionRule ? <span>📈 {ex.progressionRule}</span> : null}
+                        {ex.progressionRule && ex.notes ? ' · ' : null}
+                        {ex.notes ? <span>{ex.notes.slice(0, 180)}</span> : null}
+                      </div>
+                    )}
                     <button
                       type="button"
                       aria-expanded={!!techOpen[ex.name]}

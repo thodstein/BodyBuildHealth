@@ -28,6 +28,8 @@ import {
 } from './shared';
 import { applyToPlanner } from './planner-bridge';
 import { ruCount, RU_TRAININGS } from '../../../engines/ru-plural';
+import { saveTextFileApk } from '../../../core/apk-share';
+import { saveNativeJsonBackup, loadNativeJsonBackup } from '../../../core/native-bridge';
 
 
 /** Безопасный расчётный 1ПМ (Эпли): reps>=30 или мусор → null вместо Infinity/отрицательных. */
@@ -84,6 +86,20 @@ export const MyTrainingTab: React.FC<{ customExercises: { name: string; sets: nu
   const [savedCycles, setSavedCycles] = useState<{ id: string; name: string; date: string; weeks: number; goal: string; level: string; days: number }[]>(() => { try { const v = JSON.parse(localStorage.getItem('myTrainingCycles') || '[]'); return Array.isArray(v) ? v.filter((p: unknown) => p && typeof p === 'object' && typeof (p as { id?: unknown }).id === 'string') : []; } catch { return []; } });
   const [cycleName, setCycleName] = useState('');
   const [subTab, setSubTab] = useState<'exercises'|'plans'|'cycles'|'progress'>('exercises');
+
+  // APK-бэкап: если localStorage был пуст на холодном запуске — восстанавливаем из Directory.Data.
+  useEffect(() => {
+    let alive = true;
+    void loadNativeJsonBackup<typeof savedPlans>('bb-my-training-plans.json').then(backup => {
+      if (!alive || !Array.isArray(backup) || backup.length === 0) return;
+      setSavedPlans(prev => {
+        if (prev.length > 0) return prev;
+        try { localStorage.setItem('myTrainingPlans', JSON.stringify(backup)); } catch { /* ignore */ }
+        return backup;
+      });
+    });
+    return () => { alive = false; };
+  }, []);
 
   const [progressData, setProgressData] = useState<any>(null);
   useEffect(() => {
@@ -146,7 +162,8 @@ export const MyTrainingTab: React.FC<{ customExercises: { name: string; sets: nu
     const plan = { id: 'plan_' + Date.now(), name: planName || 'План ' + new Date().toLocaleDateString('ru'), date: new Date().toISOString(), exercises: [...customExercises] };
     const updated = [...savedPlans, plan];
     setSavedPlans(updated);
-    try { localStorage.setItem('myTrainingPlans', JSON.stringify(updated)); } catch { showToast('Не удалось сохранить: хранилище переполнено', 'err'); return; }
+    try { localStorage.setItem('myTrainingPlans', JSON.stringify(updated)); } catch { showToast('Не удалось сохранить в память браузера — пробую APK-файл', 'err'); }
+    void saveNativeJsonBackup('bb-my-training-plans.json', updated);
     setPlanName('');
     showToast('План «' + plan.name + '» (' + plan.exercises.length + ' упр.) сохранён во вкладке «Планы»', 'ok');
   };
@@ -155,7 +172,25 @@ export const MyTrainingTab: React.FC<{ customExercises: { name: string; sets: nu
     const updated = savedPlans.filter(p => p.id !== id);
     setSavedPlans(updated);
     try { localStorage.setItem('myTrainingPlans', JSON.stringify(updated)); } catch { showToast('Не удалось удалить: хранилище переполнено', 'err'); return; }
+    void saveNativeJsonBackup('bb-my-training-plans.json', updated);
     showToast('План удалён из «Мои тренировки»', 'ok');
+  };
+
+  const exportPlanFile = (plan: (typeof savedPlans)[number]) => {
+    const safeName = (plan.name || 'plan').replace(/[^a-zA-Zа-яА-ЯёЁ0-9_-]+/g, '_').slice(0, 40) || 'plan';
+    const ws = weeksOfPlan(plan);
+    const lines = [
+      `План: ${plan.name}`,
+      `Дата: ${new Date(plan.date).toLocaleDateString('ru')} · Недель: ${ws.length}`,
+      '',
+      ...ws.flatMap(w => [
+        ws.length > 1 ? `=== Неделя ${w.week} ===` : '',
+        ...(w.exercises || []).map((e, i) => `${i + 1}. ${e.name} — ${e.sets}×${e.reps} @ RIR ${e.rir}`),
+      ]).filter(Boolean),
+    ].join('\n');
+    void saveTextFileApk(`${safeName}.txt`, lines, 'text/plain;charset=utf-8').then(res => {
+      showToast(res === 'failed' ? 'Не удалось сохранить файл плана' : `📤 План «${plan.name}» сохранён в файл`, res === 'failed' ? 'err' : 'ok');
+    });
   };
 
   const loadPlan = (plan: { name?: string; exercises: { name: string; sets: number; reps: number; rir: number }[] }) => {
@@ -260,6 +295,7 @@ export const MyTrainingTab: React.FC<{ customExercises: { name: string; sets: nu
                     if (onLoadToConstructor) { onLoadToConstructor({ name: plan.name, exercises: exs }); showToast('План «' + plan.name + '» (' + exs.length + ' упр.) загружен в конструктор', 'ok'); }
                     else showToast('План «' + plan.name + '» готов — откройте Планировщик (ББ/Ручной) и нажмите «Применить»', 'ok');
                   }} style={{padding:'3px 8px',borderRadius:8,border:'1px solid rgba(168,85,247,0.2)',background:'rgba(168,85,247,0.08)',color:'#a855f7',fontSize:11,cursor:'pointer',fontWeight:700}}>📥 В конструктор</button>
+                  <button onClick={()=>exportPlanFile(plan)} style={{padding:'3px 8px',borderRadius:8,border:'1px solid rgba(56,189,248,0.25)',background:'rgba(56,189,248,0.08)',color:'#38bdf8',fontSize:11,cursor:'pointer',fontWeight:700}}>📤 В файл</button>
                   <button onClick={()=>deletePlan(plan.id)} style={{padding:'3px 8px',borderRadius:8,border:'1px solid rgba(239,68,68,0.2)',background:'rgba(239,68,68,0.08)',color:'#f87171',fontSize:11,cursor:'pointer'}}>Удалить</button>
                 </div>
               </div>

@@ -299,7 +299,7 @@ export function useBbHubScreening(input: BbHubScreeningInput) {
         // присед-тесте (стеновый тест). Без них сухожильный стоп не видел ни того, ни
         // другого, хотя хаб эти данные собирает.
         elbowPain: state.pmLoc === 'elbow' && painMon.verdict.tested,
-        
+        shoulderOhsFail: !state.ohsArmsOverMidfoot || !!(shoulderV && (shoulderV as any).tested && !(shoulderV as any).pass),
       });
       return (g as any)[joint] as { text: string; level: string } | null;
     } catch { return null; }

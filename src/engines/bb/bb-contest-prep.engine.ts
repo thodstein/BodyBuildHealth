@@ -19,6 +19,7 @@
  */
 
 import { getPeakingProtocol, type PeakingProtocol } from '../peaking-protocols.engine';
+import { icsProperty } from '../ics-format';
 import { localIsoDate } from '../../core/local-date';
 import { ruCount, ruAdjCount, RU_DAYS, RU_WEEKS, RU_ADJ_COMPLETED } from '../ru-plural';
 import type { BBPlan } from './bb-builder.engine';
@@ -287,7 +288,7 @@ export const CATEGORY_PROFILES: Record<BBContestCategory, CategoryProfile> = {
 export const CARB_DISTRIBUTION: Record<CarbLoadStrategy, number[]> = {
   front: [0.42, 0.35, 0.23],          // ранняя загрузка 42% → 35% → 23% (время на коррекцию)
   moderate: [0.25, 0.35, 0.40],       // классика нарастающая 25-35-40 (mid)
-  back: [0.15, 0.30, 0.55],           // поздняя 15-30-55 (прямо перед сценой, риск spill ниже при хорошей кондиции)
+  back: [0.35, 0.65],                 // поздняя 35-65 на 2 дня загрузки (load_1, load_2; сумма = 1.0)
   undulating: [0.30, 0.20, 0.50],     // волна 30-20-50 для непредсказуемых
   linear: [0.33, 0.33, 0.34],         // ровно
   // PRO-3 Э5 (Homer 2024: деплеция НЕ обязательна для суперкомпенсации): загрузка с дня 1
@@ -534,7 +535,10 @@ function hasContraindication(cfg: BBContestPrepConfig, id: string): boolean {
 // Валидация
 // ═══════════════════════════════════════════════════════════════════════════
 
-export function validateBBContestPrepConfig(cfg: BBContestPrepConfig): ConfigValidationResult {
+export function validateBBContestPrepConfig(
+  cfg: BBContestPrepConfig,
+  opts?: { allowPastShow?: boolean },
+): ConfigValidationResult {
   const errors: string[] = [];
   const warnings: string[] = [];
   const forced: Partial<BBContestPrepConfig> = {};
@@ -552,7 +556,12 @@ export function validateBBContestPrepConfig(cfg: BBContestPrepConfig): ConfigVal
     errors.push(`% жира ${cfg.bodyFatPct} вне диапазона 3–60.`);
   }
   if (!isValidIsoDate(cfg.showDate)) errors.push(`Дата шоу «${cfg.showDate}» некорректна (нужно ISO yyyy-mm-dd).`);
-  else if (daysBetween(isoToday(), cfg.showDate) < 0) errors.push('Дата шоу в прошлом.');
+  else {
+    const daysToShow = daysBetween(isoToday(), cfg.showDate);
+    if (daysToShow < 0 && !(opts?.allowPastShow && daysToShow >= -120)) {
+      errors.push('Дата шоу в прошлом.');
+    }
+  }
   if (!Number.isInteger(cfg.weeksOut) || cfg.weeksOut < 1 || cfg.weeksOut > 4) errors.push(`weeksOut ${cfg.weeksOut} вне диапазона 1–4.`);
   if (!['bb', 'classic', 'pl'].includes(cfg.trainingProtocol)) errors.push(`Неизвестный тренировочный протокол: ${cfg.trainingProtocol}`);
   if (!['front', 'moderate', 'back', 'undulating', 'linear', 'direct'].includes(cfg.carbLoadStrategy)) errors.push(`Неизвестная карб-стратегия: ${cfg.carbLoadStrategy}`);
@@ -770,14 +779,14 @@ export function getPerMuscleTaperMult(muscle: string, weekIdx: number): number {
   return arr[Math.min(weekIdx, arr.length - 1)] ?? 0.60;
 }
 
-export function buildTrainingTaper(cfg: BBContestPrepConfig, opts?: { volumeMult?: number }): TrainingTaperWeek[] {
+export function buildTrainingTaper(cfg: BBContestPrepConfig, opts?: { volumeMult?: number; skipConfigModifiers?: boolean }): TrainingTaperWeek[] {
   const v = validateBBContestPrepConfig(cfg);
   if (!v.ok) return [];
   const eff = applyContestPrepSafetyGate(cfg);
   const source = eff.trainingProtocol === 'bb'
     ? BB_TAPER_CURVE
     : getPeakingProtocol(eff.trainingProtocol).weeks;
-  const mods = buildTaperModifiers({ cfg: eff, experience: eff.experience });
+  const mods = opts?.skipConfigModifiers ? {} : buildTaperModifiers({ cfg: eff, experience: eff.experience });
   const weeksOut = mods.taperLength ?? eff.weeksOut;
   const selected = source.slice(-weeksOut);
   const n = selected.length;
@@ -872,6 +881,7 @@ function peakWeekCacheKey(eff: BBContestPrepConfig): string {
   const parts: Array<string | number | boolean | null | undefined> = [
     eff.sex, eff.category, eff.weightKg, eff.carbLoadStrategy, eff.waterStrategy, eff.sodiumStrategy,
     eff.bodyFatPct, eff.heightCm, eff.cycleDay, eff.hasTrialPeak, eff.experienceLevel, eff.prepCount,
+    eff.enhanced ? 1 : 0,
     eff.confirmedManipulation, eff.preferLowFiberCarbs, eff.creatineStrategy,
     eff.pedContext?.ghIU, eff.pedContext?.trenMg, eff.pedContext?.testMg, eff.pedContext?.nandMg,
     eff.pedContext?.insulinIU, eff.pedContext?.t3Mcg, eff.pedContext?.anavarMg, eff.pedContext?.diuretic ? 1 : 0,
@@ -1091,11 +1101,13 @@ export function buildPeakWeek(cfg: BBContestPrepConfig, opts?: { carbDoseGPerKg?
   // Peak/show — умеренные остатки, не загрузка: peak 1.8-2.2, show 1.4-1.8 (как было, но от tolerance)
   const peakCarbs = clamp(Math.round(w * (isFemale ? 1.8 : 2.2) * Math.min(1.1, tolMult)), 90, 260);
   const showCarbs = clamp(Math.round(w * (isFemale ? 1.4 : 1.8) * Math.min(1.1, tolMult)), 80, 220);
-  // Маппинг load_1..3 на долю бюджета
+  // Маппинг load_1..N на долю бюджета (нормализация гарантирует распределение 100% бюджета)
   const loadBudgets: Record<string, number> = {};
   const loadPhases = phases.filter(p => p.startsWith('load'));
+  const rawShares = loadPhases.map((_, i) => distribution[i] ?? (1 / Math.max(1, loadPhases.length)));
+  const shareSum = rawShares.reduce((a, b) => a + b, 0);
   loadPhases.forEach((p, i) => {
-    const share = distribution[i] ?? (1 / loadPhases.length);
+    const share = shareSum > 0 ? rawShares[i] / shareSum : (1 / Math.max(1, loadPhases.length));
     loadBudgets[p] = Math.round(totalBudget * share);
   });
 
@@ -1200,7 +1212,8 @@ export function buildPeakWeek(cfg: BBContestPrepConfig, opts?: { carbDoseGPerKg?
     if (phase.startsWith('load')) waterLiters += glycogenWaterBoost(carbsG);
     // SGLT1 guard floor: на load-днях вода не ниже 2.2л, иначе карбы не всосутся
     if (phase.startsWith('load')) waterLiters = Math.max(waterLiters, isFemale ? 2.0 : 2.2);
-    waterLiters = round1(Math.max(isFemale && day === 7 ? 0.9 : (isFemale ? 0.7 : 0.6), waterLiters));
+    // Женщины: минимум 1.5 л/день на show и ≥1.5 л в пик-неделю (риск гипонатриемии при малой массе).
+    waterLiters = round1(Math.max(isFemale ? 1.5 : 0.6, waterLiters));
     // Натрий: SGLT1 floor — на load не ниже 2600 (если tapered) / 2200 (если stable+карбы)
     let sodiumMg = naRow[idx];
     if (phase.startsWith('load') && sodiumMg < 2600 && canonNa === 'tapered') sodiumMg = 2600;
@@ -1316,8 +1329,14 @@ export function isShortCycle(totalWeeks: number): boolean { return totalWeeks>=4
 export function buildShowTimeline(cfg: BBContestPrepConfig): ShowTimelineItem[] {
   const wake = cfg.schedule?.wake || '07:00';
   const stage = cfg.schedule?.stage || '12:00';
-  const steps: Array<[number, string, string]> = [
-    [150, 'Подъём', 'Лёгкий завтрак: рисовые хлебцы + мёд/джем, ½ банана, сывороточный изолят при голоде. Кофе — при привычке.'],
+  const wakeAnchor = timeMinus(stage, 150);
+  const toMinutes = (hhmm: string): number => {
+    const [h, m] = hhmm.split(':').map(Number);
+    return (Number.isFinite(h) ? h : 0) * 60 + (Number.isFinite(m) ? m : 0);
+  };
+  const wakeTime = toMinutes(wake) < toMinutes(stage) ? (toMinutes(wake) <= toMinutes(wakeAnchor) ? wake : wakeAnchor) : wakeAnchor;
+  const steps: Array<[number, string, string, string?]> = [
+    [150, 'Подъём', 'Лёгкий завтрак: рисовые хлебцы + мёд/джем, ½ банана, сывороточный изолят при голоде. Кофе — при привычке.', wakeTime],
     [120, 'Завтрак окончен', 'Первый перекус карбс (рисовые хлебцы). Вода глотками.'],
     [90, 'Грим / укладка', 'Финализация внешнего вида, загар/грумминг.'],
     [60, 'Backstage', 'Вода глотками. При постоянном натрии: щепотка соли (продвинутые) — васкулярность.'],
@@ -1326,8 +1345,8 @@ export function buildShowTimeline(cfg: BBContestPrepConfig): ShowTimelineItem[] 
     [15, 'Прогон позирования', 'Обязательная программа: удержание каждой позы 3–5 сек.'],
     [0, 'Выход на сцену', 'Улыбка, контроль дыхания, фиксация поз. Вы готовы.'],
   ];
-  return steps.map(([min, action, detail]) => ({
-    time: timeMinus(stage, min),
+  return steps.map(([min, action, detail, explicitTime]) => ({
+    time: explicitTime ?? timeMinus(stage, min),
     action,
     detail,
   }));
@@ -1498,7 +1517,10 @@ export function planTwoShowSequence(
           exercises: s.exercises.map((e: any) => {
             if ((e as any).warmupActivator || (e as any).priming) return e;
             const newSets = Math.max(2, Math.round((e.sets || 0) * overreachMult));
-            return { ...e, sets: newSets, workSets: (e.workSets || []).slice(0, newSets), comment: (e.comment || '') + ` | ⚡ Overreach перед тапером ×${overreachMult.toFixed(2)}` };
+            const baseWs = e.workSets || [];
+            const tpl = baseWs[baseWs.length - 1] ?? { reps: (e.repsRange?.[0] ?? 10), rir: e.rir ?? 2, weight: 0, restSeconds: e.restSeconds ?? 90 };
+            const workSets = Array.from({ length: newSets }, (_, wi) => ({ ...(baseWs[wi] ?? tpl) }));
+            return { ...e, sets: newSets, workSets, comment: (e.comment || '') + ` | ⚡ Overreach перед тапером ×${overreachMult.toFixed(2)}` };
           }),
         })),
       };
@@ -2312,7 +2334,7 @@ export function deserializeBBPrepConfig(str: string | null | undefined): BBConte
       ? { wake: String((c.schedule as any).wake || '07:00'), stage: String((c.schedule as any).stage || '12:00') }
       : undefined,
   };
-  const v = validateBBContestPrepConfig(cfg);
+  const v = validateBBContestPrepConfig(cfg, { allowPastShow: true });
   if (!v.ok) return null;
   return cfg;
 }
@@ -2898,7 +2920,7 @@ export function deserializeBBContestPrepPlan(str: string | null | undefined): BB
     contraindications: Array.isArray(sf?.contraindications) ? sf.contraindications.filter((x): x is string => typeof x === 'string') : undefined,
   };
   const config = plan.config && typeof plan.config === 'object' ? plan.config : legacyConfig;
-  const v = validateBBContestPrepConfig(config);
+  const v = validateBBContestPrepConfig(config, { allowPastShow: true });
   if (!v.ok) return null;
   const version = Number(p.version);
   if (version >= 3 && !plan.config) return null;
@@ -3343,6 +3365,8 @@ function loadTestPeakWeekResults(): TestPeakWeekResult[] {
   } catch { return []; }
 }
 
+let _testPeakWeekSeq = 0;
+
 /** Сохранить результат тестовой пик-недели (не меняет основной план). */
 export function saveTestPeakWeekResult(
   planId: string,
@@ -3352,8 +3376,9 @@ export function saveTestPeakWeekResult(
   notes?: string,
 ): TestPeakWeekResult | null {
   const scored = scoreTestPeakWeek(responses, weightDeltaKg);
+  const seq = (_testPeakWeekSeq = (_testPeakWeekSeq + 1) % 46656).toString(36);
   const result: TestPeakWeekResult = {
-    id: `testpw_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 6)}`,
+    id: `testpw_${Date.now().toString(36)}_${showDate.replace(/[^0-9]/g, '').slice(-4) || '0000'}_${String(planId).length.toString(36)}_${seq}`,
     planId,
     createdAt: new Date().toISOString(),
     showDate,
@@ -3616,7 +3641,7 @@ export function prepWeightAdvice(
   if (targetW != null && avg7d != null) {
     const start = plan.preparation.startingWeightKg;
     if (Math.abs(start - targetW) > 0.5) {
-      base.progressToTargetPct = Math.round((Math.min(start, targetW) - Math.min(avg7d, targetW)) / Math.abs(start - targetW) * 100);
+      base.progressToTargetPct = Math.round(clamp(((start - avg7d) / (start - targetW)) * 100, 0, 150));
     }
   }
 
@@ -3700,9 +3725,31 @@ export interface ReverseDietWeek {
   note: string;
 }
 
-export function postShowReverseDiet(plan: BBContestPrepPlan): ReverseDietWeek[] {
-  const w = plan.preparation.startingWeightKg;
-  const post = buildPostShowPlan(plan);
+/** Определить актуальный вес сцены (приоритет: явный stageWeightKg / лог веса → startingWeightKg). */
+export function resolveStageWeightKg(
+  plan: BBContestPrepPlan,
+  opts?: { stageWeightKg?: number; weightLog?: Array<{ weightKg?: number; weight?: number }> },
+): number {
+  if (opts?.stageWeightKg != null && Number.isFinite(opts.stageWeightKg) && opts.stageWeightKg > 30) {
+    return opts.stageWeightKg;
+  }
+  const log = opts?.weightLog;
+  if (Array.isArray(log) && log.length > 0) {
+    const last = log[log.length - 1];
+    const lw = Number(last?.weightKg ?? last?.weight);
+    if (Number.isFinite(lw) && lw > 30) return lw;
+  }
+  const planStage = Number((plan as any)?.preparation?.stageWeightKg);
+  if (Number.isFinite(planStage) && planStage > 30) return planStage;
+  return plan.preparation.startingWeightKg;
+}
+
+export function postShowReverseDiet(
+  plan: BBContestPrepPlan,
+  opts?: { referenceCalories?: number; stageWeightKg?: number; weightLog?: Array<{ weightKg?: number; weight?: number }> },
+): ReverseDietWeek[] {
+  const w = resolveStageWeightKg(plan, opts);
+  const post = buildPostShowPlan(plan, opts);
   const fatG = Math.max(30, Math.round(w * prepFatFloorGPerKg(plan.sex)));
   const proteinG = post.proteinG;
   const cap = Math.round(w * 33);
@@ -3742,9 +3789,12 @@ export interface RecoveryDietWeek {
  * regain 10–15% веса сцены за 1–6 мес). Женский калорийный пол 1400 (RED-S).
  * Раньше кривая замирала на 4-й неделе и цель была 5–10% — устарело.
  */
-export function postShowRecoveryDiet(plan: BBContestPrepPlan): RecoveryDietWeek[] {
-  const w = plan.preparation.startingWeightKg;
-  const post = buildPostShowPlan(plan);
+export function postShowRecoveryDiet(
+  plan: BBContestPrepPlan,
+  opts?: { referenceCalories?: number; stageWeightKg?: number; weightLog?: Array<{ weightKg?: number; weight?: number }> },
+): RecoveryDietWeek[] {
+  const w = resolveStageWeightKg(plan, opts);
+  const post = buildPostShowPlan(plan, opts);
   const fatG = Math.max(plan.sex === 'female' ? 40 : 30, Math.round(w * prepFatFloorGPerKg(plan.sex)));
   const proteinG = post.proteinG;
   const cap = post.kcal + 800;
@@ -3772,8 +3822,11 @@ export function activePostShowCurve(plan: BBContestPrepPlan): Array<ReverseDietW
  * стабильные вода/натрий, лёгкий возврат к тренировкам, контроль веса.
  * НЕ возвращает резких протоколов — пост-шоу не место для манипуляций.
  */
-export function buildPostShowPlan(plan: BBContestPrepPlan, opts?: { referenceCalories?: number }): PostShowPlan {
-  const w = plan.preparation.startingWeightKg;
+export function buildPostShowPlan(
+  plan: BBContestPrepPlan,
+  opts?: { referenceCalories?: number; stageWeightKg?: number; weightLog?: Array<{ weightKg?: number; weight?: number }> },
+): PostShowPlan {
+  const w = resolveStageWeightKg(plan, opts);
   // Поддержание ≈ калории дефицита + 300–400 (дефицит ~0.5%/нед ≈ 400 ккал у 80 кг).
   const maintenance = Math.max(
     (opts?.referenceCalories && opts.referenceCalories > 1200 ? opts.referenceCalories : plan.preparation.currentCalories) + 300,
@@ -3956,8 +4009,12 @@ function icsEscape(s: string): string {
   return String(s).replace(/\\/g, '\\\\').replace(/;/g, '\\;').replace(/,/g, '\\,').replace(/\n/g, '\\n');
 }
 
-/** Фазы contest prep → .ics (события на каждый день фазы; show day — отдельно). */
+/** Фазы contest prep → .ics (события на каждый день фазы; show day — отдельно; RFC 5545 UID/DTSTAMP/folding). */
 export function buildPrepIcs(plan: BBContestPrepPlan): string {
+  const now = new Date();
+  const pad2 = (n: number) => String(n).padStart(2, '0');
+  const dtStamp = `${now.getUTCFullYear()}${pad2(now.getUTCMonth() + 1)}${pad2(now.getUTCDate())}T${pad2(now.getUTCHours())}${pad2(now.getUTCMinutes())}${pad2(now.getUTCSeconds())}Z`;
+  const uidBase = String(plan.id || plan.showDate || 'prep').replace(/[^A-Za-z0-9_-]/g, '_');
   const lines: string[] = [
     'BEGIN:VCALENDAR',
     'VERSION:2.0',
@@ -3969,26 +4026,33 @@ export function buildPrepIcs(plan: BBContestPrepPlan): string {
     const start = p.dateStart.replace(/-/g, '');
     const end = isoAddDays(p.dateEnd, 1).replace(/-/g, '');
     lines.push('BEGIN:VEVENT');
+    lines.push(`UID:prep-${uidBase}-${p.key}-${start}@bodybuildhealth`);
+    lines.push(`DTSTAMP:${dtStamp}`);
     lines.push(`DTSTART;VALUE=DATE:${start}`);
     lines.push(`DTEND;VALUE=DATE:${end}`);
-    lines.push(`SUMMARY:${icsEscape(`🏁 ${p.label} (contest prep)`)}`);
-    lines.push(`DESCRIPTION:${icsEscape(p.note)}`);
+    lines.push(icsProperty('SUMMARY', `🏁 ${p.label} (contest prep)`));
+    lines.push(icsProperty('DESCRIPTION', p.note || ''));
     lines.push('END:VEVENT');
   }
-  // Show day — однособытие.
+  // Show day — одно событие.
   lines.push('BEGIN:VEVENT');
+  lines.push(`UID:prep-${uidBase}-show-${plan.showDate.replace(/-/g, '')}@bodybuildhealth`);
+  lines.push(`DTSTAMP:${dtStamp}`);
   lines.push(`DTSTART;VALUE=DATE:${plan.showDate.replace(/-/g, '')}`);
   lines.push(`DTEND;VALUE=DATE:${isoAddDays(plan.showDate, 1).replace(/-/g, '')}`);
-  lines.push('SUMMARY:🎬 Show day');
-  lines.push(`DESCRIPTION:${icsEscape(`${CONTEST_CATEGORY_LABELS[plan.category] ?? plan.category} — выход на сцену`)}`);
+  lines.push(icsProperty('SUMMARY', '🎬 Show day'));
+  lines.push(icsProperty('DESCRIPTION', `${CONTEST_CATEGORY_LABELS[plan.category] ?? plan.category} — выход на сцену`));
   lines.push('END:VEVENT');
   // Э5: чек-лист шоу (tan/чек-ины/сумка) — отдельными событиями, старые события целы.
   for (const item of buildShowChecklist(plan.showDate)) {
+    const safeId = String(item.id || item.date).replace(/[^A-Za-z0-9_-]/g, '_');
     lines.push('BEGIN:VEVENT');
+    lines.push(`UID:prep-${uidBase}-chk-${safeId}@bodybuildhealth`);
+    lines.push(`DTSTAMP:${dtStamp}`);
     lines.push(`DTSTART;VALUE=DATE:${item.date.replace(/-/g, '')}`);
     lines.push(`DTEND;VALUE=DATE:${isoAddDays(item.date, 1).replace(/-/g, '')}`);
-    lines.push(`SUMMARY:${icsEscape(`📋 ${item.label}`)}`);
-    lines.push(`DESCRIPTION:${icsEscape(item.detail ?? '')}`);
+    lines.push(icsProperty('SUMMARY', `📋 ${item.label}`));
+    lines.push(icsProperty('DESCRIPTION', item.detail ?? ''));
     lines.push('END:VEVENT');
   }
   lines.push('END:VCALENDAR');

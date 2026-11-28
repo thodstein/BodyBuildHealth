@@ -10,6 +10,7 @@
  *  - 27: compareBBVariants — по-недельный дифф двух вариантов плана
  */
 import type { BBPlan, BBExercise } from './bb-builder.engine';
+import { normalizeBBMuscle } from './bb-volume.engine';
 import { ruCount, RU_SETS } from '../ru-plural';
 import { MUSCLE_LABEL_RU } from '../volume-landmarks.engine';
 import { bbSessionTagLabel } from './bb-session-tags';
@@ -54,8 +55,11 @@ export function buildBBMuscleHeatmap(plan: BBPlan, opts?: { mevByMuscle?: Record
   if (!plan?.weeks?.length) return [];
   const mev = opts?.mevByMuscle || {};
   const mrv = opts?.mrvByMuscle || {};
-  const landmarks = (plan as any).volumeLandmarks as Array<{ muscle: string; mev: number; mav: number; mrv: number }> | undefined;
-  const lmFor = (m: string) => landmarks?.find(l => l.muscle === m);
+  const landmarks = (plan as any).volumeLandmarks as Array<{ group?: string; muscle: string; mev: number; mav: number; mrv: number }> | undefined;
+  const lmFor = (m: string) => {
+    const canon = normalizeBBMuscle(m);
+    return landmarks?.find(l => l.group === m || l.group === canon || l.muscle === m || normalizeBBMuscle(l.muscle) === canon);
+  };
   // Источник цифры — снимок факта плана (`weeklyVolume`, пересчитывается
   // последним, см. bb-plan-snapshot.engine). Раньше здесь считались СЫРЫЕ сеты
   // по полю `e.muscle`, и это расходилось с планом: замер на ppl_6 — 4/28 ячеек
@@ -93,7 +97,7 @@ export function buildBBMuscleHeatmap(plan: BBPlan, opts?: { mevByMuscle?: Record
       let status: HeatmapCell['status'] = 'none';
       if (mevV != null && mrvV != null) {
         if (sets < mevV) status = 'below_mev';
-        else if (mavV != null && sets > mrvV) status = 'over_mrv';
+        else if (sets > mrvV) status = 'over_mrv';
         else if (mavV != null && sets > mavV) status = 'above_mav';
         else status = 'mev_mav';
       }
@@ -262,10 +266,20 @@ export function buildBBPlanPrintHtml(plan: BBPlan, opts?: { heatmap?: boolean; s
   const LEVEL_RU: Record<string, string> = { beginner: 'Новичок', intermediate: 'Средний', advanced: 'Опытный', enhanced: 'Enhanced (фарма)' };
   const phases = new Set(rows.map(r => r.phase));
   const phaseLegend = [...phases].map(p => `<span style="margin-right:10px"><i style="display:inline-block;width:10px;height:10px;background:${BB_PHASE_COLOR[p] || '#888'};border-radius:2px"></i> ${esc(BB_PHASE_LABEL_RU[p] || p)}</span>`).join('');
+  const PHASE_RU_MAP: Record<string, string> = { ...BB_PHASE_LABEL_RU, working: 'Рабочая' };
+  const TECH_RU_MAP: Record<string, string> = {
+    drop_set: 'Дроп-сет', rest_pause: 'Рест-пауза', myo_reps: 'Мио-репс', myo_rep: 'Мио-репс',
+    pause_rep: 'Пауза', mechanical_drop: 'Мех. дроп', negative: 'Негативы', twenty_ones: '21s',
+    giant_set: 'Гигант-сет', superset: 'Суперсет', none: '',
+  };
   const rowHtml = (r: MesocycleRow): string => {
     const pc = BB_PHASE_COLOR[r.phase] || '#888';
-    const exercises = r.exercises.map(ex => `<tr><td>${esc(ex.name)}${ex.superset ? ` <b style="color:#a855f7">🔗${esc(ex.superset)}</b>` : ''}</td><td>${esc(ruMuscle(ex.muscle))}</td><td>${ex.sets}</td><td>${ex.reps}</td><td>${ex.weight}</td><td>${ex.rir}</td><td>${ex.rest}</td><td style="font-size:9px">${esc(ex.technique || '')}</td><td style="font-size:9px">${esc(ex.progression || '')}</td><td style="border-left:1px solid #999;min-width:70px">&nbsp;</td></tr>`).join('');
-    return `<h3 style="margin:14px 0 4px;color:${pc}">Неделя ${r.week} · ${esc(r.phase)} · День ${r.day} (${esc(r.character)})</h3>
+    const phaseLabel = PHASE_RU_MAP[r.phase] || r.phase;
+    const exercises = r.exercises.map(ex => {
+      const techLabel = ex.technique ? (TECH_RU_MAP[ex.technique] || ex.technique) : '';
+      return `<tr><td>${esc(ex.name)}${ex.superset ? ` <b style="color:#a855f7">🔗${esc(ex.superset)}</b>` : ''}</td><td>${esc(ruMuscle(ex.muscle))}</td><td>${ex.sets}</td><td>${ex.reps}</td><td>${ex.weight}</td><td>${ex.rir}</td><td>${ex.rest}</td><td style="font-size:9px">${esc(techLabel)}</td><td style="font-size:9px">${esc(ex.progression || '')}</td><td style="border-left:1px solid #999;min-width:70px">&nbsp;</td></tr>`;
+    }).join('');
+    return `<h3 style="margin:14px 0 4px;color:${pc}">Неделя ${r.week} · ${esc(phaseLabel)} · День ${r.day} (${esc(r.character)})</h3>
       <table border="1" cellspacing="0" cellpadding="4" style="border-collapse:collapse;width:100%;font-size:11px">
         <thead><tr style="background:#f4f4f5"><th>Упражнение</th><th>Мышца</th><th>Сеты</th><th>Повт</th><th>Вес</th><th>RIR</th><th>Отдых</th><th>Техника</th><th>Прогрессия</th><th>Факт (вес×повт)</th></tr></thead>
         <tbody>${exercises}</tbody></table>`;
@@ -362,11 +376,25 @@ export function buildBBPlanIcs(plan: BBPlan, opts?: { startDate?: string }): str
         tag || character || 'Тренировка',
         character && tag ? character : '',
       ].filter(Boolean).join(' · ');
+      const exLines = ((s as any).exercises || [])
+        .filter((e: any) => !e.warmupActivator)
+        .map((e: any) => {
+          const ws = e.workSets?.[0];
+          const reps = ws?.reps ?? e.repsRange?.[0] ?? 10;
+          const wt = ws?.weight ? ` @${ws.weight}кг` : '';
+          return `• ${e.name || e.exerciseName}: ${e.sets}×${reps}${wt}`;
+        });
+      const now = new Date();
+      const pad2 = (n: number) => String(n).padStart(2, '0');
+      const dtStamp = `${now.getUTCFullYear()}${pad2(now.getUTCMonth() + 1)}${pad2(now.getUTCDate())}T${pad2(now.getUTCHours())}${pad2(now.getUTCMinutes())}${pad2(now.getUTCSeconds())}Z`;
       lines.push('BEGIN:VEVENT');
+      lines.push(`UID:bb-${uid(plan.pattern?.id || 'plan')}-w${w.week}-d${(s as any).weekOffset ?? dayIdx}@bb-auto`);
+      lines.push(`DTSTAMP:${dtStamp}`);
       lines.push(icsProperty('SUMMARY', title));
-      lines.push(`DTSTART:${stamp}T100000Z`);
-      lines.push(`DTEND:${stamp}T110000Z`);
-      lines.push(`UID:bb-${w.week}-${(s as any).weekOffset ?? dayIdx}@bb-auto`);
+      if (exLines.length > 0) lines.push(icsProperty('DESCRIPTION', exLines.join('\n')));
+      // Floating local time (RFC 5545): 10:00-11:00 в локальной таймзоне атлета, без сдвига Z.
+      lines.push(`DTSTART:${stamp}T100000`);
+      lines.push(`DTEND:${stamp}T110000`);
       lines.push('END:VEVENT');
     });
   });
@@ -390,12 +418,26 @@ export function compareBBVariants(a: BBPlan, b: BBPlan): BBVariantDiff[] {
     const detail: string[] = [];
     if (!wa || !wb) { detail.push(wa ? 'Неделя удалена' : 'Неделя добавлена'); }
     else {
-      const sa = (wa.sessions || []).reduce((s, x) => s + x.exercises.reduce((a2, e) => a2 + (e.sets || 0), 0), 0);
-      const sb = (wb.sessions || []).reduce((s, x) => s + x.exercises.reduce((a2, e) => a2 + (e.sets || 0), 0), 0);
+      const sa = (wa.sessions || []).reduce((s, x) => s + x.exercises.filter((e: any) => !e.warmupActivator).reduce((a2, e) => a2 + (e.sets || 0), 0), 0);
+      const sb = (wb.sessions || []).reduce((s, x) => s + x.exercises.filter((e: any) => !e.warmupActivator).reduce((a2, e) => a2 + (e.sets || 0), 0), 0);
       if (sa !== sb) detail.push(`Объём: ${sa} → ${ruCount(sb, RU_SETS)} (${sb > sa ? '+' : ''}${sb - sa})`);
       const phaseA = String((wa as any).phase || '');
       const phaseB = String((wb as any).phase || '');
       if (phaseA !== phaseB) detail.push(`Фаза: ${esc(phaseA || '—')} → ${esc(phaseB || '—')}`);
+      const namesA = new Set((wa.sessions || []).flatMap(x => x.exercises.filter((e: any) => !e.warmupActivator).map(e => e.name || e.exerciseName)));
+      const namesB = new Set((wb.sessions || []).flatMap(x => x.exercises.filter((e: any) => !e.warmupActivator).map(e => e.name || e.exerciseName)));
+      const added = [...namesB].filter(n => !namesA.has(n));
+      const removed = [...namesA].filter(n => !namesB.has(n));
+      if (added.length > 0) detail.push(`+Упр (${added.length}): ${added.slice(0, 2).join(', ')}${added.length > 2 ? '…' : ''}`);
+      if (removed.length > 0) detail.push(`−Упр (${removed.length}): ${removed.slice(0, 2).join(', ')}${removed.length > 2 ? '…' : ''}`);
+      const avgW = (wk: any) => {
+        const ws = (wk.sessions || []).flatMap((x: any) => (x.exercises || []).filter((e: any) => !e.warmupActivator).flatMap((e: any) => (e.workSets || []).map((s: any) => Number(s.weight) || 0))).filter((w: number) => w > 0);
+        return ws.length ? Math.round((ws.reduce((acc: number, v: number) => acc + v, 0) / ws.length) * 10) / 10 : 0;
+      };
+      const awA = avgW(wa); const awB = avgW(wb);
+      if (awA > 0 && awB > 0 && Math.abs(awA - awB) >= 1) {
+        detail.push(`Ср. вес: ${awA} → ${awB} кг (${awB > awA ? '+' : ''}${Math.round((awB - awA) * 10) / 10})`);
+      }
     }
     out.push({ week: wi + 1, changes: detail.length, detail });
   }

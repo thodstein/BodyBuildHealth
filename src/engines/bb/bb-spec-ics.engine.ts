@@ -72,16 +72,10 @@ export function buildBBSpecIcs(
   return ['BEGIN:VCALENDAR', 'VERSION:2.0', 'PRODID:-//BodyBuildHealth//BB Spec//RU', ...events, 'END:VCALENDAR'].join('\r\n');
 }
 
+import { saveTextFileApk } from '../../core/apk-share';
+
 export function downloadBBSpecIcs(ics: string, filename = 'bb-spec-block.ics'): void {
-  try {
-    const blob = new Blob([ics], { type: 'text/calendar' });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = filename;
-    a.click();
-    setTimeout(() => URL.revokeObjectURL(url), 2000);
-  } catch { /* noop */ }
+  void saveTextFileApk(filename, ics, 'text/calendar;charset=utf-8');
 }
 
 export interface BbWorkingRange {

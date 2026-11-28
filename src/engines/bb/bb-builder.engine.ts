@@ -31,7 +31,7 @@ import { trueMuscleOf, musclesForRole, derivePattern } from '../movement-pattern
 import { findPatternAlternative, cooldownBlockedNames as cooldownBlockedForMuscle, recordCooldownUse, type CooldownHistory } from './bb-exercise-rotation.engine';
 import { S_MRV_FACTOR } from '../rir-table';
 import type { PEDAdaptation, CourseIntensity } from './bb-ped-adaptation.engine';
-import { adaptForPEDs, computeAASEquivDose } from './bb-ped-adaptation.engine';
+import { adaptForPEDs, computeAASEquivDose, assessFemalePedSafety } from './bb-ped-adaptation.engine';
 import { volumeRegimeOf, type VolumeRegime } from './bb-ped-profile';
 import type { Injury } from '../manual-plan-builder';
 import { prescribeLoad, applyPostPhaseProcessing, taperWindowOf, type LoadStrategy, type IntensityTechnique, type DeloadType } from './bb-autocoach.engine';
@@ -291,6 +291,8 @@ export interface BBBuilderInput {
    *  'lower_back' — проблемы с поясницей → исключить conventional deadlift, barbell row.
    *  'wrist' — проблемы с запястьями → исключить straight-bar curl, prefer cable. */
   mobilityRestrictions?: string[];
+  /** P0-19: запрещённые шаблоны движений (ступень возврата после травмы) — фильтруются в пуле. */
+  bannedPatterns?: string[];
   /** PRO: предыдущий мезоцикл — для auto-progress весов, ротации упражнений, объёмной прогрессии.
    *  Если передан, buildBBPlan извлекает из него: peak-week веса → стартовые веса +2.5-5кг,
    *  список упражнений → ротация (избегаем повторов), per-muscle volume → +1-2 сета. */
@@ -344,10 +346,14 @@ export interface BBBuilderInput {
   trainingVolumeMode?: 'standard' | 'high';
   /** BFR-режим: окклюзия 20-30% 1RM, 30-15-15-15, 30с. Только для памп-изоляций, тяж не трогает. */
   bfrMode?: boolean;
-  /** Blast/Cruise: 8н blast (×1.15) / 4н cruise (×0.85), повторяется. Auto = по дозам. */
+  /** Blast/Cruise: 8н blast (×1.15) / 4н cruise (×0.85, RIR +1), повторяется. Только на курсе. */
   blastCruiseEnabled?: boolean;
   blastWeeks?: number; // по умолчанию 8
   cruiseWeeks?: number; // по умолчанию 4
+  /** Фаза активного курса: course / cruise (×0.85, RIR+1) / pct (natural, восст ×0.80, RIR+1, без отказов) / off. */
+  pedPhase?: 'course' | 'cruise' | 'pct' | 'off';
+  /** Эстрадиол (пг/мл) из анализов: <15 активирует суставной гард. */
+  estradiolPgMl?: number;
   /** Epic A: персональная калибровка MEV (bb-mev-calibration.engine). Оверрайд
    *  популяционных landmarks внутри существующих капов (потолок MRV не растёт выше +30%).
    *  Если не передан — buildBBPlan автоматически читает из хранилища he_bb_mev_calibration. */
@@ -567,6 +573,8 @@ export interface BBPlan {
   weeks: BBWeek[];
   rotationMuscleVolume: Record<string, number>; // MAV×ротация на мышцу
   rationale: string[];
+  /** ISO-дата старта мезоцикла (YYYY-MM-DD), синхронизируется с календарём/ICS/рантаймом. */
+  planStartWeek?: string;
   /** P2-4: уровень пользователя (для bb-metrics без duck-typing). */
   level?: string;
   /** Volume-landmarks (MEV/MAV/MRV) по пиковой неделе — единый источник, как в PL/ручном. */
@@ -1575,8 +1583,22 @@ function buildExComment(
 /** Разминочная пирамида для compound упражнений.
  *  Канон: warmup-ramp.engine (гриф 20×15 → 50%×10 → 70%×5 → 80%×3 → 90%×1).
  *  Единый источник — warmupRampFor; здесь только делегирование (совместимость). */
-export function buildWarmup(workWeight: number, isCompound: boolean): { load: number; reps: number }[] {
-  return warmupRampFor(workWeight, isCompound);
+export function buildWarmup(
+  workWeight: number,
+  isCompound: boolean,
+  opts?: { isBarbell?: boolean; secondCompoundSameMuscle?: boolean },
+): { load: number; reps: number }[] {
+  return warmupRampFor(workWeight, isCompound, opts);
+}
+
+function isBarbellExerciseData(exData: any): boolean {
+  const eq = Array.isArray(exData?.equipment) ? exData.equipment : (exData?.equipment ? [String(exData.equipment)] : []);
+  const norm = eq.map((x: string) => String(x || '').toLowerCase());
+  if (norm.some((e: string) => e === 'barbell' || e.includes('штан') || e.includes('гриф'))) return true;
+  if (norm.some((e: string) => ['dumbbell', 'cable', 'machine', 'bodyweight', 'kettlebell', 'band', 'smith'].includes(e))) return false;
+  const n = String(exData?.name || '').toLowerCase();
+  if (/гантел|dumbbell|блок|кабел|cable|кроссов|трен|машин|machine|смит|smith|подтяг|брус|отжиман/i.test(n)) return false;
+  return /штанг|barbell|гриф|жим лёжа|жим лежа|присед.*штанг|становая|румын/i.test(n);
 }
 
 /**
@@ -1809,6 +1831,8 @@ export interface BuildExercisePoolOpts {
   phase?: string;
   /** Цель мезоцикла — goal-aware SFR/стабильность/осевая нагрузка в _score. */
   goal?: BBGoal;
+  /** P0-19: запрещённые шаблоны движений (ступень возврата после травмы). */
+  bannedPatterns?: string[];
 }
 
 /** 3.1 — вынесенный слой selection: построение скорированного пула упражнений.
@@ -1863,22 +1887,29 @@ function exercisePoolKey(muscle: string, role: string, opts: BuildExercisePoolOp
     labMrvMultiplier: opts.labMrvMultiplier ?? null,
     phase: opts.phase || '',
     goal: opts.goal || '',
+    bannedPatterns: opts.bannedPatterns?.length ? opts.bannedPatterns : null,
   });
 }
 
 /**
- * Запреты пула, не зависящие от контекста дня: эксцентрик-скилл новичку и
- * становая/сумо/жим стоя без явного разрешения пользователя.
+ * Запреты пула, не зависящие от контекста дня: эксцентрик-скилл новичку,
+ * становая/сумо/жим стоя без явного разрешения и bannedPatterns ступени возврата.
  *
- * Вынесено в предикат (аудит 2026-11, P1-2): основной фильтр и fallback-пул
- * держали эти правила по отдельности, и fallback их терял — ровно тогда, когда
- * пользователь сильнее всего ограничен инвентарём.
+ * Вынесено в предикат (аудит 2026-11, P1-2 / P0-19): основной фильтр и fallback-пул
+ * используют единое правило.
  */
-function isPoolPolicyBlocked(ex: any, opts: { level?: string; allowStrengthLifts?: boolean }): boolean {
+function isPoolPolicyBlocked(ex: any, opts: { level?: string; allowStrengthLifts?: boolean; bannedPatterns?: string[] }): boolean {
   if (normLevel(opts.level || 'intermediate') === 'beginner' && isSkillEccentric(ex)) return true;
   if (opts.allowStrengthLifts !== true) {
     const n = (ex.name || '').toLowerCase();
     if (n.includes('становая') || n.includes('сумо') || n.includes('армейский') || n.includes('жим стоя') || n.includes('швунг') || n.includes('мертв')) return true;
+  }
+  if (Array.isArray(opts.bannedPatterns) && opts.bannedPatterns.length > 0) {
+    const hay = `${ex.id || ''} ${ex.name || ''} ${ex.movementPattern || ''}`.toLowerCase();
+    for (const bp of opts.bannedPatterns) {
+      const needle = String(bp || '').toLowerCase().trim();
+      if (needle && hay.includes(needle)) return true;
+    }
   }
   return false;
 }
@@ -1899,12 +1930,18 @@ function buildExercisePoolUncached(muscle: string, role: string, opts: BuildExer
     if (!opts.isPurePull && tm === 'shoulders' && isRearDeltExercise(ex.name)) return false;
     if (opts.avoidAxialLoad && ex.name && isAxialLoadExercise(ex as any)) return false;
     if (opts.mobilityRestrictions && isMobilityRestricted(ex, opts.mobilityRestrictions)) return false;
-    // Bodyweight capability: подтягивания не ставятся без подтверждённой
-    // способности ни в какую роль — заменяются pulldown/машиной.
+    // Bodyweight capability: подтягивания/брусья/отжимания не ставятся без подтверждённой
+    // способности — заменяются pulldown/машиной.
     if (/подтяг|pull.?up|chin.?up/i.test(ex.name || '')) {
       const cap = opts.bodyweightCapability;
-      const canPullUp = cap && ((cap.pullUpsStrict ?? 0) >= 5 || (cap.chinUpsStrict ?? 0) >= 5 || (cap.weightedPullUpLoad ?? 0) > 0);
+      const canPullUp = cap && ((cap.pullUpsStrict ?? 0) >= 5 || (cap.chinUpsStrict ?? 0) >= 5 || (cap.weightedPullUpLoad ?? 0) > 0 || (cap.assistedPullUpLoad ?? 0) > 0);
       if (!canPullUp) return false;
+    }
+    if (opts.bodyweightCapability?.dipsStrict === 0 && /брус|\bdips?\b/i.test(ex.name || '') && !/гравитрон|трен|машин|assist/i.test(ex.name || '')) {
+      return false;
+    }
+    if (opts.bodyweightCapability?.pushUpsStrict === 0 && /отжиман.*пол|push.?up/i.test(ex.name || '')) {
+      return false;
     }
     // Единая проверка «снаряд пользователя поддерживает упражнение»
     // (bb-equipment: пустой список = без ограничений, `bodyweight` разрешён
@@ -1953,11 +1990,17 @@ function buildExercisePoolUncached(muscle: string, role: string, opts: BuildExer
     if (!equipmentAllows(opts.equipmentList, ex.equipment as any)) return false;
     // B5: avAxial — даже в fallback НЕ берём осевые упражнения
     if (opts.avoidAxialLoad && ex.name && isAxialLoadExercise(ex)) return false;
-    // Bodyweight capability — и в fallback не берём подтягивания без способности.
+    // Bodyweight capability — и в fallback не берём подтягивания/брусья/отжимания без способности.
     if (/подтяг|pull.?up|chin.?up/i.test(ex.name || '')) {
       const cap = opts.bodyweightCapability;
-      const canPullUp = cap && ((cap.pullUpsStrict ?? 0) >= 5 || (cap.chinUpsStrict ?? 0) >= 5 || (cap.weightedPullUpLoad ?? 0) > 0);
+      const canPullUp = cap && ((cap.pullUpsStrict ?? 0) >= 5 || (cap.chinUpsStrict ?? 0) >= 5 || (cap.weightedPullUpLoad ?? 0) > 0 || (cap.assistedPullUpLoad ?? 0) > 0);
       if (!canPullUp) return false;
+    }
+    if (opts.bodyweightCapability?.dipsStrict === 0 && /брус|\bdips?\b/i.test(ex.name || '') && !/гравитрон|трен|машин|assist/i.test(ex.name || '')) {
+      return false;
+    }
+    if (opts.bodyweightCapability?.pushUpsStrict === 0 && /отжиман.*пол|push.?up/i.test(ex.name || '')) {
+      return false;
     }
     if (!opts.isPurePull && tm === 'shoulders' && isRearDeltExercise(ex.name)) return false;
     if (opts.mobilityRestrictions && isMobilityRestricted(ex, opts.mobilityRestrictions)) return false;
@@ -1975,7 +2018,17 @@ function buildExercisePoolUncached(muscle: string, role: string, opts: BuildExer
   // Гард работает на уровне отбора, а не характера дня (тяж остаётся тяж, но с машиной).
   const _jgHasGH = !!opts.pedDoses && Number((opts.pedDoses as any)['GH']) > 0;
   const _jgHasAAS = !!opts.pedDoses && Number((opts.pedDoses as any)['AAS']) > 0;
-  const _jgInput = { hasGH: _jgHasGH, ghDose: Number((opts.pedDoses as any)?.['GH'] || 0), hasAAS: _jgHasAAS, aasDose: Number((opts.pedDoses as any)?.['AAS'] || 0), hasInsulin: !!opts.pedDoses && Number((opts.pedDoses as any)['insulin']) > 0, labMrvMultiplier: opts.labMrvMultiplier as any };
+  const _jgInput = {
+    hasGH: _jgHasGH,
+    ghDose: Number((opts.pedDoses as any)?.['GH'] || 0),
+    hasAAS: _jgHasAAS,
+    aasDose: Number((opts.pedDoses as any)?.['AAS'] || 0),
+    hasInsulin: !!opts.pedDoses && Number((opts.pedDoses as any)['insulin']) > 0,
+    labMrvMultiplier: opts.labMrvMultiplier as any,
+    peds: (opts as any).peds,
+    pedDoses: opts.pedDoses as any,
+    estradiolPgMl: (opts as any).estradiolPgMl,
+  };
   const _jgActive = jointGuardActive(_jgInput);
 
   // ━━━ _score: BB-приоритет ВСЕГДА (не только generic) ━━━
@@ -2146,6 +2199,8 @@ export interface BuildSessionParams {
   abAvoidPatterns?: string[];
   /** A/B-ротация: порядковый номер среди sibling-сессий того же тега (0,1,…) — суффикс primary-слота. */
   abSibIndex?: number;
+  /** P0-19: запрещённые шаблоны движений (ступень возврата после травмы). */
+  bannedPatterns?: string[];
   /** Packing-v2: заливка до индивидуальных капов (пилот back). */
   packingV2?: boolean;
   /** PPL-паттерн (мандаты ensurePPL*: packing не сбрасывает мандатные). */
@@ -2221,6 +2276,7 @@ function buildSession(
   rirEscalation: number = 0,
   goal?: BBGoal,
   volumeRegime?: VolumeRegime,
+  bannedPatterns?: string[],
 ): BBSession {
   const character = sched.character as DayCharacter;
   // Интенсивность тренинга → множитель отдыха (плотность/восстановление).
@@ -2611,6 +2667,7 @@ function buildSession(
       // бы между неделями (паритет с selWeek-пиннингом выше).
       phase: rotationMode === 'forbid' ? 'accumulation' : phase,
       goal,
+      bannedPatterns,
     });
     // Pro primary: только канонические tier 1, иначе tier 1-2, чтобы hex/svend/TRX не лезли в primary Pro
     if (role === 'primary' && (level === 'advanced' || level === 'enhanced')) {
@@ -2933,7 +2990,19 @@ function buildSession(
       const used = new Set(exDatas.map(e => e.id));
       for (const ac of ANGLE_CLASSES.back) {
         if (exDatas.length >= targetExercises) break;
-        const candidate = [...pool, ...EXERCISE_CATALOG].find(e => !used.has(e.id) && trueMuscleOf(e) === 'back' && !isBBJunk(e) && ac.match(e));
+        const candidate = [...pool, ...EXERCISE_CATALOG].find(e => {
+          if (used.has(e.id) || trueMuscleOf(e) !== 'back' || isBBJunk(e) || !ac.match(e)) return false;
+          if (excludeIds.includes(e.id) || excludeIds.includes(e.name)) return false;
+          if (!equipmentAllows(equipmentList, (e as any).equipment)) return false;
+          if (avoidAxialLoad && isAxialLoadExercise(e as any)) return false;
+          if (mobilityRestrictions && isMobilityRestricted(e, mobilityRestrictions)) return false;
+          if (/подтяг|pull.?up|chin.?up/i.test(e.name || '')) {
+            const cap = bodyweightCapability;
+            const canPull = cap && ((cap.pullUpsStrict ?? 0) >= 5 || (cap.chinUpsStrict ?? 0) >= 5 || (cap.weightedPullUpLoad ?? 0) > 0 || (cap.assistedPullUpLoad ?? 0) > 0);
+            if (!canPull) return false;
+          }
+          return true;
+        });
         if (!candidate) continue;
         exDatas.push(candidate);
         used.add(candidate.id);
@@ -3309,9 +3378,16 @@ function buildSession(
           workSets, exerciseName: (exData as any).name || (exData as any).id,
           exerciseType: (exData as any).exerciseType || (exData as any).type || 'compound',
           tempoSpec: tempoStr, restSeconds: exRest,
-            comment: buildExComment(pl.muscle, (exData as any).id || (exData as any).name, pl.role, pl.resolved as DayCharacter, adjustedSets, Math.min(repMin, repsCap), Math.round(exWeight * wPct * ((exData as any)._weightMod || 1) * 10) / 10, finalRir, weakPoints, focusGroup, phase, tempoStr, exRest, isSubstituted, (exData as any).id, trainingFocus, pl.rationaleMap.get((exData as any).name) || undefined),
+            comment: buildExComment(pl.muscle, (exData as any).name || (exData as any).id, pl.role, pl.resolved as DayCharacter, adjustedSets, Math.min(repMin, repsCap), Math.round(exWeight * wPct * ((exData as any)._weightMod || 1) * 10) / 10, finalRir, weakPoints, focusGroup, phase, tempoStr, exRest, isSubstituted, (exData as any).id, trainingFocus, pl.rationaleMap.get((exData as any).name) || undefined),
           executionProfile: buildExerciseInstructions({ exerciseId: (exData as any).id, exerciseName: (exData as any).name || (exData as any).id, muscle: pl.muscle, role: pl.role, phase, trainingFocus, level, tempo: tempoStr, restSeconds: exRest, orderIndex: exercises.length, totalExercises: pl.exDatas.length }),
-          warmupSets: buildWarmup(Math.round(exWeight * wPct * ((exData as any)._weightMod || 1) * 10) / 10, pl.role === 'primary' || (exData as any).type === 'compound'),
+          warmupSets: buildWarmup(
+            Math.round(exWeight * wPct * ((exData as any)._weightMod || 1) * 10) / 10,
+            pl.role === 'primary' || (exData as any).type === 'compound',
+            {
+              isBarbell: isBarbellExerciseData(exData),
+              secondCompoundSameMuscle: exercises.some(prev => prev.muscle === pl.muscle && prev.exerciseType === 'compound'),
+            },
+          ),
           rationale: pl.rationaleMap.get((exData as any).name) || '',
         });
         continue;
@@ -3344,9 +3420,16 @@ function buildSession(
         workSets, exerciseName: (exData as any).name || (exData as any).id,
         exerciseType: (exData as any).exerciseType || (exData as any).type || 'compound',
         tempoSpec: tempoStr, restSeconds: exRest,
-         comment: buildExComment(pl.muscle, (exData as any).id || (exData as any).name, pl.role, pl.resolved as DayCharacter, exSets, Math.min(repMin, repsCap), Math.round(exWeight * wPct * ((exData as any)._weightMod || 1) * 10) / 10, finalRir, weakPoints, focusGroup, phase, tempoStr, exRest, isSubstituted, (exData as any).id, trainingFocus, pl.rationaleMap.get((exData as any).name) || undefined),
+         comment: buildExComment(pl.muscle, (exData as any).name || (exData as any).id, pl.role, pl.resolved as DayCharacter, exSets, Math.min(repMin, repsCap), Math.round(exWeight * wPct * ((exData as any)._weightMod || 1) * 10) / 10, finalRir, weakPoints, focusGroup, phase, tempoStr, exRest, isSubstituted, (exData as any).id, trainingFocus, pl.rationaleMap.get((exData as any).name) || undefined),
         executionProfile: buildExerciseInstructions({ exerciseId: (exData as any).id, exerciseName: (exData as any).name || (exData as any).id, muscle: pl.muscle, role: pl.role, phase, trainingFocus, level, tempo: tempoStr, restSeconds: exRest, orderIndex: exercises.length, totalExercises: pl.exDatas.length }),
-        warmupSets: buildWarmup(Math.round(exWeight * wPct * ((exData as any)._weightMod || 1) * 10) / 10, pl.role === 'primary'),
+        warmupSets: buildWarmup(
+          Math.round(exWeight * wPct * ((exData as any)._weightMod || 1) * 10) / 10,
+          pl.role === 'primary',
+          {
+            isBarbell: isBarbellExerciseData(exData),
+            secondCompoundSameMuscle: exercises.some(prev => prev.muscle === pl.muscle && prev.exerciseType === 'compound'),
+          },
+        ),
         rationale: pl.rationaleMap.get((exData as any).name) || '',
       });
     }
@@ -3425,15 +3508,14 @@ function buildSession(
         const tm = trueMuscleOf(ex);
         if (tm === null || tm !== wp) return false;
         if (seenNamesList.has(ex.name)) return false;
+        if (excludeIds.includes(ex.id) || excludeIds.includes(ex.name)) return false;
         if (isBBJunk(ex)) return false;
       { const _t = bbExerciseTier(ex); if (_t === 4 || (!allowExotic && _t === 3)) return false; }
         const n = (ex.name || '').toLowerCase();
         if (n.includes('становая') || n.includes('жим стоя') || n.includes('армей')) return false;
-        if (equipmentList.length > 0) {
-          const rawEq = ex.equipment;
-          const exEq: string[] = Array.isArray(rawEq) ? rawEq : (rawEq ? [String(rawEq)] : []);
-          if (exEq.length > 0 && !exEq.some(eq => equipmentList.includes(eq))) return false;
-        }
+        if (avoidAxialLoad && isAxialLoadExercise(ex)) return false;
+        if (mobilityRestrictions && isMobilityRestricted(ex, mobilityRestrictions)) return false;
+        if (!equipmentAllows(equipmentList, ex.equipment)) return false;
         return true;
       });
       if (pumpPool.length === 0) continue;
@@ -3506,7 +3588,7 @@ export function buildSessionWithParams(p: BuildSessionParams): BBSession {
     p.fewerCompound, p.allowStrengthLifts, p.rotationMode, p.intensityLevel, p.legDayIndex ?? 0,
     p.skipStrictCoverage, p.abAvoidPatterns, p.abSibIndex ?? 0,
     p.packingV2 ?? false, p.isPPL ?? false, p.cooldownNames ?? [], p.mrvRotByMuscle ?? {}, p.rirEscalation ?? 0,
-    p.goal, p.volumeRegime,
+    p.goal, p.volumeRegime, p.bannedPatterns,
   );
 }
 
@@ -3514,6 +3596,48 @@ export function buildSessionWithParams(p: BuildSessionParams): BBSession {
 function todayStr(): string {
   const d = new Date();
   return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');
+}
+
+/**
+ * P0-1 (аудит 2026-11): фильтрация pedDoses по активному списку `peds` / `onCourse` / возрасту.
+ * Предотвращает утечку дефолтных UI-доз `{ AAS: 500, GH: 4, insulin: 10, MGF: 200, IGF1: 50 }`
+ * к натуралам (`peds: []`), несовершеннолетним (`age < 18`) и на одиночный стек (`peds: ['AAS']`).
+ * При `peds === undefined` (прямой вызов движка/теста с одними дозами) и не `onCourse === false`
+ * и не `age < 18` сохраняет обратную совместимость.
+ */
+export function sanitizePedDosesForInput(input: {
+  peds?: string[];
+  pedDoses?: Record<string, number>;
+  onCourse?: boolean;
+  age?: number;
+}): Record<string, number> | undefined {
+  const raw = input.pedDoses;
+  if (!raw || typeof raw !== 'object') return raw;
+  const age = Number(input.age);
+  if (Number.isFinite(age) && age > 0 && age < 18) return {};
+  if (input.onCourse === false) return {};
+  if (!Array.isArray(input.peds)) return { ...raw };
+  const activeSet = new Set(input.peds.map(p => String(p).toLowerCase().trim()).filter(Boolean));
+  if (activeSet.size === 0) {
+    if (input.onCourse !== true) return {};
+    activeSet.add('aas');
+  }
+  const hasAas = activeSet.has('aas') || [...activeSet].some(p => /test|tren|deca|nandro|bold|prim|drost|stan|oxan|methan|anadrol|masteron|turin|trena|dhb|trest|sarm|ostarine|lgd|rad140/.test(p));
+  const hasGh = activeSet.has('gh') || activeSet.has('hgh') || [...activeSet].some(p => /somatrop|ghrp|ipamorelin|sermorelin|cjc|mk677/.test(p));
+  const hasIns = activeSet.has('insulin') || activeSet.has('ins') || [...activeSet].some(p => /^ins[_-]|novorapid|humalog|lantus/.test(p));
+  const hasMgf = activeSet.has('mgf') || [...activeSet].some(p => /mgf/.test(p));
+  const hasIgf = activeSet.has('igf1') || activeSet.has('igf') || [...activeSet].some(p => /igf/.test(p));
+  const out: Record<string, number> = {};
+  for (const [k, v] of Object.entries(raw)) {
+    const kl = k.toLowerCase();
+    if (activeSet.has(kl)) { out[k] = v; continue; }
+    if ((kl === 'gh' || kl === 'hgh' || /somatrop|ghrp|ipamorelin|sermorelin|cjc/.test(kl)) && hasGh) { out[k] = v; continue; }
+    if ((kl === 'insulin' || kl === 'ins' || /^ins[_-]|novorapid|humalog|lantus/.test(kl)) && hasIns) { out[k] = v; continue; }
+    if (kl.includes('mgf') && hasMgf) { out[k] = v; continue; }
+    if (kl.includes('igf') && hasIgf) { out[k] = v; continue; }
+    if ((kl === 'aas' || /test|tren|deca|nandro|bold|prim|drost|stan|oxan|methan|anadrol|masteron|turin|trena|dhb|trest/.test(kl)) && hasAas) { out[k] = v; continue; }
+  }
+  return out;
 }
 
 /** Сдвинуть ISO-дату на N дней (fix F: per-week оценка травм). */
@@ -3569,15 +3693,20 @@ export function buildBBPlan(input: BBBuilderInput, pedAdapt?: PEDAdaptation): BB
   }
   // Never mutate the caller's object: replan/UI reuse the same input
   // reference, and workMax numeric clamps used to delete caller keys.
+  const sanitizedPedDoses = sanitizePedDosesForInput(input);
+  const isMinorInput = Number.isFinite(Number(input.age)) && Number(input.age) > 0 && Number(input.age) < 18;
   input = {
     ...input,
     weeks: safeWeeks,
     workMax: input.workMax ? { ...input.workMax } : undefined,
     equipment: input.equipment ? [...input.equipment] : input.equipment,
     injuries: input.injuries ? [...input.injuries] : input.injuries,
-    pedDoses: input.pedDoses ? { ...input.pedDoses } : input.pedDoses,
+    peds: isMinorInput ? [] : (input.peds ? [...input.peds] : input.peds),
+    onCourse: isMinorInput ? false : input.onCourse,
+    pedDoses: sanitizedPedDoses,
     autoRegResult: input.autoRegResult ? { ...input.autoRegResult } : input.autoRegResult,
   };
+  if (isMinorInput) pedAdapt = undefined;
   // Числовые гарды — защита от NaN/экстремалей без сдвига капов (только clamp + warn)
   const numWarn = (name: string, v: any, min: number, max: number) => {
     if (v == null) return;
@@ -3703,7 +3832,21 @@ export function buildBBPlan(input: BBBuilderInput, pedAdapt?: PEDAdaptation): BB
   const sessions = sessionsOf(pattern);
   const injuries = input.injuries || [];
   const favIds = input.favoriteExercises || [];
-  const exclIds = input.excludedExercises || [];
+  const exclIdsBase = input.excludedExercises || [];
+  // P0-19: bannedPatterns ступени возврата транслируются в exclIds, чтобы ВСЕ проходы
+  // (buildExercisePool, авто-добивки, finalizeBBPlan, repairAdaptiveSafety) соблюдали запрет.
+  const bannedNeedles = (input.bannedPatterns || []).map(b => String(b || '').toLowerCase().trim()).filter(Boolean);
+  const exclIds = bannedNeedles.length > 0
+    ? Array.from(new Set([
+        ...exclIdsBase,
+        ...EXERCISE_CATALOG
+          .filter((ex: any) => {
+            const hay = `${ex.id || ''} ${ex.name || ''} ${ex.movementPattern || ''}`.toLowerCase();
+            return bannedNeedles.some(n => hay.includes(n));
+          })
+          .flatMap((ex: any) => [ex.id, ex.name].filter(Boolean)),
+      ]))
+    : exclIdsBase;
   const avAxial = input.avoidAxialLoad || false;
   const eqList = normalizeEquipmentIds(input.equipment || []);
   const backProfile = backVolumeProfile(level, input.trainingYears);
@@ -3723,11 +3866,14 @@ export function buildBBPlan(input: BBBuilderInput, pedAdapt?: PEDAdaptation): BB
       input.peds == null && input.pedDoses == null && pedAdapt?.activePEDs?.length ? true : undefined
     ),
   });
-  // Фаза off: явный `onCourse:false` — это натурал, включая PED-механизмы
-  // (minSetsArms, budgetCap 0.70, pedArmBoost). Иначе остатки адаптации
-  // добавляли 3 сета к натуральному плану и «off» не был натуралом.
-  if (volumeRegime === 'natural' && input.onCourse === false) pedAdapt = undefined;
-  const onCourse = volumeRegime === 'course';
+  // Фаза off / pct: явный `onCourse:false` или фаза ПКТ — натуральный режим (без PED-механизмов).
+  const isPctPhase = input.pedPhase === 'pct';
+  const isCruisePhase = input.pedPhase === 'cruise';
+  if ((volumeRegime === 'natural' && input.onCourse === false) || isPctPhase) pedAdapt = undefined;
+  const onCourse = !isPctPhase && volumeRegime === 'course';
+  // Blast/Cruise запрещён для натуралов и несовершеннолетних (<18).
+  const isMinorAge = Number(input.age) > 0 && Number(input.age) < 18;
+  const effBlastCruise = !!input.blastCruiseEnabled && (onCourse || level === 'enhanced') && !isMinorAge && !isPctPhase;
   // Решение владельца 2026-11: ЖЕНСКАЯ glute-специализация (18–20 ПРЯМЫХ на
   // пике) получает scoped-кап 24 вместо глобального якоря 18. Только advanced/
   // enhanced и только glute-шаблоны — мужские планы и обычные сплиты не растут.
@@ -3754,25 +3900,30 @@ export function buildBBPlan(input: BBBuilderInput, pedAdapt?: PEDAdaptation): BB
       // Аудит 2026-11: возраст объявлен и учитывается (−8 при 45+), но не передавался.
       age: input.age,
     });
-  // Фаза 4.28: ручной оверрайд множителя восстановления из визарда.
-  const recoveryMultOverride = Number.isFinite(input.recoveryMultOverride) ? Math.max(0.6, Math.min(1.5, input.recoveryMultOverride as number)) : 1;
+  // Фаза 4.28: ручной оверрайд множителя восстановления из визарда (+ фаза ПКТ/круиза).
+  const baseRecOverride = Number.isFinite(input.recoveryMultOverride) ? Math.max(0.6, Math.min(1.5, input.recoveryMultOverride as number)) : 1;
+  const recoveryMultOverride = isPctPhase ? Math.min(baseRecOverride, 0.8) : isCruisePhase ? Math.min(baseRecOverride, 0.85) : baseRecOverride;
   // P0-7 (аудит 2026-09): это ОЦЕНКА для rationale/отображения, а не кап —
   // реальные потолки: per-muscle mrvByMuscle + sessionLimitsFor (ниже).
   // Имя переименовано, чтобы не читалось как жёсткий бюджет.
   const weeklyBudgetEstimate = Math.round(computeBBWeeklyBudget({
-    volumeRegime,
-    peds: input.peds,
-    pedDoses: input.pedDoses,
+    volumeRegime: isPctPhase ? 'natural' : volumeRegime,
+    peds: isPctPhase ? [] : input.peds,
+    pedDoses: isPctPhase ? undefined : input.pedDoses,
     courseIntensity: pedAdapt?.courseIntensity || input.courseIntensity,
+    doseAwareMrv: pedAdapt?.combinedMrvMultiplier,
+    sex: input.sex,
     recoveryScore,
     calorieSurplus: input.calorieSurplus, proteinPerKg: input.proteinPerKg,
     labMrvMultiplier: input.labMrvMultiplier,
   }) * recoveryMultOverride);
   const sessLimits = sessionLimitsFor({
-    volumeRegime,
-    peds: input.peds,
-    pedDoses: input.pedDoses,
+    volumeRegime: isPctPhase ? 'natural' : volumeRegime,
+    peds: isPctPhase ? [] : input.peds,
+    pedDoses: isPctPhase ? undefined : input.pedDoses,
     courseIntensity: pedAdapt?.courseIntensity || input.courseIntensity,
+    doseAwareMrv: pedAdapt?.combinedMrvMultiplier,
+    sex: input.sex,
     recoveryScore,
     calorieSurplus: input.calorieSurplus, proteinPerKg: input.proteinPerKg,
     labMrvMultiplier: input.labMrvMultiplier,
@@ -3813,19 +3964,18 @@ export function buildBBPlan(input: BBBuilderInput, pedAdapt?: PEDAdaptation): BB
   const muscleVolumeRotation: Record<string, number> = {};
   const mrvByMuscle: Record<string, number> = {};
   const volumeTargets: Record<string, BBVolumeTarget> = {};
-  // Recovery/nutrition — единый источник из bb-volume.engine (fix F1: убираем дубли)
+  // Recovery/nutrition — единый источник из bb-volume.engine (fix F1 + P1-11: без двойного
+  // умножения wearableRecoveryFactor — mergeWearableIntoRecovery уже влил HRV и сон).
   const wearableMerged = mergeWearableIntoRecovery({ hrvMs: input.hrvMs, sleepHours: input.sleepHours, stressLevel: input.stressLevel }, input.wearable ?? null);
     const recoveryMult = computeBBRecoveryMultiplier({
       bodyFat: input.bodyFat,
       leanMass: input.leanMass,
       hrvMs: wearableMerged.hrvMs,
-      // 26.09.2026 (аудит): личная HRV-база/Z доезжает до MRV-множителя (была объявлена,
-      // но не передавалась — HRV-сигнал всегда брался из store he_hrv_log).
       hrvBaseline: input.hrvBaseline,
       hrvBaselineZ: input.hrvBaselineZ,
       sleepHours: wearableMerged.sleepHours,
       stressLevel: wearableMerged.stressLevel,
-    }) * cycleVolumeFactor(input.cycleDay, input.cycleLength, input.sex) * wearableRecoveryFactor(input.wearable ?? null);
+    }) * cycleVolumeFactor(input.cycleDay, input.cycleLength, input.sex);
   const nutritionMult = computeBBNutritionMultiplier({
     calorieSurplus: input.calorieSurplus,
     proteinPerKg: input.proteinPerKg,
@@ -3873,6 +4023,10 @@ export function buildBBPlan(input: BBBuilderInput, pedAdapt?: PEDAdaptation): BB
     // сколько целевого объёма иметь смысл, не ослабляя гарантий/минимумов.
     const ageMult = mastersMrvMult(input.age);
     if (ageMult < 1) v = Math.max(1, Math.round(v * ageMult));
+    // P1-4: применяем recoveryMult * nutritionMult к целевому объёму (при дефолтах = 1.0 байт-в-байт).
+    if (Math.abs(recoveryMult * nutritionMult - 1) > 1e-4) {
+      v = Math.max(2, Math.round(v * recoveryMult * nutritionMult));
+    }
     return v;
   };
   // Базовый целевой объём мышцы для резолвера (спец-блок или баланс).
@@ -4155,9 +4309,9 @@ export function buildBBPlan(input: BBBuilderInput, pedAdapt?: PEDAdaptation): BB
       const wave = getVolumeWaveFactor(phaseWeek, phase);
       if (Number.isFinite(wave) && wave > 0) baseWeekVolumeMult = baseWeekVolumeMult * wave;
     }
-    // Blast/Cruise: 8н blast ×1.15 / 4н cruise ×0.85 (повторяется), только при вкл.
+    // Blast/Cruise: 8н blast ×1.15 / 4н cruise ×0.85 (повторяется), только на курсе.
     let blastMult = 1;
-    if (input.blastCruiseEnabled) {
+    if (effBlastCruise) {
       const blast = Math.max(1, Math.min(12, input.blastWeeks ?? 8));
       const cruise = Math.max(1, Math.min(12, input.cruiseWeeks ?? 4));
       const cycle = blast + cruise;
@@ -4273,7 +4427,7 @@ export function buildBBPlan(input: BBBuilderInput, pedAdapt?: PEDAdaptation): BB
         // (финализатор копирует сессии поверхностно, поле переживает).
         // Без флага — undefined, legacy 1-в-1 байт-в-байт.
         const abAvoid = input.abPatternRotation ? abDominantPattern(abWeekPatterns.get(s.sessionTag || '')) : undefined;
-        const sess = buildSessionWithParams({ sched: s, dayInRotation: i + 1, legDayIndex, week: w, muscleVolumeRotation: scaledVolumeRotation, muscleSessionCount, musclePrimaryAssigned, workMax, weakPoints: weekSpec.weak, focusGroup: weekSpec.focus || undefined, pedAdapt, dailyCap: sessDailyCap, level, injuryProfile: weekInjuryProfile, injuredMuscles: new Set(weekInjuryProfile), excludedMuscles: weekExcluded, gradedInjuries: weekGraded, today: weekDate, phase, phaseWeek, mrvRotByMuscle, preSelectedIds: isFB ? fbUsedIds : [], preSelectedNames: [...(isFB ? fbUsedNames : []), ...rotationNames], rotationBlockIds: rotationIds, favoriteIds: favIds, excludeIds: exclIds, avoidAxialLoad: avAxial, equipmentList: eqList, methodology: input.methodology, isFemale: input.sex === 'female', intensityTechnique: undefined, autoDeload: undefined, loadStrategy: undefined, autoRegResult: undefined, pedDoses: input.pedDoses, labMrvMultiplier: input.labMrvMultiplier, courseIntensity: input.courseIntensity, onCourse, sex: input.sex, weekLocalUsed, primaryBySlot, trainingFocus: input.trainingFocus, eccentricMult: input.eccentricMult, mobilityRestrictions: input.mobilityRestrictions, trainingYears: input.trainingYears, bodyweightCapability: input.bodyweightCapability, fewerCompound: input.fewerCompound, allowStrengthLifts: input.allowStrengthLifts, rotationMode: input.rotationMode, intensityLevel: input.intensityLevel, skipStrictCoverage: !!mesoProgression, specialization: specRes.active, abAvoidPatterns: abAvoid, abSibIndex, packingV2: input.packingV2, isPPL: String((pattern as any)?.id || '').toLowerCase().includes('ppl'), cooldownNames, rirEscalation: mesoProgression?.rirEscalation ?? 0, goal: input.goal, volumeRegime });
+        const sess = buildSessionWithParams({ sched: s, dayInRotation: i + 1, legDayIndex, week: w, muscleVolumeRotation: scaledVolumeRotation, muscleSessionCount, musclePrimaryAssigned, workMax, weakPoints: weekSpec.weak, focusGroup: weekSpec.focus || undefined, pedAdapt, dailyCap: sessDailyCap, level, injuryProfile: weekInjuryProfile, injuredMuscles: new Set(weekInjuryProfile), excludedMuscles: weekExcluded, gradedInjuries: weekGraded, today: weekDate, phase, phaseWeek, mrvRotByMuscle, preSelectedIds: isFB ? fbUsedIds : [], preSelectedNames: [...(isFB ? fbUsedNames : []), ...rotationNames], rotationBlockIds: rotationIds, favoriteIds: favIds, excludeIds: exclIds, avoidAxialLoad: avAxial, equipmentList: eqList, methodology: input.methodology, isFemale: input.sex === 'female', intensityTechnique: undefined, autoDeload: undefined, loadStrategy: undefined, autoRegResult: undefined, pedDoses: input.pedDoses, labMrvMultiplier: input.labMrvMultiplier, courseIntensity: input.courseIntensity, onCourse, sex: input.sex, weekLocalUsed, primaryBySlot, trainingFocus: input.trainingFocus, eccentricMult: input.eccentricMult, mobilityRestrictions: input.mobilityRestrictions, trainingYears: input.trainingYears, bodyweightCapability: input.bodyweightCapability, fewerCompound: input.fewerCompound, allowStrengthLifts: input.allowStrengthLifts, rotationMode: input.rotationMode, intensityLevel: input.intensityLevel, skipStrictCoverage: !!mesoProgression, specialization: specRes.active, abAvoidPatterns: abAvoid, abSibIndex, packingV2: input.packingV2, isPPL: String((pattern as any)?.id || '').toLowerCase().includes('ppl'), cooldownNames, rirEscalation: mesoProgression?.rirEscalation ?? 0, goal: input.goal, volumeRegime, bannedPatterns: input.bannedPatterns });
       sess.weekOffset = (w - 1) * pattern.rotationDays + (i + 1);
       if (abAvoid && abAvoid.length > 0) (sess as any).abAvoidPatterns = [...abAvoid];
       // A/B-ротация: фиксируем паттерны сессии для sibling-сессий того же тега.
@@ -4699,7 +4853,7 @@ export function buildBBPlan(input: BBBuilderInput, pedAdapt?: PEDAdaptation): BB
     return parseFloat(String(v).replace(',', '.').replace(/[^0-9.]/g, '')) || 0;
   };
   const pedsForMethEarly: any[] = pedAdapt?.activePEDs || (onCourse ? (Object.keys(input.pedDoses || {}).filter(k => parseMethDoseEarly((input.pedDoses as any)[k]) > 0) as any) : []);
-  const hasAnyPedInput = pedsForMethEarly.length > 0 || (input.pedDoses && Object.keys(input.pedDoses).length > 0);
+  const hasAnyPedInput = pedsForMethEarly.length > 0 || (!!input.pedDoses && Object.values(input.pedDoses).some(v => parseMethDoseEarly(v) > 0));
   // Волна-3.3: реальная фаза плана для rep-схем (было жёстко 'accumulation' —
   // dc_rp/cluster были недостижимы). Планы без intensification/peaking → accumulation.
   const schemePhase: BBPhase = phaseDist.some(pd => pd.phase === 'peaking') ? 'peaking'
@@ -4746,7 +4900,11 @@ export function buildBBPlan(input: BBBuilderInput, pedAdapt?: PEDAdaptation): BB
     effIntensityTechnique = 'none';
     schemeDowngradeNotes.push('⛔ Соло-инсулин: rest-pause (DC) отключён — отказные техники без анаболической базы запрещены. Техника: выкл.');
   }
-  const fst7Seven = effVolumeScheme === 'fst7' && level === 'enhanced' && !methForGates?.jointGuard && !soloInsulinGate;
+  if ((isPctPhase || isCruisePhase) && effIntensityTechnique && effIntensityTechnique !== 'none') {
+    effIntensityTechnique = 'none';
+    schemeDowngradeNotes.push(`🛡️ Фаза ${isPctPhase ? 'ПКТ' : 'Круиз'}: отказные техники отключены для защиты ЦНС и восстановления.`);
+  }
+  const fst7Seven = effVolumeScheme === 'fst7' && level === 'enhanced' && !methForGates?.jointGuard && !soloInsulinGate && !isPctPhase && !isCruisePhase;
   // Волна-3.12: VBT в генерацию — потеря скорости режет объём/RIR (см. input.vbt).
   let vbtRec: ReturnType<typeof bbVbtRecommendation> | null = null;
   let vbtReg: { volumeMultiplier: number; topSetPctMultiplier: number; rirShift: number } | null = null;
@@ -4830,7 +4988,7 @@ export function buildBBPlan(input: BBBuilderInput, pedAdapt?: PEDAdaptation): BB
   // Cross-day weakPoints compensation: если слабая группа получает < MEV за неделю (потому что
   // не входит ни в один дневной тег), добавить feeder-сет в ближайший релевантный день.
   finalPlan = (weakPoints.length > 0 || allSpecTargets.length > 0)
-    ? compensateCrossDayWeakPoints(finalPlan, [...new Set([...weakPoints, ...allSpecTargets])], level, workMax, eqList, effectiveMrvMult, avAxial, phaseByWeek)
+    ? compensateCrossDayWeakPoints(finalPlan, [...new Set([...weakPoints, ...allSpecTargets])], level, workMax, eqList, effectiveMrvMult, avAxial, phaseByWeek, exclIds, input.mobilityRestrictions)
     : finalPlan;
   // Final re-sort: compensateCrossDayWeakPoints may have added feeders that break grouping
   for (const w of finalPlan.weeks) {
@@ -5573,9 +5731,11 @@ export function buildBBPlan(input: BBBuilderInput, pedAdapt?: PEDAdaptation): BB
       weakPoints,
       focusGroup,
       bfrMode: input.bfrMode,
-      blastCruiseEnabled: input.blastCruiseEnabled,
+      blastCruiseEnabled: effBlastCruise || undefined,
       blastWeeks: input.blastWeeks,
       cruiseWeeks: input.cruiseWeeks,
+      pedPhase: input.pedPhase,
+      estradiolPgMl: input.estradiolPgMl,
       // P0 replan-контракт: без этих полей пересборка остатка теряла пол,
       // фарм-дозы, техники, авторегуляцию и стартовую неделю.
       sex: input.sex,
@@ -5596,6 +5756,24 @@ export function buildBBPlan(input: BBBuilderInput, pedAdapt?: PEDAdaptation): BB
       bodyweightCapability: input.bodyweightCapability,
       availablePlates: input.availablePlates,
       planStartWeek: input.planStartWeek,
+      // P0-16: полная сохранность параметров для replanBBMesoFromFact
+      specialization: input.specialization,
+      specializationSchedule: input.specializationSchedule,
+      dcMode: input.dcMode,
+      pedPhaseOverride: input.pedPhaseOverride,
+      abPatternRotation: input.abPatternRotation,
+      packingV2: input.packingV2,
+      allowStrengthLifts: input.allowStrengthLifts,
+      recoveryMultOverride: input.recoveryMultOverride,
+      targetBodyFat: input.targetBodyFat,
+      wearable: input.wearable,
+      vbt: input.vbt,
+      deloadReadiness: input.deloadReadiness,
+      mevCalibration: input.mevCalibration,
+      cooldownHistory: input.cooldownHistory,
+      labWarnings: input.labWarnings,
+      labIntensityNote: input.labIntensityNote,
+      bannedPatterns: input.bannedPatterns,
     },
     // Аудит 2026-10: generic-путь НЕ писал planStartWeek на уровень плана, хотя
     // его читают bb-plan-fact (план vs факт), bb-visual (диапазоны недель) и
@@ -5891,9 +6069,53 @@ export function buildBBPlan(input: BBBuilderInput, pedAdapt?: PEDAdaptation): BB
     }
     if (bfrApplied > 0) finalized.rationale.push(`🩸 BFR-режим: ${bfrApplied} памп-изоляций переведены в 30-15-15-15 @25% (тяж дни без изменений)`);
   }
-  if (input.blastCruiseEnabled) {
-    const bw = input.blastWeeks ?? 8, cw = input.cruiseWeeks ?? 4;
-    finalized.rationale.push(`🔄 Blast/Cruise: ${bw}н ×1.15 (blast) / ${cw}н ×0.85 (cruise), повторяется — объём волнами, тяж/памп сохранены`);
+  if (effBlastCruise) {
+    const bw = Math.max(1, Math.min(12, input.blastWeeks ?? 8));
+    const cw = Math.max(1, Math.min(12, input.cruiseWeeks ?? 4));
+    const cycle = bw + cw;
+    // Круиз-недели получают RIR +1 (соответствует обещанию UI: «Cruise — −15% и RIR +1»).
+    for (let wi = 0; wi < finalized.weeks.length; wi++) {
+      const wk = finalized.weeks[wi];
+      if ((wk as any).phase === 'deload' || (wk as any).deload) continue;
+      if ((wi % cycle) >= bw) {
+        (wk as any).cruiseWeek = true;
+        for (const ses of wk.sessions) {
+          for (const ex of ses.exercises) {
+            if ((ex as any).warmupActivator) continue;
+            ex.rir = Math.min(5, (Number(ex.rir) || 2) + 1);
+            if (Array.isArray(ex.workSets)) {
+              ex.workSets = ex.workSets.map(ws => ({ ...ws, rir: Math.min(5, (Number(ws.rir) || 2) + 1) }));
+            }
+          }
+        }
+      }
+    }
+    finalized.rationale.push(`🔄 Blast/Cruise: ${bw}н ×1.15 (blast) / ${cw}н ×0.85 + RIR+1 (cruise), повторяется — объём волнами, тяж/памп сохранены`);
+  }
+  if (isPctPhase || isCruisePhase) {
+    for (const wk of finalized.weeks) {
+      if ((wk as any).phase === 'deload' || (wk as any).deload) continue;
+      if ((wk as any).cruiseWeek) continue; // уже сдвинут выше
+      for (const ses of wk.sessions) {
+        for (const ex of ses.exercises) {
+          if ((ex as any).warmupActivator) continue;
+          ex.rir = Math.min(5, (Number(ex.rir) || 2) + 1);
+          if (Array.isArray(ex.workSets)) {
+            ex.workSets = ex.workSets.map(ws => ({ ...ws, rir: Math.min(5, (Number(ws.rir) || 2) + 1) }));
+          }
+        }
+      }
+    }
+    finalized.rationale.push(
+      isPctPhase
+        ? '🛡️ Фаза ПКТ: андрогены неактивны — объём/восстановление ×0.80, RIR +1, без отказных техник.'
+        : '🛡️ Фаза Круиз: объём ×0.85, RIR +1, умеренный стресс ЦНС и суставов.',
+    );
+  }
+  if (input.sex === 'female' && !isPctPhase && (input.peds?.length || Object.keys(input.pedDoses || {}).length)) {
+    const fSafety = assessFemalePedSafety({ sex: input.sex, peds: input.peds, pedDoses: input.pedDoses });
+    if (fSafety.warnings.length > 0) finalized.rationale.push(...fSafety.warnings);
+    if (fSafety.redFlags.length > 0) finalized.rationale.push(...fSafety.redFlags);
   }
 
   // Слабые группы: +1 упражнение (3-4 сета) на отстающий вид, БЕЗ учёта капа (optional ⚡).
@@ -6060,21 +6282,21 @@ export function buildBBPlan(input: BBBuilderInput, pedAdapt?: PEDAdaptation): BB
   // D-1b: комментарий схемы синхронизируется с фактическим числом сетов после
   // ВСЕХ урезающих проходов (рампа, MRV, реализм). Иначе «FST-7 (7×8-12)» в
   // комментарии и 4 сета в плане расходятся прямо в одном упражнении.
-  {
-    const trimmed = reconcileSchemeComments(finalized);
-    if (trimmed.fixed > 0) {
-      const notes: string[] = [];
-      const fst7n = trimmed.byLabel[REP_SCHEMES.fst7.nameRu] || 0;
-      if (fst7n > 0) {
-        notes.push(`🎛 FST-7: финишер урезан бюджетом недели у ${fst7n} упр. (вместо 7 сетов — меньше). Схема не применяется поверх MRV: для полных 7 нужен памп-день или меньше объёма в других мышцах.`);
-      }
-      for (const [label, n] of Object.entries(trimmed.byLabel)) {
-        if (label === REP_SCHEMES.fst7.nameRu) continue;
-        notes.push(`🎛 ${label}: у ${n} упр. сетов меньше, чем обещает схема (бюджет недели/MRV) — цифра в комментарии исправлена на фактическую.`);
-      }
-      for (const note of notes) if (!finalized.rationale.includes(note)) finalized.rationale.push(note);
+  const pushSchemeTrimNotes = (plan: BBPlan) => {
+    const trimmed = reconcileSchemeComments(plan);
+    if (trimmed.fixed <= 0) return;
+    const notes: string[] = [];
+    const fst7n = trimmed.byLabel[REP_SCHEMES.fst7.nameRu] || 0;
+    if (fst7n > 0) {
+      notes.push(`🎛 FST-7: финишер урезан бюджетом недели у ${fst7n} упр. (вместо 7 сетов — меньше). Схема не применяется поверх MRV: для полных 7 нужен памп-день или меньше объёма в других мышцах.`);
     }
-  }
+    for (const [label, n] of Object.entries(trimmed.byLabel)) {
+      if (label === REP_SCHEMES.fst7.nameRu) continue;
+      notes.push(`🎛 ${label}: у ${n} упр. сетов меньше, чем обещает схема (бюджет недели/MRV) — цифра в комментарии исправлена на фактическую.`);
+    }
+    for (const note of notes) if (!plan.rationale.includes(note)) plan.rationale.push(note);
+  };
+  pushSchemeTrimNotes(finalized);
   syncBBPlanSetShape(finalized);
   // Поздняя нормализация задних дельт: метки/сводка финального плана должны
   // видеть rear-delt как плечо, но объёмные проходы выше — нет (иначе
@@ -6090,7 +6312,19 @@ export function buildBBPlan(input: BBBuilderInput, pedAdapt?: PEDAdaptation): BB
     sex: input.sex,
     trainingYears: input.trainingYears,
     onCourse,
+    volumeRegime,
+    peds: isPctPhase ? [] : input.peds,
+    pedDoses: isPctPhase ? undefined : input.pedDoses,
+    courseIntensity: (input as any).courseIntensity,
+    doseAwareMrv: pedAdapt?.combinedMrvMultiplier,
+    trainingVolumeMode: input.trainingVolumeMode,
+    maxWorkingSets: sessLimits.maxWorkingSets,
+    maxExercises: sessLimits.maxExercises,
     equipment: eqList,
+    excludedExercises: exclIds,
+    avoidAxialLoad: avAxial,
+    mobilityRestrictions: input.mobilityRestrictions,
+    bodyweightCapability: input.bodyweightCapability,
     excludedMuscles: [...excludedMuscles],
     gradedMuscles: [...new Set(gradedInjuries.map(inj => inj.muscle))],
   } as any;
@@ -6143,9 +6377,37 @@ export function buildBBPlan(input: BBBuilderInput, pedAdapt?: PEDAdaptation): BB
   // кламп — здесь, ДО снимка/сверки целей, чтобы weeklyVolume и validation
   // описывали уже очищенный план (иначе glutes 14 > 12×1.15 у новичка).
   enforceFinalEffectiveMrv(finalized);
+  // FullBody и high-tier курсовые сессии (cap ≥ 52): поздние добивки
+  // (fill optional + ensureBodybuildingMinimums) не должны выводить суммарное
+  // число рабочих подходов за канонический потолок сессии (sessLimits.maxWorkingSets).
+  if (sessLimits.maxWorkingSets > 0 && (/fullbody/i.test(String(pattern?.id || '')) || sessLimits.maxWorkingSets >= 52)) {
+    const cap = sessLimits.maxWorkingSets;
+    for (const w of finalized.weeks as any[]) {
+      if (w.phase === 'deload' || w.deload) continue;
+      for (const s of w.sessions || []) {
+        const working = (s.exercises || []).filter((e: any) => !e.warmupActivator);
+        let sum = working.reduce((a: number, e: any) => a + (e.sets || 0), 0);
+        if (sum <= cap) continue;
+        const isProtectedScheme = (e: any) => Number(e.schemeAssignedSets) > 0 || /FST-?7|GVT|Gironda/i.test(String(e.comment || ''));
+        const order = [
+          ...working.filter((e: any) => (e as any).optional).sort((a: any, b: any) => (b.sets || 0) - (a.sets || 0)),
+          ...working.filter((e: any) => !(e as any).optional && e.role === 'accessory' && !isProtectedScheme(e)).sort((a: any, b: any) => (b.sets || 0) - (a.sets || 0)),
+          ...working.filter((e: any) => !(e as any).optional && e.role === 'primary' && !isProtectedScheme(e)).sort((a: any, b: any) => (b.sets || 0) - (a.sets || 0)),
+        ];
+        for (const e of order) {
+          if (sum <= cap) break;
+          while (sum > cap && (e.sets || 0) > 2) {
+            e.sets -= 1;
+            if (Array.isArray(e.workSets) && e.workSets.length > e.sets) e.workSets = e.workSets.slice(0, e.sets);
+            sum -= 1;
+          }
+        }
+      }
+    }
+  }
   syncBBPlanSetShape(finalized);
-  // Добивки могли затронуть упражнения со схемами — комментарий снова к факту.
-  reconcileSchemeComments(finalized);
+  // Добивки могли затронуть упражнения со схемами — комментарий снова к факту (и rationale синхронизирован).
+  pushSchemeTrimNotes(finalized);
   // Финальная честная реконсиляция: после ВСЕХ режущих проходов (рампа,
   // синхронизация схем, женские добивки) цель не должна оставаться выше
   // достижимого пика — иначе path-adequacy видит 26.25 < 90% цели 30.
@@ -6170,6 +6432,11 @@ export function buildBBPlan(input: BBBuilderInput, pedAdapt?: PEDAdaptation): BB
     });
     finalized.weeks = dupPlan.weeks;
     finalized.rationale = dupPlan.rationale;
+  }
+  // P1-1: финальное округление весов по доступным блинам ПОСЛЕ всех весовых проходов
+  // (rehab/схемы/BFR/pre_exhaust/DUP); гриф 20 кг применяется только к штанговым упражнениям.
+  if (input.availablePlates && input.availablePlates.length > 0) {
+    applyPlateRoundingToPlan(finalized, input.availablePlates, 20);
   }
   // M/L/K: финальный снимок ФАКТА — одной точкой (bb-plan-snapshot.engine).
   // `finalizeBBPlan` снимает weeklyVolume/validation/balanceReport/report в конце
@@ -6242,6 +6509,8 @@ function compensateCrossDayWeakPoints(
   pedMrvMult: number,
   avAxial: boolean = false,
   phaseByWeek?: Map<number, BBPhase>,
+  excludeIds: string[] = [],
+  mobilityRestrictions?: string[],
 ): BBPlan {
   if (!plan.weeks || plan.weeks.length === 0) return plan;
   // Аудит Sep 2026: было `{ week, sessions }` — phase/deload терялись, все weak-планы
@@ -6309,15 +6578,18 @@ function compensateCrossDayWeakPoints(
       if (!bestSlot) continue;
 
       // Выбрать feeder-упражнение: изоляция на wp, не rear-delt в push, не junk
+      const normEqFeeder = normalizeEquipmentIds(equipment || []);
       const feederPool = (EXERCISE_CATALOG as any[]).filter((e: any) => {
         const raw = e.group;
         const mg = collapseKey(trueMuscleOf(e) || raw);
         if (raw !== wp && mg !== wp) return false;
         if (e.exerciseType !== 'isolation' && e.type !== 'isolation') return false;
+        if (excludeIds.includes(e.id) || excludeIds.includes(e.name)) return false;
         if (isBBJunk(e)) return false;
         if (isInappropriateBB(e)) return false;
-        if (equipment?.length && e.equipment && !equipment.includes(e.equipment)) return false;
+        if (normEqFeeder.length > 0 && !equipmentAllows(normEqFeeder, e.equipment)) return false;
         if (avAxial && isAxialLoadExercise(e as any)) return false;
+        if (mobilityRestrictions && isMobilityRestricted(e, mobilityRestrictions)) return false;
         if (isRearDeltExercise(e.name) && (bestSlot.session.sessionTag || '').toLowerCase().includes('push')) return false;
         return true;
       });

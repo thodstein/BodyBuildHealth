@@ -14,12 +14,21 @@ export interface JointGuardInput {
   hasInsulin?: boolean;
   labMrvMultiplier?: number;
   mobilityRestrictions?: string[];
+  peds?: string[];
+  pedDoses?: Record<string, number>;
+  /** Эстрадиол (пг/мл) из анализов: <15 пг/мл («высушенные суставы» от ИА/станозолола) включает защиту сухожилий. */
+  estradiolPgMl?: number;
 }
 
 export function jointGuardActive(input: JointGuardInput): boolean {
   if (input.hasGH && (input.ghDose ?? 0) >= 4) return true;
   if (input.hasGH && input.hasAAS && (input.ghDose ?? 0) >= 2 && (input.aasDose ?? 0) >= 500) return true;
   if ((input.labMrvMultiplier ?? 1) < 0.65) return true;
+  const stanRe = /winstrol|stan|stanozolol|станозолол|винстрол/i;
+  const hasStanozolol = (input.peds || []).some((p) => stanRe.test(String(p)))
+    || Object.entries(input.pedDoses || {}).some(([k, v]) => (Number(v) || 0) > 0 && stanRe.test(k));
+  if (hasStanozolol) return true;
+  if (input.estradiolPgMl != null && Number.isFinite(input.estradiolPgMl) && input.estradiolPgMl < 15) return true;
   return false;
 }
 

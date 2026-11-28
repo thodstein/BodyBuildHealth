@@ -90,12 +90,12 @@ export function applyRehabToPlan(plan: RehabPlanLike, injuredMuscles: string[], 
         const newCount = Math.max(1, Math.round(ex.workSets.length * phase.volumePct));
         ex.workSets = ex.workSets.slice(0, newCount).map(st => ({
           ...st,
-          weight: Number(st.weight ?? 0) * phase.weightPct,
-          rir: (Number(st.rir ?? 2)) + phase.rirShift,
+          weight: Math.round(Number(st.weight ?? 0) * phase.weightPct * 2) / 2,
+          rir: Math.min(5, Math.round(((Number(st.rir ?? 2)) + phase.rirShift) * 10) / 10),
         }));
         ex.sets = newCount;
       }
-      if (typeof ex.rir === 'number') ex.rir = ex.rir + phase.rirShift;
+      if (typeof ex.rir === 'number') ex.rir = Math.min(5, Math.round((ex.rir + phase.rirShift) * 10) / 10);
       if (!changes.includes(ex.muscle as string)) {
         changes.push(`🩹 rehab «${ex.muscle}» нед ${wk.week}: объём ×${Math.round(phase.volumePct * 100)}%, вес ×${Math.round(phase.weightPct * 100)}%, RIR+${phase.rirShift}`);
       }
