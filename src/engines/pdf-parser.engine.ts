@@ -1335,6 +1335,92 @@ export async function ocrScannedPdf(fileOrBuffer: File | ArrayBuffer): Promise<s
   }
 }
 
+/** File.arrayBuffer() есть не во всех старых WebView — FileReader как fallback. */
+async function readPdfArrayBuffer(file: File): Promise<ArrayBuffer> {
+  if (typeof file.arrayBuffer === 'function') {
+    try {
+      return await file.arrayBuffer();
+    } catch {
+      /* fallback ниже */
+    }
+  }
+  return await new Promise<ArrayBuffer>((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(reader.result as ArrayBuffer);
+    reader.onerror = () => reject(new Error('Не удалось прочитать PDF в память.'));
+    reader.readAsArrayBuffer(file);
+  });
+}
+
+export interface RenderPdfPagesOptions {
+  /** Сколько первых страниц отрисовать. Больше 4 обычно не нужно: AI-проверка не заменяет OCR. */
+  maxPages?: number;
+  /** Длинная сторона JPEG в пикселях; тот же порядок, что у лаб-фото. */
+  maxSide?: number;
+  /** JPEG quality для vision-запроса. */
+  quality?: number;
+}
+
+/**
+ * Отрисовать страницы PDF в JPEG для AI-проверки (purpose='lab').
+ *
+ * Это не OCR и не парсер: функция нужна, чтобы PDF можно было отправить в
+ * тот же vision-эндпоинт, что и фото. Текст PDF при этом уже разобран
+ * основным путём; AI получает картинку только как второе мнение.
+ */
+export async function renderPdfPagesForVision(
+  file: File,
+  opts: RenderPdfPagesOptions = {},
+): Promise<File[]> {
+  installWebViewPolyfills();
+  const pdfjsLib: any = await import('pdfjs-dist/legacy/build/pdf.mjs');
+  await setupPdfjs(pdfjsLib);
+  const arrayBuffer = await readPdfArrayBuffer(file);
+  const pdf = await openPdfDocument(pdfjsLib, arrayBuffer);
+  const maxPages = Math.min(pdf.numPages, Math.max(1, opts.maxPages ?? 3));
+  const maxSide = opts.maxSide ?? 1800;
+  const quality = opts.quality ?? 0.9;
+  const pages: File[] = [];
+  try {
+    for (let pageNumber = 1; pageNumber <= maxPages; pageNumber++) {
+      const page = await pdf.getPage(pageNumber);
+      const base = page.getViewport({ scale: 1 });
+      const scale = Math.min(2.5, maxSide / Math.max(1, base.width, base.height));
+      const viewport = page.getViewport({ scale });
+      const canvas = document.createElement('canvas');
+      canvas.width = Math.ceil(viewport.width);
+      canvas.height = Math.ceil(viewport.height);
+      const context = canvas.getContext('2d');
+      if (!context) continue;
+      await withStageTimeout(
+        page.render({ canvas, canvasContext: context, viewport, intent: 'print' }).promise,
+        60_000,
+        `рендер страницы ${pageNumber} для AI`,
+      );
+      const blob = await withStageTimeout(
+        new Promise<Blob | null>((resolve) => canvas.toBlob(resolve, 'image/jpeg', quality)),
+        15_000,
+        `кодирование страницы ${pageNumber} для AI`,
+      );
+      if (blob) {
+        pages.push(
+          new File([blob], `${(file.name || 'lab').replace(/\.pdf$/i, '')}-p${pageNumber}.jpg`, {
+            type: 'image/jpeg',
+          }),
+        );
+      }
+      page.cleanup?.();
+      canvas.width = 1;
+      canvas.height = 1;
+    }
+  } finally {
+    await pdf.cleanup?.();
+    await pdf.destroy?.();
+  }
+  if (pages.length === 0) throw new Error('Не удалось отрисовать страницы PDF для AI-проверки.');
+  return pages;
+}
+
 export async function parseLabFile(file: File, arrayBuffer?: ArrayBuffer): Promise<ParsedLabResult> {
   if (file.type === 'application/pdf' || /\.pdf$/i.test(file.name)) {
     return parsePDF(arrayBuffer ?? file);
