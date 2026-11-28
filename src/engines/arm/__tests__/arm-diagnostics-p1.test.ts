@@ -45,7 +45,9 @@ describe('arm P1 E9: vbt weakPoint', () => {
     expect(thresholdsFor('side_press_cable', 'side_mid')).toEqual({ warnPct: 10, stopPct: 20 });
   });
   it('diagnoseVbt с weakPoint: потеря 16% pron = warn (legacy wrist был бы ok)', () => {
-    const recs = (v: number) => [{ weight: 30, reps: 5, velocityMs: v, exerciseId: 'wrist_curl_belt', weakPoint: 'pron_open' }];
+    const recs = (v: number) => [
+      { weight: 30, reps: 5, velocityMs: v, exerciseId: 'wrist_curl_belt', weakPoint: 'pron_open' },
+    ];
     const r = diagnoseVbt([recs(1.0)[0], recs(0.84)[0]]);
     expect(r.zone).toBe('warn');
     expect(r.velocityLossPct).toBe(16);
@@ -65,7 +67,14 @@ describe('arm P1 E10: mobility', () => {
     expect(r.score).toBeLessThan(100);
   });
   it('retest better → хинт про кисть', () => {
-    const r = assessArmMobility({ wristFlexOk: true, wristExtOk: true, pronOk: true, supOk: true, elbowExtOk: true, reverseRetest: 'better' });
+    const r = assessArmMobility({
+      wristFlexOk: true,
+      wristExtOk: true,
+      pronOk: true,
+      supOk: true,
+      elbowExtOk: true,
+      reverseRetest: 'better',
+    });
     expect(r.retestHint).toContain('кисть');
   });
   it('fail→точка: wrist зажигает cup, не зажигает side без elbow', () => {
@@ -97,13 +106,20 @@ describe('arm P1 E11: autoreg + guards', () => {
     expect(r.replaceHeavyPronWithPulses).toBe(true);
   });
   it('UCL guard: новичок side>2 первые 3н', () => {
-    const plan: any = { level: 'beginner', weeks: [{ week: 1, sessions: [{ exercises: [{ muscle: 'side_pressure', sets: 4 }] }] }] };
+    const plan: any = {
+      level: 'beginner',
+      weeks: [{ week: 1, sessions: [{ exercises: [{ muscle: 'side_pressure', sets: 4 }] }] }],
+    };
     expect(checkUCLGuard(plan).length).toBeGreaterThan(0);
   });
-  it('tendon guard: >22 critical', () => {
-    const plan: any = { weeks: [{ week: 1, sessions: [{ exercises: [{ muscle: 'pronators', sets: 23 }] }] }] };
+  it('tendon guard: кондиционирование > лимита уровня', () => {
+    const plan: any = {
+      level: 'intermediate',
+      weeks: [{ week: 1, sessions: [{ exercises: [{ muscle: 'pronators', sets: 23, isStatic: true }] }] }],
+    };
     const w = checkTendonGuard(plan);
-    expect(w.join(' ')).toContain('CRITICAL');
+    expect(w.join(' ')).toContain('кондиционирование');
+    expect(w.join(' ')).not.toContain('CRITICAL');
     expect(checkShoulderGuard({ weeks: [{ sessions: [{ exercises: [] }] }] } as any)).toEqual([]);
   });
 });
@@ -132,7 +148,9 @@ describe('arm P1 E12: bilateral', () => {
 });
 
 describe('arm P1: localStorage-history (jsdom)', () => {
-  beforeEach(() => { localStorage.clear(); });
+  beforeEach(() => {
+    localStorage.clear();
+  });
   it('applyMobility пишет he_profile_v2 без затирания', async () => {
     const { applyArmMobilityToProfile } = await import('../arm-mobility.engine');
     localStorage.setItem('he_profile_v2', JSON.stringify({ health: { chronic: 1 }, training: {} }));

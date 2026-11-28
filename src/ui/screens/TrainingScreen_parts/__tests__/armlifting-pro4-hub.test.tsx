@@ -2,7 +2,13 @@ import { describe, it, expect } from 'vitest';
 import { render, screen, fireEvent } from '@testing-library/react';
 import { ArmliftingDiagnosticsHub } from '../ArmliftingDiagnosticsHub';
 
-const clear = () => { try { localStorage.clear(); } catch { /* noop */ } };
+const clear = () => {
+  try {
+    localStorage.clear();
+  } catch {
+    /* noop */
+  }
+};
 
 describe('PRO-4 UI: хаб армлифтинга', () => {
   it('новые поля рендерятся: Pinch кг, Silver, L/R, вес тела', () => {
@@ -26,12 +32,29 @@ describe('PRO-4 UI: хаб армлифтинга', () => {
     expect(document.body.textContent).not.toContain('М-90');
     expect((screen.getByLabelText(/Вес тела кг/) as HTMLInputElement).value).toBe('85');
     fireEvent.change(screen.getByLabelText(/RT кг/), { target: { value: '100' } });
+    // Аудит 2026-11: без согласия данные здоровья в мост не уходят.
+    fireEvent.click(screen.getByLabelText(/Согласие на хранение данных здоровья/));
     fireEvent.click(screen.getByLabelText(/Применить в Арм-конструктор/));
     const raw = localStorage.getItem('he_planner_apply') || '';
     expect(raw).toContain('weightClass');
     expect(raw).toContain('М-90');
     expect(raw).toContain('rulesNote');
     expect(raw).toContain('"lms"');
+  });
+  it('без согласия мост в конструктор не пишет health-payload', () => {
+    clear();
+    render(<ArmliftingDiagnosticsHub />);
+    fireEvent.change(screen.getByLabelText(/RT кг/), { target: { value: '100' } });
+    fireEvent.click(screen.getByLabelText(/Применить в Арм-конструктор/));
+    expect(localStorage.getItem('he_planner_apply')).toBeNull();
+    expect(document.body.textContent).toContain('Нет согласия');
+  });
+  it('без согласия экспорт health-отчёта блокируется', () => {
+    clear();
+    render(<ArmliftingDiagnosticsHub />);
+    fireEvent.change(screen.getByLabelText(/RT кг/), { target: { value: '100' } });
+    fireEvent.click(screen.getByText(/Профиль JSON/));
+    expect(document.body.textContent).toContain('Нет согласия');
   });
   it('L/R дают асимметрию и рецепт, без last-man-standing', () => {
     clear();

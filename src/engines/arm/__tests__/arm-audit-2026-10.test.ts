@@ -345,7 +345,7 @@ describe('P2: прочие регрессии раунда', () => {
     expect(perExerciseCap('side_pressure')).toBe(3);
     expect(perExerciseCap('thumb')).toBe(4);
   });
-  it('ARM_MUSCLES покрыты landmarks (19 мышц × 4 уровня)', () => {
+  it('ARM_MUSCLES покрыты landmarks (18 планируемых мышц × 4 уровня)', () => {
     for (const m of ARM_MUSCLES) {
       for (const lvl of ['beginner', 'intermediate', 'advanced', 'enhanced']) {
         const lm = getArmLandmarks(lvl as any, m);

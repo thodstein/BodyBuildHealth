@@ -1043,12 +1043,23 @@ export const ArmliftingDiagnosticsHub: React.FC = () => {
     return planArmliftAttempts(kg, row.implement, row.label);
   }, [report]);
 
+  /** Общий гейт здоровья: без согласия никакой health-payload не покидает хаб. */
+  const requireConsent = (): boolean => {
+    if (state.consent) return true;
+    setToast('Нет согласия на обработку данных здоровья — экспорт заблокирован');
+    setTimeout(() => setToast(''), 3000);
+    return false;
+  };
+
   const applyToConstructor = () => {
     if (!report.filled) {
       setToast('Нечего отправлять — введи хотя бы один снаряд');
       setTimeout(() => setToast(''), 2500);
       return;
     }
+    // Аудит 2026-11 (§7): в конструктор уходят данные здоровья (замеры, вес,
+    // боль/условия). Без явного согласия мост не отправляет payload.
+    if (!requireConsent()) return;
     try {
       void haptics('light');
     } catch {
@@ -1264,6 +1275,7 @@ export const ArmliftingDiagnosticsHub: React.FC = () => {
   };
 
   const handleExportHtml = async () => {
+    if (!requireConsent()) return;
     try {
       const o = await saveTextFileApk(
         `armlifting-${localIsoDate()}.html`,
@@ -1279,6 +1291,7 @@ export const ArmliftingDiagnosticsHub: React.FC = () => {
   };
 
   const handleExportCsv = async () => {
+    if (!requireConsent()) return;
     try {
       const o = await saveCsvApk(`armlifting-${localIsoDate()}.csv`, buildArmliftingCsv(exportData()));
       setToast(shareOutcomeLabel(o));
@@ -1291,6 +1304,7 @@ export const ArmliftingDiagnosticsHub: React.FC = () => {
 
   /** Волна 5: бэкап/импорт полного профиля (замеры + диагностика) в JSON. */
   const handleExportProfile = async () => {
+    if (!requireConsent()) return;
     try {
       const payload = { schemaVersion: 1, state, diag };
       const o = await saveTextFileApk(
@@ -1330,6 +1344,7 @@ export const ArmliftingDiagnosticsHub: React.FC = () => {
   /** АПК-безопасная печать: window.open().print() в Capacitor WebView не работает
    *  (см. core/apk-share.ts) — там .html сохраняется в Documents + Share. */
   const handlePrint = async () => {
+    if (!requireConsent()) return;
     try {
       const o = await printHtmlApk(buildArmliftingHtml(exportData()), `armlifting-diagnostics-${localIsoDate()}.html`);
       setToast(shareOutcomeLabel(o));
@@ -2837,7 +2852,16 @@ export const ArmliftingDiagnosticsHub: React.FC = () => {
         <AdBtn variant="ghost" data-arm="export-print" onClick={handlePrint}>
           🖨 Печать
         </AdBtn>
-        <label style={{ display: 'inline-flex', alignItems: 'center', gap: 6, fontSize: 12, color: '#fff' }}>
+        <label
+          style={{
+            display: 'inline-flex',
+            alignItems: 'center',
+            gap: 6,
+            fontSize: 12,
+            color: '#fff',
+            minHeight: 44,
+          }}
+        >
           <input type="checkbox" checked={state.consent} onChange={(e) => set({ consent: e.target.checked })} />
           Согласие на хранение данных здоровья
         </label>

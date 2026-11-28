@@ -11,6 +11,14 @@ import { injectArmTestWeek, planArmTestWeeks, buildArmTestExercises } from '../a
 import { hookVolumeOf } from '../arm-pro5-safety.engine';
 import { workMaxFromBenchmarks } from '../arm-load-quant.engine';
 import { aggregateArmVolume } from '../arm-volume.engine';
+import { canonicalizeArmMuscle } from '../arm-tendon-sets.engine';
+import { armTendonBudgetFor } from '../arm-tendon-budget.engine';
+import { checkTendonGuard } from '../arm-injury-guard.engine';
+import {
+  ARM_TECHNIQUE_DRILLS,
+  armTechniqueStageForWeek,
+  ARM_TECHNIQUE_STAGE_PCT,
+} from '../arm-technique-curriculum.engine';
 import { TAG_MUSCLES_ARM } from '../arm-day-types';
 
 const BASE = {
@@ -284,6 +292,138 @@ describe('тестовая неделя (P1-7)', () => {
       const days = wk.sessions.map((s: any) => Number(s.day));
       expect(new Set(days).size, `Н${wk.week}`).toBe(days.length);
     }
+  });
+  it('endurance: 5-й замер (3×20 с) и недельный блок «долгой схватки»', () => {
+    const plan = make({ goal: 'endurance', testWeekEvery: 8 });
+    const tests = allEx(plan).filter((e: any) => e.provenanceSource === 'arm-test-week');
+    expect(tests.length).toBe(5);
+    const blocks = allEx(plan).filter((e: any) => /Долгая схватка/.test(String(e.name)));
+    expect(blocks.length).toBeGreaterThan(0);
+    for (const b of blocks) {
+      expect(Number(b.sets)).toBe(3);
+      expect(b.workSets.every((ws: any) => Number(ws.holdSeconds) === 20)).toBe(true);
+    }
+  });
+});
+
+describe('единая модель сгибателей локтя (P0-4)', () => {
+  it('biceps_short канонизируется в biceps_long и не считается отдельно', () => {
+    expect(canonicalizeArmMuscle('biceps_short')).toBe('biceps_long');
+    const agg = aggregateArmVolume([
+      { sessions: [{ exercises: [{ muscle: 'biceps_short', sets: 3, movementPattern: 'bicep_curl' }] }] } as any,
+    ]);
+    expect(agg.biceps_long?.directSets).toBe(3);
+    expect(agg.biceps_short).toBeUndefined();
+  });
+  it('в планируемом списке одна запись сгибателей локтя (нет «мышцы без упражнений»)', () => {
+    const plan = make();
+    const flexors = plan.volumeLandmarks.filter((x: any) => String(x.muscle).startsWith('biceps'));
+    expect(flexors.length).toBe(1);
+  });
+});
+
+describe('технический курикулум (P1-8)', () => {
+  const curriculum = (plan: any) => (plan.techniqueCurriculum || []) as any[];
+  it('8 дриллов в справочнике; 1 дрилл на рабочую неделю, встроен в разминку', () => {
+    expect(ARM_TECHNIQUE_DRILLS.length).toBe(8);
+    const plan = make();
+    const list = curriculum(plan);
+    expect(list.length).toBeGreaterThanOrEqual(6);
+    const weeks = list.map((x) => x.week);
+    expect(new Set(weeks).size).toBe(weeks.length);
+    for (const x of list) {
+      expect(x.embeddedIn).toBeTruthy();
+      expect(x.label).toBeTruthy();
+      expect(x.errors.length).toBeGreaterThan(0);
+    }
+    // Дрилл виден в комментарии упражнения (не отдельным объёмом).
+    const comments = allEx(plan).map((e: any) => String(e.comment || ''));
+    expect(comments.some((c: string) => c.includes('🧭 Техника'))).toBe(true);
+  });
+  it('дриллы не встраиваются в Test и LegsCore', () => {
+    const plan = make({ legsAnchor: true, testWeekEvery: 8 });
+    for (const s of plan.weeks.flatMap((w: any) => w.sessions)) {
+      if (s.sessionTag !== 'Test' && s.sessionTag !== 'LegsCore') continue;
+      expect(s.exercises.some((e: any) => String(e.comment || '').includes('🧭 Техника'))).toBe(false);
+    }
+  });
+  it('прогрессия стадий: изометрия → 70 → 90 → 100%', () => {
+    for (const w of [1, 3, 5, 7]) expect(armTechniqueStageForWeek(w, 8)).toBe((w - 1) / 2);
+    expect(ARM_TECHNIQUE_STAGE_PCT).toEqual({ 0: 0, 1: 0.7, 2: 0.9, 3: 1 });
+    const plan = make();
+    const week1 = curriculum(plan).find((x) => x.week === 1);
+    expect(week1?.stage).toBe(0);
+    // Изометрия — текст дрилла, без «0×1» в разминке.
+    const zero = allEx(plan)
+      .flatMap((e: any) => e.warmupSets || [])
+      .filter((ws: any) => Number(ws.load) === 0);
+    expect(zero.length).toBe(0);
+  });
+  it("стоп-условия: травма side/shoulder убирает press и king's move", () => {
+    const plan = make({
+      injuries: [
+        { muscle: 'side_pressure', exclude: true },
+        { muscle: 'shoulder_stab', exclude: true },
+      ],
+    });
+    const names = curriculum(plan).map((x) => String(x.name));
+    expect(names.some((n) => /Press/.test(n))).toBe(false);
+    expect(names.some((n) => /King/.test(n))).toBe(false);
+    expect(names.length).toBeGreaterThan(0);
+  });
+});
+
+describe('tendon-бюджет как модель (P1-10)', () => {
+  it('кондиционирование и спортивные сеты считаются раздельно, не-сухожильные не входят', () => {
+    const b = armTendonBudgetFor(
+      [
+        { muscle: 'wrist_flexors', sets: 4, isStatic: true },
+        { muscle: 'pronators', sets: 3, holdSeconds: 10 },
+        { muscle: 'wrist_flexors', sets: 6 },
+        { muscle: 'brachialis', sets: 5 },
+      ],
+      'intermediate',
+    );
+    expect(b.conditioningSets).toBe(7);
+    expect(b.sportSets).toBe(6);
+    expect(b.limit).toBe(16);
+    expect(b.overConditioning).toBe(false);
+    expect(b.totalSets).toBe(13);
+  });
+  it('лимит применяется только к кондиционированию; спортивные сеты не капаются', () => {
+    const b = armTendonBudgetFor(
+      [
+        { muscle: 'wrist_flexors', sets: 20, isStatic: true },
+        { muscle: 'wrist_flexors', sets: 40 },
+      ],
+      'beginner',
+    );
+    expect(b.overConditioning).toBe(true);
+    expect(b.limit).toBe(12);
+    expect(b.sportSets).toBe(40);
+  });
+  it('план получает tendonBudget по неделям и честную строку при перерасходе', () => {
+    const plan = make();
+    expect(plan.tendonBudget).toBeTruthy();
+    for (const wk of plan.weeks as any[]) {
+      const b = (plan.tendonBudget as any)[wk.week];
+      expect(b).toBeTruthy();
+      expect(typeof b.conditioningSets).toBe('number');
+      expect(typeof b.sportSets).toBe('number');
+    }
+    // Обычный план не должен получать ложный «tendon CRITICAL» из старой суммы.
+    const warnings = checkTendonGuard(plan as any);
+    expect(warnings.some((w: string) => /CRITICAL/.test(w))).toBe(false);
+  });
+  it('замеры тестовой недели не считаются кондиционированием', () => {
+    const b = armTendonBudgetFor(
+      [
+        { muscle: 'wrist_flexors', sets: 3, holdSeconds: 20, provenanceSource: 'arm-test-week' },
+        { muscle: 'wrist_flexors', sets: 2, isStatic: true },
+      ],
+      'intermediate',
+    );
+    expect(b.conditioningSets).toBe(2);
   });
 });
 

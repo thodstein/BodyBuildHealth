@@ -107,3 +107,5 @@ export * from './arm-for.engine';
 // Аудит 2026-11: калибровка workMax и тестовая неделя
 export * from './arm-calibration.engine';
 export * from './arm-test-week.engine';
+export * from './arm-technique-curriculum.engine';
+export * from './arm-tendon-budget.engine';

@@ -25,6 +25,10 @@ export const ARM_TENDON_MUSCLE_SET: ReadonlySet<string> = new Set(ARM_TENDON_MUS
 export const ARM_TENDON_SET = ARM_TENDON_MUSCLE_SET;
 
 const ARM_MUSCLE_ALIASES: Readonly<Record<string, ArmMuscle>> = {
+  // Обе головки бицепса — один объём сгибателей локтя (аудит 2026-11, §5 п.4):
+  // длинная головка пересекает плечевой сустав и задаёт акцент, но объём
+  // планируется как один пул. Legacy biceps_short не теряется.
+  biceps_short: 'biceps_long',
   wrist: 'wrist_flexors',
   wrist_flexion: 'wrist_flexors',
   wrist_flexor: 'wrist_flexors',
@@ -76,7 +80,7 @@ export function canonicalizeArmMuscle(value: unknown): ArmMuscle | null {
 
 export function canonicalizeArmTendonMuscle(value: unknown): ArmTendonMuscle | null {
   const muscle = canonicalizeArmMuscle(value);
-  return muscle && ARM_TENDON_MUSCLE_SET.has(muscle) ? muscle as ArmTendonMuscle : null;
+  return muscle && ARM_TENDON_MUSCLE_SET.has(muscle) ? (muscle as ArmTendonMuscle) : null;
 }
 
 export function isArmTendonMuscle(value: unknown): value is ArmTendonMuscle {
@@ -84,13 +88,8 @@ export function isArmTendonMuscle(value: unknown): value is ArmTendonMuscle {
 }
 
 export function armTendonSet(values: Iterable<unknown> | string | null | undefined): ArmTendonMuscle[] {
-  const source = typeof values === 'string'
-    ? [values]
-    : values == null
-      ? []
-      : Array.isArray(values)
-        ? values
-        : Array.from(values);
+  const source =
+    typeof values === 'string' ? [values] : values == null ? [] : Array.isArray(values) ? values : Array.from(values);
   const out = new Set<ArmTendonMuscle>();
   for (const value of source) {
     const muscle = canonicalizeArmTendonMuscle(value);
@@ -112,7 +111,9 @@ export function armExerciseSetCount(exercise: ArmTendonExerciseLike | null | und
   return Array.isArray(exercise?.workSets) ? exercise.workSets.length : 0;
 }
 
-export function armTendonSetForExercises(exercises: Array<ArmTendonExerciseLike | null | undefined> | null | undefined): {
+export function armTendonSetForExercises(
+  exercises: Array<ArmTendonExerciseLike | null | undefined> | null | undefined,
+): {
   totalSets: number;
   byMuscle: Record<string, number>;
 } {
@@ -129,6 +130,8 @@ export function armTendonSetForExercises(exercises: Array<ArmTendonExerciseLike 
   return { totalSets, byMuscle };
 }
 
-export function countArmTendonSets(exercises: Array<ArmTendonExerciseLike | null | undefined> | null | undefined): number {
+export function countArmTendonSets(
+  exercises: Array<ArmTendonExerciseLike | null | undefined> | null | undefined,
+): number {
   return armTendonSetForExercises(exercises).totalSets;
 }

@@ -23,6 +23,7 @@ import {
   type ArmWeeklyCheckin,
 } from '../../../engines/arm/arm-types';
 import { calibrateArmWorkMax } from '../../../engines/arm/arm-calibration.engine';
+import { ARM_TECHNIQUE_DRILLS } from '../../../engines/arm/arm-technique-curriculum.engine';
 import {
   loadArmCheckins,
   saveArmCheckin,
@@ -3507,6 +3508,42 @@ export function ArmAutoConstructor() {
                   />
                 </AdField>
               </div>
+            </div>
+            {/* Roadmap §5 п.8: технический курикулум — 8 дриллов, стадии, чек-лист ошибок. */}
+            <div
+              data-arm="technique"
+              style={{ marginTop: 10, paddingTop: 8, borderTop: '1px solid rgba(255,255,255,0.08)' }}
+            >
+              <div className="ad-sec-t">🧭 Техника: курикулум (1 дрилл/нед)</div>
+              <div className="ad-muted" style={{ fontSize: 12, marginBottom: 6 }}>
+                Прогрессия — практика: изометрия → 70% → 90% → 100%. Сначала чек-лист ошибок, потом вес.
+              </div>
+              {Array.isArray((viewPlan as any)?.techniqueCurriculum) &&
+                (viewPlan as any).techniqueCurriculum.length > 0 && (
+                  <div className="ad-muted" style={{ fontSize: 12, marginBottom: 6 }} data-arm="technique-plan">
+                    В плане:{' '}
+                    {(() => {
+                      const list = (viewPlan as any).techniqueCurriculum as Array<any>;
+                      const first = list[0];
+                      return `${list.length} дрилл(ов). Неделя ${first.week}: ${first.name} — ${first.label}${first.embeddedIn ? ` → «${first.embeddedIn}»` : ''}.`;
+                    })()}
+                  </div>
+                )}
+              <details>
+                <summary
+                  style={{ cursor: 'pointer', fontSize: 13, minHeight: 44, display: 'flex', alignItems: 'center' }}
+                >
+                  8 дриллов и чек-лист ошибок
+                </summary>
+                <ul style={{ margin: '6px 0 0 16px', padding: 0, fontSize: 12 }}>
+                  {ARM_TECHNIQUE_DRILLS.map((d) => (
+                    <li key={d.id} style={{ marginBottom: 6 }}>
+                      <b>{d.name}</b> — {d.focus}
+                      <div className="ad-muted">Ошибки: {d.errors.join('; ')}</div>
+                    </li>
+                  ))}
+                </ul>
+              </details>
             </div>
           </AdSec>
 

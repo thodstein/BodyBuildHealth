@@ -101,7 +101,10 @@ export const ARM_MUSCLES: readonly ArmMuscle[] = [
   'radial_deviators',
   'brachialis',
   'biceps_long',
-  'biceps_short',
+  // 'biceps_short' НЕ входит в планируемый список: обе головки — один объём
+  // сгибателей локтя (аудит 2026-11, §5 п.4). Legacy-данные с biceps_short
+  // канонизируются в biceps_long (arm-tendon-sets), поэтому не теряются;
+  // отдельная запись давала «мышцу без единого упражнения» на каждом плане.
   'brachioradialis',
   'back_pressure',
   'side_pressure',
@@ -416,6 +419,31 @@ export interface ArmPlan {
     number,
     Record<string, { directSets: number; effectiveSets: number; tendonSets: number; fatigueWeightedSets: number }>
   >;
+  /** Недельный tendon-бюджет: кондиционирование отдельно от спортивной работы
+   *  (arm-tendon-budget.engine; лимит уровня применяется только к кондиционированию). */
+  tendonBudget?: Record<
+    number,
+    {
+      conditioningSets: number;
+      sportSets: number;
+      totalSets: number;
+      limit: number;
+      overConditioning: boolean;
+      note: string;
+    }
+  >;
+  /** Технический курикулум по неделям (arm-technique-curriculum.engine). */
+  techniqueCurriculum?: Array<{
+    week: number;
+    drillId: string;
+    name: string;
+    stage: 0 | 1 | 2 | 3;
+    label: string;
+    focus: string;
+    cues: string[];
+    errors: string[];
+    embeddedIn?: string;
+  }>;
   validation?: ArmValidationResult;
   report?: ArmReport;
   metrics?: ArmMetrics;
@@ -512,7 +540,7 @@ export const ARM_MUSCLE_RU: Record<string, string> = {
   ulnar_deviators: 'Локтевые девиаторы',
   radial_deviators: 'Лучевые девиаторы',
   brachialis: 'Брахиалис',
-  biceps_long: 'Бицепс (длинная)',
+  biceps_long: 'Бицепс / сгибатели локтя',
   biceps_short: 'Бицепс (короткая)',
   brachioradialis: 'Брахиорадиалис',
   back_pressure: 'Тяга на себя (back pressure)',

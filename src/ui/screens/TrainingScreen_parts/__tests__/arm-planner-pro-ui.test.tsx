@@ -37,6 +37,14 @@ describe('Arm PRO-PLAN UI', () => {
     fireEvent.click(screen.getByRole('button', { name: /Рассчитать workMax/ }));
     expect((screen.getByLabelText(/Кисть \(кг\)/) as HTMLInputElement).value).toBe('50.5');
   });
+  it('техника: карточка курикулума с 8 дриллами', () => {
+    render(<ArmAutoConstructor />);
+    fireEvent.click(screen.getByRole('button', { name: '2 Атлет' }));
+    openSec(/Рабочие максимумы/);
+    expect(document.querySelector('[data-arm="technique"]')).toBeTruthy();
+    expect(screen.getByText(/8 дриллов и чек-лист ошибок/)).toBeTruthy();
+    expect(document.body.textContent).toContain('Вход в hook');
+  });
   it('секция «Периодизация и старты»: стили прогрессии выбираются', () => {
     render(<ArmAutoConstructor />);
     openPlanSec();

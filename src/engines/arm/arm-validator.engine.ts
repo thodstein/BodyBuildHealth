@@ -67,7 +67,9 @@ export function validateArmPlan(plan: ArmPlan, level?: string): ArmValidationRes
   }
   for (const line of plan.safetyWarnings || []) {
     if (
-      /нет безопасного упражнения|исключено травмой|ограничен|эффективный объём/.test(line) &&
+      /нет безопасного упражнения|исключено травмой|ограничен|эффективный объём|кондиционирование сухожилий/.test(
+        line,
+      ) &&
       !warnings.includes(line)
     )
       warnings.push(line);

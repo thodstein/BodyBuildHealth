@@ -3,9 +3,9 @@
  */
 import type { ArmPlan, ArmReport } from './arm-types';
 import { calcArmMetrics, armMetricsSummary } from './arm-metrics.engine';
-import { isArmTendonMuscle } from './arm-tendon-sets.engine';
+import { armTendonBudgetFor } from './arm-tendon-budget.engine';
 import { aggregateArmVolume } from './arm-volume.engine';
-import { getArmLandmarks } from './arm-volume-landmarks.engine';
+import { getArmLandmarks, tendonWeeklyLimit } from './arm-volume-landmarks.engine';
 
 export function buildArmReport(plan: ArmPlan): ArmReport {
   const metrics = calcArmMetrics(plan);
@@ -18,17 +18,24 @@ export function buildArmReport(plan: ArmPlan): ArmReport {
   const volumeSummary = armMetricsSummary(metrics);
 
   const techniqueRationale: string[] = [];
-  if (plan.technique === 'hook') techniqueRationale.push('Хук: акцент супинация + брахиалис + cup + back pressure. Супинация ставьте первой.');
-  else if (plan.technique === 'toproll') techniqueRationale.push('Топролл: пронация + rising + brachioradialis + back pressure. Rising — каждый стол-день.');
-  else if (plan.technique === 'press') techniqueRationale.push('Пресс: боковое + грудь/трицепс + плечо. Контроль кисти обязателен, не на блоке.');
+  if (plan.technique === 'hook')
+    techniqueRationale.push('Хук: акцент супинация + брахиалис + cup + back pressure. Супинация ставьте первой.');
+  else if (plan.technique === 'toproll')
+    techniqueRationale.push('Топролл: пронация + rising + brachioradialis + back pressure. Rising — каждый стол-день.');
+  else if (plan.technique === 'press')
+    techniqueRationale.push('Пресс: боковое + грудь/трицепс + плечо. Контроль кисти обязателен, не на блоке.');
   else techniqueRationale.push('Сбалансировано: пронация/супинация, cup/rising, side/back — равномерно.');
 
   const gripRationale: string[] = [];
   if (plan.discipline === 'armlifting' || plan.discipline === 'hybrid') {
-    gripRationale.push('Армлифтинг: поддержка (Rolling Thunder/Axle) + щипок (Saxon/Hub) + дробление (CoC) — не смешивать.');
+    gripRationale.push(
+      'Армлифтинг: поддержка (Rolling Thunder/Axle) + щипок (Saxon/Hub) + дробление (CoC) — не смешивать.',
+    );
     if (plan.inputSnapshot?.gripImplement) gripRationale.push(`Имплемент: ${plan.inputSnapshot.gripImplement}`);
   }
-  gripRationale.push(`Table sessions: ${(metrics.tableSessionShare * 100).toFixed(0)}% · table minutes: ${metrics.tableMinutesShare == null ? 'нет данных' : `${(metrics.tableMinutesShare * 100).toFixed(0)}%`} · table volume: ${(metrics.tableVolumeShare * 100).toFixed(0)}%.`);
+  gripRationale.push(
+    `Table sessions: ${(metrics.tableSessionShare * 100).toFixed(0)}% · table minutes: ${metrics.tableMinutesShare == null ? 'нет данных' : `${(metrics.tableMinutesShare * 100).toFixed(0)}%`} · table volume: ${(metrics.tableVolumeShare * 100).toFixed(0)}%.`,
+  );
   gripRationale.push(`Политика стола: target — доля сессий; минуты отображаются только при наличии длительностей.`);
 
   const warnings: string[] = [];
@@ -36,18 +43,30 @@ export function buildArmReport(plan: ArmPlan): ArmReport {
   // гардами (humerus 6/9, tendon 22/18/12). 8–12-недельный план с нормой 8 tendon-
   // сетов/нед получал «Tendon load 96 — много» — ложная тревога. Теперь считаем
   // МАКСИМУМ по неделям (как недельные гарды) и добавляем среднее как контекст.
-  let maxTendon = 0, maxSide = 0;
+  let maxCond = 0,
+    maxSport = 0,
+    maxSide = 0,
+    condLimit = tendonWeeklyLimit(plan.level || 'intermediate');
   for (const wk of plan.weeks) {
     const perWeek: Record<string, number> = {};
-    for (const sess of wk.sessions) for (const ex of sess.exercises) perWeek[ex.muscle] = (perWeek[ex.muscle] || 0) + ex.sets;
-    const wkTendon = Object.entries(perWeek).filter(([m]) => isArmTendonMuscle(m)).reduce((s, [, v]) => s + v, 0);
+    for (const sess of wk.sessions)
+      for (const ex of sess.exercises) perWeek[ex.muscle] = (perWeek[ex.muscle] || 0) + ex.sets;
+    const budget = armTendonBudgetFor(wk.sessions.flatMap((s) => s.exercises) as any, plan.level || 'intermediate');
     const wkSide = perWeek['side_pressure'] || 0;
-    if (wkTendon > maxTendon) maxTendon = wkTendon;
+    if (budget.conditioningSets > maxCond) {
+      maxCond = budget.conditioningSets;
+      maxSport = budget.sportSets;
+      condLimit = budget.limit;
+    }
     if (wkSide > maxSide) maxSide = wkSide;
   }
-  if (maxTendon > 22) warnings.push(`Tendon load ${maxTendon} сетов/нед (пиковая неделя) — много сухожильной работы, добавить восстановление`);
+  if (maxCond > condLimit)
+    warnings.push(
+      `Кондиционирование сухожилий ${maxCond} > лимита ${condLimit} (внутренняя эвристика) — спортивная работа ${maxSport} без капа`,
+    );
   if (maxSide > 9) warnings.push(`Side pressure ${maxSide} сетов/нед (пиковая неделя) — проверить humerus guard`);
-  if (metrics.tableSessionShare < 0.4 && plan.discipline === 'armwrestling') warnings.push('Table sessions <40% — для армрестлинга мало стола');
+  if (metrics.tableSessionShare < 0.4 && plan.discipline === 'armwrestling')
+    warnings.push('Table sessions <40% — для армрестлинга мало стола');
 
   // 26.10.2026 (§7 плана): пиковый перебор MRV с РАЗБИВКОЙ прямой/косвенной.
   // Было: валидатор говорил только «N сетов > MRV» — непонятно, прямая работа или
@@ -64,7 +83,7 @@ export function buildArmReport(plan: ArmPlan): ArmReport {
     const r1 = (x: number) => Math.round(x * 10) / 10;
     const directShare = effectivePerWeek > 0 ? Math.round((directPerWeek / effectivePerWeek) * 100) : 0;
     warnings.push(
-      `⚠ Пик ${muscle}: эффективно ${r1(effectivePerWeek)}/нед (прямые ${r1(directPerWeek)} · косвенные ${r1(effectivePerWeek - directPerWeek)} = ${directShare}% прямых) > MRV ${mrv}×1.15 — перебор в основном ${directShare >= 70 ? 'прямой работой' : 'косвенной нагрузкой'}.`
+      `⚠ Пик ${muscle}: эффективно ${r1(effectivePerWeek)}/нед (прямые ${r1(directPerWeek)} · косвенные ${r1(effectivePerWeek - directPerWeek)} = ${directShare}% прямых) > MRV ${mrv}×1.15 — перебор в основном ${directShare >= 70 ? 'прямой работой' : 'косвенной нагрузкой'}.`,
     );
   }
 

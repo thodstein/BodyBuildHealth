@@ -17,6 +17,8 @@ import { perExerciseCap, sessionLimitsForArm } from './arm-volume.engine';
 export interface ArmTestWeekOptions {
   every?: number; // 0 = выключено
   level?: string;
+  /** Цель плана: в endurance добавляется 5-й замер (3×20 с). */
+  goal?: string;
   /** Явные номера недель (например, калибровочная неделя 1) — приоритетнее every. */
   targets?: number[];
 }
@@ -38,10 +40,10 @@ export function planArmTestWeeks(weeks: number, every = 8): number[] {
 }
 
 /**
- * Тестовый блок: 4 замера, малый объём. Вес 0 — пользователь вводит фактический,
- * движок не выдумывает килограммы.
+ * Тестовый блок: 4 замера (5-й — энда-холд в endurance-цели), малый объём.
+ * Вес 0 — пользователь вводит фактический, движок не выдумывает килограммы.
  */
-export function buildArmTestExercises(level = 'intermediate'): ArmExercise[] {
+export function buildArmTestExercises(level = 'intermediate', opts: { goal?: string } = {}): ArmExercise[] {
   const lvl = String(level || 'intermediate').toLowerCase();
   const hard = lvl === 'advanced' || lvl === 'enhanced';
   const base = (muscle: string, name: string, sets: number, reps: number, holdSeconds?: number): ArmExercise => ({
@@ -68,12 +70,21 @@ export function buildArmTestExercises(level = 'intermediate'): ArmExercise[] {
     provenanceSource: 'arm-test-week',
     comment: '🧪 Тест: записать фактический вес/время — это калибровка workMax.',
   });
-  return [
+  const core = [
     base('wrist_flexors', 'Тест: сгибание кисти 5ПМ', 2, 5),
     base('pronators', 'Тест: пронация — холд', 1, 1, 15),
     base('side_pressure', 'Тест: боковое — холд', 1, 1, 10),
     base('grip_support', 'Тест: Rolling Thunder — сингл', 1, 1),
   ];
+  // Endurance-цель: пятый замер — «долгая схватка» 3×20 с изометрия.
+  // Это практика клуба, а НЕ валидированный тест: число не выдаётся за норму.
+  if (String(opts.goal || '').toLowerCase() === 'endurance') {
+    core.push({
+      ...base('side_pressure', 'Тест: долгая схватка — 3×20 с изометрия', 3, 1, 20),
+      comment: '🧪 Энда-тест (практика, не валидирован): 3×20 с изометрия в рабочей позиции — записать вес/время.',
+    });
+  }
+  return core;
 }
 
 /**
@@ -97,7 +108,7 @@ export function injectArmTestWeek(plan: ArmPlan, opts: ArmTestWeekOptions = {}):
       : planArmTestWeeks(copy.weeks.length, opts.every ?? 8);
   if (targets.length === 0) return result;
   const level = String(opts.level || copy.level || 'intermediate');
-  const template = buildArmTestExercises(level);
+  const template = buildArmTestExercises(level, { goal: opts.goal || String((copy as any).goal || '') });
 
   const isWorking = (w: any): boolean => !w.deload && !w.taper && w.phase !== 'deload' && w.phase !== 'peaking';
   for (const target of targets) {
@@ -116,15 +127,25 @@ export function injectArmTestWeek(plan: ArmPlan, opts: ArmTestWeekOptions = {}):
     // место у рабочих сессий и не зависит от их заполненности.
     let added = 0;
     const block: typeof template = [];
+    const skippedTests: string[] = [];
     for (const ex of template) {
-      // Не переполняем MRV мышцы тестовыми сетами.
-      let weekly = 0;
+      // Не переполняем MRV мышцы тестовыми сетами (учитываем уже принятые замеры).
+      let weekly = block.filter((b) => b.muscle === ex.muscle).reduce((a, b) => a + (Number(b.sets) || 0), 0);
       for (const s of wk.sessions) for (const e of s.exercises) if (e.muscle === ex.muscle) weekly += e.sets;
       const mrv = Number(copy.mrvByMuscle?.[ex.muscle] ?? 99);
-      if (weekly + ex.sets > mrv) continue;
-      if (ex.sets > perExerciseCap(String(ex.muscle), level)) continue;
+      if (weekly + ex.sets > mrv) {
+        skippedTests.push(`${ex.name}: MRV ${ex.muscle} (${weekly}+${ex.sets}>${mrv})`);
+        continue;
+      }
+      if (ex.sets > perExerciseCap(String(ex.muscle), level)) {
+        skippedTests.push(`${ex.name}: per-exercise cap ${ex.muscle}`);
+        continue;
+      }
       block.push({ ...ex });
       added++;
+    }
+    if (skippedTests.length) {
+      result.notes.push(`🧪 Тест Н${wk.week}: пропущено — ${skippedTests.join('; ')}.`);
     }
     if (block.length > 0) {
       const limits = sessionLimitsForArm({ level, discipline: copy.discipline, sessionTag: 'Test' });

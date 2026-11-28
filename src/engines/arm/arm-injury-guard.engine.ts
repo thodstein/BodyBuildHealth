@@ -4,7 +4,9 @@ import {
   normalizeArmBodyRegion,
   type ArmBodyRegion,
 } from './arm-body-region.engine';
-import { canonicalizeArmMuscle, isArmTendonMuscle } from './arm-tendon-sets.engine';
+import { canonicalizeArmMuscle } from './arm-tendon-sets.engine';
+import { armTendonBudgetFor } from './arm-tendon-budget.engine';
+import { tendonWeeklyLimit } from './arm-volume-landmarks.engine';
 
 /**
  * arm-injury-guard.engine.ts — травмо-гейты для арм-плана (как bb-joint-guard).
@@ -248,30 +250,29 @@ export function checkTendonGuard(plan: {
   weeks: Array<{ week: number; sessions: Array<{ exercises: Array<{ muscle: string; sets: number }> }> }>;
   level?: string;
 }): string[] {
-  // 28.11.2026: раньше каждая неделя >22 давала свою строку (12 недель → 12 дублей).
-  // Теперь одна строка по пиковой неделе; пороги — внутренняя эвристика проекта
-  // (валидированного недельного капа сухожилий в литературе нет — так и подписано).
-  let peak = 0;
+  // 28.11.2026: модель tendon-бюджета (§5 п.10) — лимит уровня применяется только
+  // к КОНДИЦИОНИРОВАНИЮ (изометрия/холды/HSR), а спортивная работа (стол, тяжёлые
+  // пронации/кисть) идёт отдельным счётчиком без выдуманного капа. Раньше сравнивалась
+  // сумма всех сетов, и план выглядел перегруженным при нормальной спортивной работе.
+  const level = String(plan.level || 'intermediate');
+  let peakCond = 0;
+  let peakSport = 0;
   let peakWeek = 0;
+  let limit = tendonWeeklyLimit(level);
   for (const wk of plan.weeks) {
-    let tendon = 0;
-    for (const sess of wk.sessions)
-      for (const ex of sess.exercises) {
-        if (isArmTendonMuscle(ex.muscle)) tendon += ex.sets;
-      }
-    if (tendon > peak) {
-      peak = tendon;
+    const exercises = wk.sessions.flatMap((sess) => sess.exercises);
+    const budget = armTendonBudgetFor(exercises as any, level);
+    if (budget.conditioningSets > peakCond) {
+      peakCond = budget.conditioningSets;
+      peakSport = budget.sportSets;
       peakWeek = wk.week;
+      limit = budget.limit;
     }
   }
   const warnings: string[] = [];
-  if (peak > 22)
+  if (peakCond > limit)
     warnings.push(
-      `Н${peakWeek}: tendon ${peak} сетов/нед > внутреннего ориентира 22 — CRITICAL (не валидированный медицинский порог), добавить восстановление.`,
+      `Н${peakWeek}: кондиционирование сухожилий ${peakCond} > лимита ${limit} (внутренняя эвристика, не медицинский порог); спортивная работа ${peakSport} — без валидированного капа.`,
     );
-  else if (peak > 18)
-    warnings.push(`Н${peakWeek}: tendon ${peak} сетов/нед >18 — выше ориентира проекта, следить за локтем/кистью.`);
-  else if ((plan as any).level === 'beginner' && peak > 12)
-    warnings.push(`Н${peakWeek}: tendon ${peak} >12 для beginner — много сухожильной работы (F1).`);
   return warnings;
 }

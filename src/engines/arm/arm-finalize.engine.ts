@@ -23,15 +23,29 @@ import { ARM_EXERCISES } from '../../core/exercise-catalog-arm';
 import { armEquipmentAllows } from './arm-builder.engine';
 import { hookVolumeOf, isHookVolumeExercise } from './arm-pro5-safety.engine';
 import { injectArmTestWeek } from './arm-test-week.engine';
+import { applyArmTechniqueCurriculum } from './arm-technique-curriculum.engine';
+import { armTendonBudgetFor } from './arm-tendon-budget.engine';
 
 /** Последняя НЕ-тестовая сессия недели: баланс-пассы не должны доукомплектовывать
  *  калибровочную Test-сессию обычными упражнениями (review 2026-11). */
 function lastWorkSession(wk: { sessions: Array<{ sessionTag: string; exercises: unknown[] }> }): any {
-  const list = (wk.sessions || []).filter((s) => s.sessionTag !== 'Test');
+  // LegsCore/Test — не арм-сессии: баланс-пассы не должны их доукомплектовывать.
+  const list = (wk.sessions || []).filter((s) => s.sessionTag !== 'Test' && s.sessionTag !== 'LegsCore');
   return list[list.length - 1];
 }
 
-function ensurePronSupBalance(plan: ArmPlan): void {
+/** Есть ли место в сессии по канону уровня (а не хардкод 6 из аудита). */
+function hasSessionRoom(plan: ArmPlan, level: string, sess: any): boolean {
+  if (!sess) return false;
+  const lim = sessionLimitsForArm({
+    level: level || String((plan as any).level || 'intermediate'),
+    discipline: plan.discipline,
+    sessionTag: sess.sessionTag,
+  });
+  return (sess.exercises?.length || 0) < lim.maxExercises;
+}
+
+function ensurePronSupBalance(plan: ArmPlan, level: string): void {
   for (const wk of plan.weeks) {
     let pron = 0,
       sup = 0;
@@ -43,7 +57,7 @@ function ensurePronSupBalance(plan: ArmPlan): void {
     if (pron > 0 && sup === 0) {
       // добавить супинацию в последнюю сессию
       const last = lastWorkSession(wk);
-      if (last && last.exercises.length < 6) {
+      if (hasSessionRoom(plan, level, last)) {
         last.exercises.push({
           muscle: 'supinators' as any,
           name: 'Супинация молотком',
@@ -65,7 +79,7 @@ function ensurePronSupBalance(plan: ArmPlan): void {
       }
     } else if (sup > 0 && pron === 0) {
       const last = lastWorkSession(wk);
-      if (last && last.exercises.length < 6) {
+      if (hasSessionRoom(plan, level, last)) {
         last.exercises.push({
           muscle: 'pronators' as any,
           name: 'Пронация на блоке (90)',
@@ -97,7 +111,7 @@ function ensurePronSupBalance(plan: ArmPlan): void {
   }
 }
 
-function ensureFlexExtBalance(plan: ArmPlan): void {
+function ensureFlexExtBalance(plan: ArmPlan, level: string): void {
   for (const wk of plan.weeks) {
     let flex = 0,
       ext = 0;
@@ -108,7 +122,7 @@ function ensureFlexExtBalance(plan: ArmPlan): void {
       }
     if (flex > 0 && ext === 0 && flex >= 6) {
       const last = lastWorkSession(wk);
-      if (last) {
+      if (last && hasSessionRoom(plan, level, last)) {
         last.exercises.push({
           muscle: 'wrist_extensors' as any,
           name: 'Разгибание кисти со штангой',
@@ -153,10 +167,10 @@ function ensureSidePressureGuard(plan: ArmPlan): void {
   }
 }
 
-function tryTableSwap(plan: ArmPlan, wkIdx: number, why: string): boolean {
+function tryTableSwap(plan: ArmPlan, wkIdx: number, why: string, level: string): boolean {
   const wk = plan.weeks[wkIdx];
   const supportIdx = wk.sessions.findIndex((s) => !s.tableTime && s.sessionTag === 'Support');
-  if (supportIdx >= 0 && wk.sessions[supportIdx].exercises.length < 6) {
+  if (supportIdx >= 0 && hasSessionRoom(plan, level, wk.sessions[supportIdx])) {
     wk.sessions[supportIdx].tableTime = true;
     wk.sessions[supportIdx].sessionTag = 'TableTech';
     wk.sessions[supportIdx].exercises.unshift({
@@ -206,12 +220,18 @@ function ensureTableTime(plan: ArmPlan, targetRatio: number): void {
     const ratio = tableSess / Math.max(1, wk.sessions.length);
     if (ratio < 0.3 && targetRatio >= 0.5) {
       // PRO: не только warning, но и swap одной Support сессии на TableTech если есть место
-      tryTableSwap(plan, plan.weeks.indexOf(wk), `table time ${(ratio * 100).toFixed(0)}% <30% при цели 50%`);
+      tryTableSwap(
+        plan,
+        plan.weeks.indexOf(wk),
+        `table time ${(ratio * 100).toFixed(0)}% <30% при цели 50%`,
+        String((plan as any).level || 'intermediate'),
+      );
     } else if (tableSess < cycleTableFloor) {
       tryTableSwap(
         plan,
         plan.weeks.indexOf(wk),
         `цикл ${cycleName} просит стол ${cycleTableFloor}×/нед, в плане ${tableSess}`,
+        String((plan as any).level || 'intermediate'),
       );
     }
   }
@@ -410,7 +430,7 @@ function injectTendonConditioning(plan: ArmPlan, level: string): void {
   }
 }
 
-function ensureGripCoverage(plan: ArmPlan): void {
+function ensureGripCoverage(plan: ArmPlan, level: string): void {
   // если grip специализация — обеспечить support+pinch
   const hasGripSpec = plan.specializationSchedule?.blocks.some((b) => b.targets.some((t) => t.includes('grip')));
   if (!hasGripSpec) return;
@@ -455,7 +475,7 @@ function ensureGripCoverage(plan: ArmPlan): void {
     }
     if (!hasPinch) {
       const last = lastWorkSession(wk);
-      if (last && last.exercises.length < 6)
+      if (hasSessionRoom(plan, level, last))
         last.exercises.push({
           muscle: 'grip_pinch' as any,
           name: 'Щипок блинов (удержание)',
@@ -478,7 +498,7 @@ function ensureGripCoverage(plan: ArmPlan): void {
   }
 }
 
-function ensureCocCoverage(plan: ArmPlan): void {
+function ensureCocCoverage(plan: ArmPlan, level: string): void {
   // CoC-режим (cocWorking задан): crush-эспандер обязан быть в каждой неделе.
   // IronMind: crush без work-сетов не растёт; extensor-баланс уже закрыт гардами.
   const coc = String((plan.inputSnapshot as any)?.cocWorking || '');
@@ -494,7 +514,7 @@ function ensureCocCoverage(plan: ArmPlan): void {
       }
     if (hasCrush) continue;
     const last = lastWorkSession(wk);
-    if (last && last.exercises.length < 6) {
+    if (hasSessionRoom(plan, level, last)) {
       last.exercises.push({
         muscle: 'grip_crush' as any,
         name: 'Эспандер CoC (дробление)',
@@ -538,7 +558,10 @@ function enforceInputSafety(plan: ArmPlan): void {
         const alreadyDosed =
           ex.provenance === 'catalog' ||
           ex.provenanceSource === 'arm-finalize:mev-floor' ||
-          ex.provenanceSource === 'arm-finalize:frequency-split';
+          ex.provenanceSource === 'arm-finalize:frequency-split' ||
+          // Замеры тестовой недели не масштабируем травмой: 5ПМ/3×20 — это
+          // измерение, а не тренировочная доза (review 2026-11).
+          ex.provenanceSource === 'arm-test-week';
         const factor = alreadyDosed ? 1 : armInjuryVolumeFactor(injuries, ex.muscle);
         const weightFactor = alreadyDosed ? 1 : armInjuryWeightFactor(injuries, ex.muscle);
         const repsCap = armInjuryRepsCap(injuries, ex.muscle);
@@ -887,7 +910,13 @@ function rebalanceIndirectOverflow(plan: ArmPlan, level: string): void {
         // LegsCore/Test — не арм-сессии: их объём не трогаем (review 2026-11).
         .filter((s) => s.sessionTag !== 'LegsCore' && s.sessionTag !== 'Test')
         .flatMap((s) => s.exercises)
-        .filter((e) => e.muscle === target!.muscle && e.sets > 1 && e.provenanceSource !== 'arm-test-week');
+        .filter(
+          (e) =>
+            e.muscle === target!.muscle &&
+            e.sets > 1 &&
+            e.provenanceSource !== 'arm-test-week' &&
+            e.provenanceSource !== 'arm-technique',
+        );
       if (!exs.length) {
         // Нечего резать — фиксируем и идём к следующей мышце, а не обрываем неделю.
         stuck.add(target.muscle);
@@ -1037,11 +1066,11 @@ export function finalizeArmPlan(plan: ArmPlan, opts?: { level?: string; tableRat
     opts?.tableRatio ??
     (Number.isFinite(snapRatio) && snapRatio > 0 ? snapRatio : plan.discipline === 'armlifting' ? 0.2 : 0.55);
 
-  ensurePronSupBalance(plan);
-  ensureFlexExtBalance(plan);
+  ensurePronSupBalance(plan, level);
+  ensureFlexExtBalance(plan, level);
   ensureSidePressureGuard(plan);
-  ensureGripCoverage(plan);
-  ensureCocCoverage(plan);
+  ensureGripCoverage(plan, level);
+  ensureCocCoverage(plan, level);
   // Стол — ДО кривой тейпера: иначе добавка 2 сетов пронации ложится
   // в уже срезанную хвостовую неделю мимо кривой (нашёл аудит).
   ensureTableTime(plan, tableRatio);
@@ -1071,7 +1100,7 @@ export function finalizeArmPlan(plan: ArmPlan, opts?: { level?: string; tableRat
   try {
     const every = Number((plan.inputSnapshot as any)?.testWeekEvery);
     if (Number.isFinite(every) && every > 0) {
-      const inj = injectArmTestWeek(plan, { every, level });
+      const inj = injectArmTestWeek(plan, { every, level, goal: String((plan as any).goal || '') });
       plan.weeks = inj.plan.weeks;
       (plan as any)._testWeekApplied = true;
       for (const line of inj.notes) plan.rationale.push(line);
@@ -1079,8 +1108,20 @@ export function finalizeArmPlan(plan: ArmPlan, opts?: { level?: string; tableRat
   } catch {
     plan.rationale.push('⚠ Тестовая неделя недоступна — замеры не вставлены.');
   }
-  rebalanceIndirectOverflow(plan, level);
+  // Частота 2×/нед — ДО rebalance: баланс срезает сеты, и донор перестаёт
+  // дотягивать до порога переноса (review 2026-11). Объём потом чистит rebalance.
   splitMuscleFrequency(plan, level);
+  // Технический курикулум (roadmap §5 п.8): 1 дрилл/нед, низкая усталость.
+  // После split (не отнимает слот у частоты), до rebalance (его сеты входят в MRV).
+  try {
+    const tech = applyArmTechniqueCurriculum(plan, { level, goal: String((plan as any).goal || 'strength') });
+    plan.weeks = tech.plan.weeks;
+    (plan as any).techniqueCurriculum = (tech.plan as any).techniqueCurriculum;
+    (plan as any)._techniqueApplied = true;
+  } catch {
+    plan.rationale.push('⚠ Технический курикулум недоступен — дриллы не добавлены.');
+  }
+  rebalanceIndirectOverflow(plan, level);
   enforceSessionLimits(plan, level);
   orderSessionExercises(plan);
   assignHoldsAndStatics(plan);
@@ -1110,5 +1151,25 @@ export function finalizeArmPlan(plan: ArmPlan, opts?: { level?: string; tableRat
   const weeklyVolume: Record<number, any> = {};
   for (const wk of plan.weeks) weeklyVolume[wk.week] = armWeeklyVolumeFor([wk as any]);
   plan.weeklyVolume = weeklyVolume;
+
+  // Tendon-бюджет как модель (roadmap §5 п.10): кондиционирование отдельно от
+  // спортивной работы. Лимит уровня применяется только к кондиционированию;
+  // спортивные сеты показываются без выдуманного капа.
+  try {
+    const tendonBudget: Record<number, any> = {};
+    for (const wk of plan.weeks) {
+      const exercises = wk.sessions.flatMap((s) => s.exercises);
+      const budget = armTendonBudgetFor(exercises as any, level);
+      tendonBudget[wk.week] = budget;
+      if (budget.overConditioning && !wk.deload && !wk.taper && wk.phase !== 'peaking') {
+        if (!plan.safetyWarnings) plan.safetyWarnings = [];
+        const line = `Н${wk.week}: ${budget.note}`;
+        if (!plan.safetyWarnings.includes(line)) plan.safetyWarnings.push(line);
+      }
+    }
+    (plan as any).tendonBudget = tendonBudget;
+  } catch {
+    /* бюджет опционален */
+  }
   return plan;
 }
