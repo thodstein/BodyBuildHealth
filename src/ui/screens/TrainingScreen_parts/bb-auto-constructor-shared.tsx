@@ -154,15 +154,21 @@ export function clampInlineNumber(
 export function computeBulkWeekEdits(args: {
   sessions: any[];
   weekNo: number;
-  field: 'sets' | 'reps' | 'weight';
+  field: 'sets' | 'reps' | 'weight' | 'restSeconds' | 'tempo';
   mode: 'set' | 'mult';
   rawValue: string | number | null | undefined;
   existing?: Record<string, any>;
 }): { edits: Record<string, any> } | { error: string } {
-  const value = parseInlineNumber(args.rawValue);
-  if (value == null) return { error: 'укажите число' };
-  if (args.mode === 'mult' && !(value > 0)) return { error: 'множитель должен быть больше нуля' };
-  if (args.mode === 'set' && args.field !== 'weight' && !(value >= 1)) return { error: 'значение должно быть не меньше 1' };
+  const isTempoField = args.field === 'tempo';
+  const strVal = isTempoField ? String(args.rawValue ?? '').trim() : '';
+  const value = isTempoField ? null : parseInlineNumber(args.rawValue);
+  if (isTempoField) {
+    if (!/^\d-\d-\d-\d$/.test(strVal)) return { error: 'формат темпа E-B-C-T (например 3-1-1-0)' };
+  } else {
+    if (value == null) return { error: 'укажите число' };
+    if (args.mode === 'mult' && !(value > 0)) return { error: 'множитель должен быть больше нуля' };
+    if (args.mode === 'set' && args.field !== 'weight' && !(value >= 1)) return { error: 'значение должно быть не меньше 1' };
+  }
   const next: Record<string, any> = { ...(args.existing || {}) };
   for (let si = 0; si < args.sessions.length; si++) {
     const session = args.sessions[si];
@@ -176,19 +182,60 @@ export function computeBulkWeekEdits(args: {
         sets: Number(ex?.sets) || 0,
         reps: Number(first?.reps) || Number(ex?.repsRange?.[0]) || 10,
         weight: Number.isFinite(Number(first?.weight)) ? Number(first.weight) : 0,
+        restSeconds: Number(first?.restSeconds ?? ex?.restSeconds) || 90,
+        tempo: ex?.tempoSpec || first?.tempo || '',
         exerciseKey: bbExerciseIdentity(ex),
       };
+      if (isTempoField) {
+        next[key] = { ...base, tempo: strVal };
+        continue;
+      }
       const cur = Number(base[args.field]) || 0;
-      const rawVal = args.mode === 'mult' ? cur * value : value;
+      const rawVal = args.mode === 'mult' ? cur * (value as number) : (value as number);
       const val = args.field === 'weight'
         ? Math.max(0, Math.min(500, Math.round(rawVal * 10) / 10))
-        : args.field === 'reps'
-          ? Math.max(1, Math.min(30, Math.round(rawVal)))
-          : Math.max(0, Math.min(20, Math.round(rawVal)));
+        : args.field === 'restSeconds'
+          ? Math.max(20, Math.min(360, Math.round(rawVal)))
+          : args.field === 'reps'
+            ? Math.max(1, Math.min(30, Math.round(rawVal)))
+            : Math.max(0, Math.min(20, Math.round(rawVal)));
       next[key] = { ...base, [args.field]: val };
     }
   }
   return { edits: next };
+}
+
+/** Скопировать inline-правку упражнения (подходы/повторы/вес/отдых/темп) на все недели мезоцикла по совпадению identity. */
+export function propagateEditAcrossWeeks(args: {
+  weeks: Array<{ week: number; sessions: Array<{ exercises: any[] }> }>;
+  sourceEdit: BBInlineEdit;
+  exerciseIdentity: string;
+  siFallback?: number;
+  eiFallback?: number;
+  existing?: Record<string, BBInlineEdit>;
+}): { edits: Record<string, BBInlineEdit>; updated: number } {
+  const next: Record<string, BBInlineEdit> = { ...(args.existing || {}) };
+  let updated = 0;
+  for (const w of args.weeks || []) {
+    for (let si = 0; si < (w.sessions || []).length; si++) {
+      const s = w.sessions[si];
+      for (let ei = 0; ei < (s.exercises || []).length; ei++) {
+        const ex = s.exercises[ei];
+        const id = bbExerciseIdentity(ex);
+        if (id !== args.exerciseIdentity && !(si === args.siFallback && ei === args.eiFallback && !args.exerciseIdentity)) {
+          continue;
+        }
+        const key = `${w.week}-${si}-${ei}`;
+        next[key] = {
+          ...(next[key] || {}),
+          ...args.sourceEdit,
+          exerciseKey: id,
+        };
+        updated += 1;
+      }
+    }
+  }
+  return { edits: next, updated };
 }
 
 /** Персональная доза trial для пик-неделы: сначала сохранённая в плане, иначе — из

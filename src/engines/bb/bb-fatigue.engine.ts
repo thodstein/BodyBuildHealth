@@ -1,4 +1,5 @@
 import type { BBExercise, BBSession } from './bb-builder.engine';
+import { parseTempoTutPerRep } from './bb-tempo-rest';
 
 export interface BBExerciseCost {
   systemic: number;
@@ -6,10 +7,12 @@ export interface BBExerciseCost {
   joint: number;
   local: number;
   timeSeconds: number;
+  tutSeconds?: number;
 }
 
 export interface BBSessionCost extends BBExerciseCost {
   exerciseCount: number;
+  tutSeconds: number;
 }
 
 export interface BBFatigueBudget {
@@ -44,12 +47,15 @@ export function estimateBBExerciseCost(exercise: BBExercise): BBExerciseCost {
   const joint = sets * (isolation ? 0.8 : 1.2) * (/француз|behind neck|за голов|upright|подбород/i.test(name) ? 1.35 : 1);
   const rawRest = exercise.restSeconds;
   const rest = Number.isFinite(Number(rawRest)) ? Number(rawRest) : (exercise.character === 'тяж' ? 180 : exercise.character === 'памп' ? 60 : 90);
-  const timeSeconds = sets * (Math.max(20, reps * 4) + rest) + 60;
-  return { systemic, axial, joint, local, timeSeconds };
+  const rawTempo = exercise.workSets?.[0]?.tempo || (exercise as any).tempoSpec;
+  const tutPerRep = parseTempoTutPerRep(rawTempo, reps >= 15 ? 3 : 4);
+  const tutSeconds = sets * Math.max(15, reps * tutPerRep);
+  const timeSeconds = tutSeconds + sets * rest + 60;
+  return { systemic, axial, joint, local, timeSeconds, tutSeconds };
 }
 
 export function estimateBBSessionCost(session: BBSession): BBSessionCost {
-  const total: BBSessionCost = { systemic: 0, axial: 0, joint: 0, local: 0, timeSeconds: 0, exerciseCount: session.exercises.length };
+  const total: BBSessionCost = { systemic: 0, axial: 0, joint: 0, local: 0, timeSeconds: 0, tutSeconds: 0, exerciseCount: session.exercises.length };
   for (const exercise of session.exercises) {
     const cost = estimateBBExerciseCost(exercise);
     total.systemic += cost.systemic;
@@ -57,6 +63,7 @@ export function estimateBBSessionCost(session: BBSession): BBSessionCost {
     total.joint += cost.joint;
     total.local += cost.local;
     total.timeSeconds += cost.timeSeconds;
+    total.tutSeconds += cost.tutSeconds || 0;
   }
   return total;
 }
@@ -150,6 +157,51 @@ export function suggestSupersetPairs(session: BBSession, maxMinutes: number): BB
     pairs,
     totalSavedSeconds: saved,
     estimatedMinutes: Math.max(1, Math.round((estimate.timeSeconds - saved) / 60)),
+  };
+}
+
+/**
+ * Применить рекомендованные пары суперсетов-антагонистов непосредственно к сессии
+ * (устанавливает `supersetGroup`, `supersetSlot`, `supersetWith` и экономит отдых).
+ */
+export function applySupersetPairsToSession(
+  session: BBSession,
+  maxMinutes?: number,
+): { pairsApplied: number; savedSeconds: number; estimatedMinutes: number } {
+  const before = estimateSessionTimeWithSupersets(session);
+  const limit = Number.isFinite(Number(maxMinutes)) && Number(maxMinutes) > 0
+    ? Number(maxMinutes)
+    : Math.max(20, Math.round(before.baseSeconds / 60) - 5);
+  const suggestion = suggestSupersetPairs(session, limit);
+  if (!suggestion.pairs.length) {
+    return {
+      pairsApplied: 0,
+      savedSeconds: before.savedSeconds,
+      estimatedMinutes: Math.max(1, Math.round(before.supersetSeconds / 60)),
+    };
+  }
+  let nextGroup = session.exercises.reduce((m, e: any) => Math.max(m, Number(e.supersetGroup || 0)), 0) + 1;
+  let applied = 0;
+  for (const pair of suggestion.pairs) {
+    const a = session.exercises.find((e: any) => !(e as any).supersetGroup && e.name === pair.aExercise && e.muscle === pair.a);
+    const b = session.exercises.find((e: any) => !(e as any).supersetGroup && e !== a && e.name === pair.bExercise && e.muscle === pair.b);
+    if (!a || !b) continue;
+    (a as any).supersetGroup = nextGroup;
+    (a as any).supersetSlot = 0;
+    (a as any).supersetWith = b.name;
+    (a as any).restSeconds = 0;
+    if (Array.isArray(a.workSets)) for (const ws of a.workSets) ws.restSeconds = 0;
+    (b as any).supersetGroup = nextGroup;
+    (b as any).supersetSlot = 1;
+    (b as any).supersetWith = a.name;
+    nextGroup += 1;
+    applied += 1;
+  }
+  const after = estimateSessionTimeWithSupersets(session);
+  return {
+    pairsApplied: applied,
+    savedSeconds: after.savedSeconds,
+    estimatedMinutes: Math.max(1, Math.round(after.supersetSeconds / 60)),
   };
 }
 

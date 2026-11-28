@@ -229,3 +229,130 @@ export function clearMEVCalibration(): void {
 export function allCalibrationMuscles(_level: string): string[] {
   return ['chest', 'back', 'quads', 'hamstrings', 'shoulders', 'biceps', 'triceps', 'glutes', 'calves', 'abs'];
 }
+
+export interface DiaryVolumeInferenceResult {
+  adjustedLandmarks: Record<string, { mev: number; mav: number; mrv: number }>;
+  confidence: 'low' | 'medium' | 'high';
+  notes: string[];
+  suggestedCalibration: MEVCalibration;
+}
+
+/**
+ * Автообучение личных объёмных ориентиров (MEV/MAV/MRV) по дневнику тренировок
+ * за последние weeksWindow недель: оценивает выполненный недельный объём по мышцам,
+ * частоту RIR <= 1 (признак перегрузки/околоотказа) и прирост e1RM.
+ */
+export function inferPersonalVolumeFromDiary(
+  sessions: Array<{ date?: string; exercises?: Array<{ muscle?: string; muscleGroup?: string; sets?: Array<{ weightKg?: number; weight?: number; reps?: number; rir?: number }> }> }>,
+  weeksWindow = 8,
+  level: string = 'intermediate',
+): DiaryVolumeInferenceResult {
+  const safeWindow = Math.max(1, Math.min(16, Math.round(weeksWindow || 8)));
+  const cutoffMs = Date.now() - safeWindow * 7 * 86400 * 1000;
+  const recent = (Array.isArray(sessions) ? sessions : []).filter(s => {
+    if (!s || !Array.isArray(s.exercises)) return false;
+    if (!s.date) return true;
+    const ms = Date.parse(String(s.date).slice(0, 10));
+    return !Number.isFinite(ms) || ms >= cutoffMs;
+  });
+
+  const muscleWeekSets = new Map<string, number>();
+  const muscleEarlyE1rm = new Map<string, number>();
+  const muscleLateE1rm = new Map<string, number>();
+  const muscleRirLow = new Map<string, number>();
+  const muscleRirTotal = new Map<string, number>();
+
+  const ordered = [...recent].sort((a, b) => String(a.date || '').localeCompare(String(b.date || '')));
+  const halfIdx = Math.floor(ordered.length / 2);
+
+  ordered.forEach((sess, idx) => {
+    for (const ex of sess.exercises || []) {
+      const canon = normMuscle(String((ex as any).muscle || ex.muscleGroup || ''));
+      if (!canon) continue;
+      const setsArr = Array.isArray(ex.sets) ? ex.sets : [];
+      if (setsArr.length === 0) continue;
+      muscleWeekSets.set(canon, (muscleWeekSets.get(canon) || 0) + setsArr.length);
+      for (const st of setsArr) {
+        const w = Number(st?.weightKg ?? (st as any)?.weight ?? 0);
+        const r = Number(st?.reps ?? 0);
+        const rir = Number(st?.rir);
+        if (w > 0 && r > 0) {
+          const e1rm = w * (1 + r / 30);
+          const targetMap = idx < halfIdx ? muscleEarlyE1rm : muscleLateE1rm;
+          if (e1rm > (targetMap.get(canon) || 0)) targetMap.set(canon, e1rm);
+        }
+        if (Number.isFinite(rir)) {
+          muscleRirTotal.set(canon, (muscleRirTotal.get(canon) || 0) + 1);
+          if (rir <= 1) muscleRirLow.set(canon, (muscleRirLow.get(canon) || 0) + 1);
+        }
+      }
+    }
+  });
+
+  const weeksObserved = Math.max(1, Math.min(safeWindow, Math.ceil(ordered.length / 3) || 1));
+  const adjustedLandmarks: Record<string, { mev: number; mav: number; mrv: number }> = {};
+  const userMevByMuscle: Record<string, number> = {};
+  const notes: string[] = [];
+
+  for (const m of allCalibrationMuscles(level)) {
+    const base = getVolumeLandmarks(level, m) || { mev: 6, mav: 12, mrv: 18 };
+    const totalSets = muscleWeekSets.get(m) || 0;
+    const weeklyAvg = totalSets / weeksObserved;
+    const lowRirShare = (muscleRirTotal.get(m) || 0) > 0
+      ? (muscleRirLow.get(m) || 0) / (muscleRirTotal.get(m) || 1)
+      : 0;
+    const early = muscleEarlyE1rm.get(m) || 0;
+    const late = muscleLateE1rm.get(m) || 0;
+    const e1rmGain = early > 0 && late > 0 ? (late - early) / early : 0;
+
+    let mev = base.mev;
+    let mav = base.mav;
+    let mrv = base.mrv;
+
+    if (totalSets >= 6) {
+      if (e1rmGain >= 0.03 && weeklyAvg <= base.mav) {
+        // Растёт сила/результат на умеренном объёме → личный MEV может быть чуть ниже или подтверждён фактом
+        mev = Math.max(2, Math.min(base.mav - 2, Math.round(weeklyAvg * 0.75)));
+        mav = Math.max(mev + 2, Math.round((base.mav + weeklyAvg) / 2));
+        notes.push(`${m}: прогресс e1RM +${Math.round(e1rmGain * 100)}% при ~${weeklyAvg.toFixed(1)} сет/нед → MEV=${mev}`);
+      } else if (lowRirShare > 0.5 && e1rmGain <= 0) {
+        // Половина подходов почти в отказ без прироста → снижаем MRV на ~15%
+        mrv = Math.max(base.mev + 2, Math.round(base.mrv * 0.85));
+        mav = Math.min(mrv - 1, base.mav);
+        notes.push(`${m}: частый отказ (RIR≤1) без роста e1RM → потолок MRV снижен до ${mrv}`);
+      } else if (weeklyAvg > base.mav && e1rmGain >= 0) {
+        // Переносит повышенный объём с положительной динамикой → аккуратный +1..2 к MAV/MRV в пределах +30%
+        mav = Math.min(Math.round(base.mrv * 1.15), Math.round(weeklyAvg));
+        mrv = Math.min(Math.round(base.mrv * 1.25), Math.max(base.mrv, mav + 2));
+      }
+    }
+    const clampedMrv = Math.min(Math.round(base.mrv * 1.3), Math.max(mev + 2, mrv));
+    const clampedMav = Math.max(mev + 1, Math.min(clampedMrv - 1, mav));
+    const clampedMev = Math.max(2, Math.min(clampedMav - 1, mev));
+    adjustedLandmarks[m] = { mev: clampedMev, mav: clampedMav, mrv: clampedMrv };
+    userMevByMuscle[m] = clampedMev;
+  }
+
+  const confidence: 'low' | 'medium' | 'high' =
+    ordered.length >= 12 ? 'high' : ordered.length >= 5 ? 'medium' : 'low';
+  if (notes.length === 0) {
+    notes.push(ordered.length === 0
+      ? 'Дневник пуст — использованы популяционные ориентиры уровня.'
+      : `Проанализировано ${ordered.length} тренировок: серьёзных отклонений от базовых норм не выявлено.`);
+  }
+
+  return {
+    adjustedLandmarks,
+    confidence,
+    notes,
+    suggestedCalibration: {
+      id: `diary-mev-${Date.now()}`,
+      level,
+      startedAt: new Date().toISOString(),
+      startSetsByMuscle: userMevByMuscle,
+      weeks: [],
+      resolvedAt: new Date().toISOString(),
+      userMevByMuscle,
+    },
+  };
+}

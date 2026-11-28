@@ -820,7 +820,7 @@ describe('G1-полный: недельная траектория объёма'
 
   it('source-guard: getVolumeWaveFactor реально вызывается в билдере (был мёртв)', () => {
     const src = readFileSync(join(__dirname, '..', 'bb-builder.engine.ts'), 'utf8');
-    expect(src).toContain('const wave = getVolumeWaveFactor(phaseWeek, phase);');
+    expect(src).toContain('const wave = getVolumeWaveFactor(phaseWeek,');
     // Импорт добавлен — иначе был бы мёртвый экспорт.
     expect(src).toMatch(/getVolumeWaveFactor, type BBPhase \} from '\.\.\/periodization'/);
   });

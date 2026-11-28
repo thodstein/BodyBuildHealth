@@ -11,16 +11,16 @@
  */
 
 export const MOBILITY_PATTERNS: Record<string, RegExp> = {
-  shoulder: /overhead|жим.*стоя|ohp|за.*голов|behind.?neck|upright.?row|тяга.*подбород|арнольд|arnold/i,
-  hip: /atg|ass.?to.?grass|глубок.*присед|гоблет.*присед|goblet.*squat|sissy|сисси/i,
+  shoulder: /overhead|жим.*стоя|ohp|за.*голов|behind.?neck|upright.?row|тяга.*подбород|арнольд|arnold|отжиман.*брус|dips/i,
+  hip: /atg|ass.?to.?grass|глубок.*присед|гоблет.*присед|goblet.*squat|sissy|сисси|фронт.*присед|front.?squat|болгар|bulgarian|выпад|lunge|присед.*штанг|back.?squat/i,
   ankle: /присед.*штанг|back.?squat|front.?squat|выпад|lunge|болгар|bulgarian/i,
-  lower_back: /станов.*классик|conventional.*deadlift|тяга.*наклон|barbell.?row|good.?morning|гудморнинг|румынск.*штанг|rdl.*barbell/i,
-  wrist: /штанг.*бицепс|бицепс.*штанг|barbell.?curl|ez.?bar|ez.?гриф|француз.*(штанг|гриф)|french.?press.*barbell|skullcrusher.*barbell/i,
+  lower_back: /станов.*классик|conventional.*deadlift|deadlift|тяга.*наклон|barbell.?row|good.?morning|гудморнинг|румынск|rdl|мёртв|мертв|присед.*штанг|back.?squat|тяга.*т-?гриф|t-?bar/i,
+  wrist: /штанг.*бицепс|бицепс.*штанг|barbell.?curl|ez.?bar|ez.?гриф|француз.*(штанг|гриф)|french.?press.*barbell|skullcrusher.*barbell|фронтальн.*присед|front.?squat|отжиман.*пол|push.?up/i,
 };
 
 export function isMobilityRestricted(ex: any, restrictions?: string[]): boolean {
   if (!restrictions || restrictions.length === 0) return false;
-  const n = (ex.name || '').toLowerCase();
+  const n = `${ex?.name || ''} ${ex?.exerciseName || ''} ${ex?.id || ''}`.toLowerCase();
   for (const r of restrictions) {
     const pattern = MOBILITY_PATTERNS[r];
     if (pattern && pattern.test(n)) return true;

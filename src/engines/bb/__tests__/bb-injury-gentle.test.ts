@@ -23,8 +23,9 @@ describe('expandInjuryMuscle — зонные ключи травм раскры
   it('arms → biceps/triceps/forearms', () => {
     expect(expandInjuryMuscle('arms')).toEqual(['biceps', 'triceps', 'forearms']);
   });
-  it('core → abs/lower_back', () => {
-    expect(expandInjuryMuscle('core')).toEqual(['abs', 'lower_back']);
+  it('core → abs; lower_back отделена от пресса (T-1)', () => {
+    expect(expandInjuryMuscle('core')).toEqual(['abs']);
+    expect(expandInjuryMuscle('lower_back')).toEqual(['lower_back']);
   });
   it('канонический ключ не меняется', () => {
     expect(expandInjuryMuscle('shoulders')).toEqual(['shoulders']);

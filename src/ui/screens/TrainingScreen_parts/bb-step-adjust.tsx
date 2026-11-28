@@ -24,7 +24,7 @@ import { FFChart } from '../SRCBBScreen_parts/ProMetricsPanel';
 import { PopupSelect, ExpandableCard } from '../SRCBBScreen_parts/TrainingPopups';
 import { BTN, BTN_GHOST, IN, SMALL, H } from './training-ui';
 import { PHASE_COLORS } from './PlanOutput';
-import { CollapsibleCard, phaseForWeek, exerciseComment, backSubgroupLabel, armHeadLabel, bbExerciseIdentity, clampInlineNumber, computeBulkWeekEdits, type BBPhase, type Step, type BBInlineEdit } from './bb-auto-constructor-shared';
+import { CollapsibleCard, phaseForWeek, exerciseComment, backSubgroupLabel, armHeadLabel, bbExerciseIdentity, clampInlineNumber, computeBulkWeekEdits, propagateEditAcrossWeeks, type BBPhase, type Step, type BBInlineEdit } from './bb-auto-constructor-shared';
 import { exerciseFeatureBadges, planSetsBreakdown, canonTechniqueId } from './bb-technique-display';
 import { muscleLabel } from './bb-labels';
 import type { SavedBBPlan } from './bb-plans-store';
@@ -47,8 +47,8 @@ export interface BbAdjustStepProps {
   redoEdits: () => void;
   bulkModal: boolean;
   setBulkModal: React.Dispatch<React.SetStateAction<boolean>>;
-  bulkField: 'sets' | 'reps' | 'weight';
-  setBulkField: React.Dispatch<React.SetStateAction<'sets' | 'reps' | 'weight'>>;
+  bulkField: 'sets' | 'reps' | 'weight' | 'restSeconds' | 'tempo';
+  setBulkField: React.Dispatch<React.SetStateAction<'sets' | 'reps' | 'weight' | 'restSeconds' | 'tempo'>>;
   bulkMode: 'set' | 'mult';
   setBulkMode: React.Dispatch<React.SetStateAction<'set' | 'mult'>>;
   /** Пакетная правка недели: значение вводится как строка, чтобы пустое поле
@@ -181,8 +181,8 @@ export const BbAdjustStep: React.FC<BbAdjustStepProps> = React.memo(({
                 {taper.map(t => (
                   <div key={t.week} style={{ flex: 1, textAlign: 'center' }}>
                     <div title={`${t.label}: ${Math.round(t.volumePct * 100)}% · RIR ${t.rir[0]}-${t.rir[1]}`} style={{ height: Math.max(6, Math.round(t.volumePct * 56)), borderRadius: 6, background: 'linear-gradient(180deg,#e11d48,#7f1d1d)', border: '1px solid rgba(225,29,72,0.4)', boxShadow: '0 0 8px rgba(225,29,72,0.25)' }} />
-                    <div style={{ fontSize: 9, color: 'rgba(255,255,255,0.6)', marginTop: 3 }}>нед {t.week}</div>
-                    <div style={{ fontSize: 9, color: '#fca5a5', fontWeight: 700 }}>{Math.round(t.volumePct * 100)}%</div>
+                    <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.6)', marginTop: 3 }}>нед {t.week}</div>
+                    <div style={{ fontSize: 10, color: '#fca5a5', fontWeight: 700 }}>{Math.round(t.volumePct * 100)}%</div>
                   </div>
                 ))}
               </div>
@@ -220,12 +220,12 @@ export const BbAdjustStep: React.FC<BbAdjustStepProps> = React.memo(({
                   return (
                     <div key={w.weekNumber} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '6px 8px', borderRadius: 8, background: 'rgba(0,0,0,0.15)', border: '1px solid rgba(255,255,255,0.06)' }}>
                       <span style={{ fontSize: 10, fontWeight: 800, color: '#00e68a', width: 62 }}>нед {w.weekNumber}</span>
-                      <span style={{ fontSize: 9, color: 'rgba(255,255,255,0.55)', width: 108 }}>{w.startDate?.slice(5)}–{w.endDate?.slice(5)}</span>
+                      <span style={{ fontSize: 10, color: 'rgba(255,255,255,0.55)', width: 108 }}>{w.startDate?.slice(5)}–{w.endDate?.slice(5)}</span>
                       <span style={{ flex: 1, fontSize: 10, color: 'var(--text, #fff)' }}>
                         план {w.planned.sets} с. · {Math.round(w.planned.tonnage)} кг
                         {w.actual.sessions > 0 ? ` → факт ${w.actual.sets} с. · ${Math.round(w.actual.tonnage)} кг · RIR ${w.actual.avgRir.toFixed(1)}` : ''}
                       </span>
-                      <span style={{ fontSize: 9, fontWeight: 700, color: b.color, whiteSpace: 'nowrap' }}>{b.label}</span>
+                      <span style={{ fontSize: 10, fontWeight: 700, color: b.color, whiteSpace: 'nowrap' }}>{b.label}</span>
                     </div>
                   );
                 })}
@@ -235,7 +235,7 @@ export const BbAdjustStep: React.FC<BbAdjustStepProps> = React.memo(({
                   <div style={{ fontSize: 10, fontWeight: 700, color: 'rgba(255,255,255,0.7)', marginBottom: 4 }}>По мышцам:</div>
                   <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4 }}>
                     {Object.entries(fact.byMuscle).map(([m, v]) => (
-                      <span key={m} style={{ fontSize: 9, fontWeight: 700, padding: '2px 7px', borderRadius: 999, background: v.adherence >= 0.9 ? 'rgba(0,230,138,0.12)' : v.adherence >= 0.6 ? 'rgba(251,191,36,0.12)' : 'rgba(248,113,113,0.12)', color: v.adherence >= 0.9 ? '#00e68a' : v.adherence >= 0.6 ? '#fbbf24' : '#f87171', border: '1px solid rgba(255,255,255,0.1)' }}>
+                      <span key={m} style={{ fontSize: 10, fontWeight: 700, padding: '2px 7px', borderRadius: 999, background: v.adherence >= 0.9 ? 'rgba(0,230,138,0.12)' : v.adherence >= 0.6 ? 'rgba(251,191,36,0.12)' : 'rgba(248,113,113,0.12)', color: v.adherence >= 0.9 ? '#00e68a' : v.adherence >= 0.6 ? '#fbbf24' : '#f87171', border: '1px solid rgba(255,255,255,0.1)' }}>
                         {MUSCLE_LABEL_RU[m] || m}: {v.actualSets}/{v.plannedSets}
                       </span>
                     ))}
@@ -274,7 +274,7 @@ export const BbAdjustStep: React.FC<BbAdjustStepProps> = React.memo(({
                 </div>
               )}
               {fact.unmatchedSessions.length > 0 && (
-                <div style={{ marginTop: 6, fontSize: 9, color: 'rgba(255,255,255,0.5)' }}>
+                <div style={{ marginTop: 6, fontSize: 10, color: 'rgba(255,255,255,0.5)' }}>
                   {ruCount(fact.unmatchedSessions.length, RU_SESSIONS)} вне диапазона плана (даты не совпадают с неделями мезо).
                 </div>
               )}
@@ -283,7 +283,16 @@ export const BbAdjustStep: React.FC<BbAdjustStepProps> = React.memo(({
         })()}
       </CollapsibleCard>
       <CollapsibleCard title="🔧 Инструменты коррекции" defaultOpen={true} headerStyle={{ background: 'linear-gradient(135deg, rgba(96,165,250,0.12), rgba(96,165,250,0.04))', color: '#60a5fa' }} badge="3 группы действий">
-          {builtPlan.validation && !builtPlan.validation.valid && <div style={{ width:'100%', fontSize:11, color:'#f59e0b', marginBottom:8 }}>⚠ Есть предупреждения валидации — сохранение доступно, но проверьте замечания.</div>}
+          {builtPlan.validation && !builtPlan.validation.valid && (() => {
+            const hasErrors = (builtPlan.validation.issues || []).some((i: any) => i.level === 'error');
+            return (
+              <div style={{ width:'100%', fontSize:11, color: hasErrors ? '#f87171' : '#f59e0b', marginBottom:8 }}>
+                {hasErrors
+                  ? '⛔ Есть ошибки валидации — проверьте замечания перед отправкой в выполнение.'
+                  : '⚠ Есть замечания валидации — сохранение доступно, но проверьте рекомендации.'}
+              </div>
+            );
+          })()}
           {Object.keys(exerciseEdits).length > 0 && (
             <div data-bb="adjust-edits-diff" style={{ marginBottom:8, padding:'8px 10px', borderRadius:10, background:'rgba(245,158,11,0.08)', border:'1px solid rgba(245,158,11,0.28)', display:'flex', alignItems:'center', justifyContent:'space-between', gap:8, flexWrap:'wrap', fontSize:11, color:'var(--text, #fff)' }}>
               <span>📝 Ручных правок: <b>{Object.keys(exerciseEdits).length}</b> (поверх сгенерированного плана)</span>
@@ -454,7 +463,7 @@ export const BbAdjustStep: React.FC<BbAdjustStepProps> = React.memo(({
             {redosHistory.length > 0 && <button onClick={redoEdits} style={{ padding:'3px 8px', borderRadius:8, fontSize:11, cursor:'pointer', border:'1px solid rgba(139,92,246,0.3)', background:'rgba(139,92,246,0.1)', color:'#a78bfa' }} title="Повторить правку">↪ Повторить</button>}
             <button onClick={() => setBulkModal(true)} style={{ padding:'3px 8px', borderRadius:8, fontSize:11, cursor:'pointer', border:'1px solid rgba(245,158,11,0.3)', background:'rgba(245,158,11,0.1)', color:'#f59e0b' }} title="Применить ко всем упражнениям недели">⚡ Пакетно</button>
             {W.map(w => {
-              const ph = phaseForWeek(w.week, bbWeeks);
+              const ph = ((w as any).phase || ((w as any).deload ? 'deload' : phaseForWeek(w.week, bbWeeks))) as BBPhase;
               return <button key={w.week} onClick={() => setBbWeekSel(w.week)} style={{ padding:'3px 8px', borderRadius:8, fontSize:11, cursor:'pointer', border:w.week===bbWeekSel?'1px solid ' + PHASE_COLORS[ph]:'1px solid rgba(255,255,255,0.08)', background:w.week===bbWeekSel?PHASE_COLORS[ph]+'20':'transparent', color:w.week===bbWeekSel?PHASE_COLORS[ph]:'#fff' }}>{w.week}</button>;
             })}
           </div>
@@ -467,22 +476,36 @@ export const BbAdjustStep: React.FC<BbAdjustStepProps> = React.memo(({
                 label="Поле"
                 value={bulkField}
                 onChange={v => setBulkField(v as any)}
-                options={[{ id: 'sets', label: 'Сеты' }, { id: 'reps', label: 'Повторы' }, { id: 'weight', label: 'Вес, кг' }]}
+                options={[
+                  { id: 'sets', label: 'Сеты' },
+                  { id: 'reps', label: 'Повторы' },
+                  { id: 'weight', label: 'Вес, кг' },
+                  { id: 'restSeconds', label: 'Отдых, с' },
+                  { id: 'tempo', label: 'Темп (E-B-C-T)' },
+                ]}
               />
-              <PopupSelect
-                label="Режим"
-                value={bulkMode}
-                onChange={v => setBulkMode(v as any)}
-                options={[{ id: 'set', label: '= задать' }, { id: 'mult', label: '× умножить' }]}
+              {bulkField !== ('tempo' as any) && (
+                <PopupSelect
+                  label="Режим"
+                  value={bulkMode}
+                  onChange={v => setBulkMode(v as any)}
+                  options={[{ id: 'set', label: '= задать' }, { id: 'mult', label: '× умножить' }]}
+                />
+              )}
+              <input
+                type={bulkField === ('tempo' as any) ? 'text' : 'number'}
+                placeholder={bulkField === ('tempo' as any) ? '3-1-1-0' : undefined}
+                value={bulkValue}
+                onChange={e2 => setBulkValue(e2.target.value)}
+                style={{ width: bulkField === ('tempo' as any) ? 76 : 60, ...IN }}
               />
-              <input type="number" value={bulkValue} onChange={e2 => setBulkValue(e2.target.value)} style={{ width:60, ...IN }} />
               <button onClick={() => {
                 // Аудит UI, P2 «пакетная правка недели»: пустое поле раньше читалось как 0
                 // («× умножить» обнулял вес и сеты всей недели), а в правку дописывались
                 // выдуманные поля (`reps: 10`, `weight: 80`). Разбор и правила —
                 // `computeBulkWeekEdits` (меняется только выбранное поле).
                 const res = computeBulkWeekEdits({
-                  sessions: wk.sessions, weekNo: wk.week, field: bulkField, mode: bulkMode,
+                  sessions: wk.sessions, weekNo: wk.week, field: bulkField as any, mode: bulkField === ('tempo' as any) ? 'set' : bulkMode,
                   rawValue: bulkValue, existing: editsRef.current,
                 });
                 if ('error' in res) { flash('⚡ Пакетно: ' + res.error); return; }
@@ -509,6 +532,8 @@ export const BbAdjustStep: React.FC<BbAdjustStepProps> = React.memo(({
                 const altExercises = (byMuscleAlt.length > 0 ? byMuscleAlt : getExercisesByGroup(e.muscle)).filter(x => x.name !== e.name).slice(0, 5);
                 const editBadges = exerciseFeatureBadges(e, dupMode);
                 const { lines: editSetLines, chain: editSetChain } = planSetsBreakdown(e, edit);
+                const curRest = edit.restSeconds ?? (e as any).restSeconds ?? e.workSets[0]?.restSeconds ?? 90;
+                const curTempo = edit.tempo !== undefined ? edit.tempo : ((e as any).tempoSpec || e.workSets[0]?.tempo || '');
                 return <div key={ei} style={{ marginBottom:8, padding:'8px 10px', borderRadius:10, background:'rgba(255,255,255,0.03)', border:'1px solid rgba(255,255,255,0.06)' }}>
                   <div style={{ fontWeight:700, fontSize:11, color: 'var(--text, #fff)', marginBottom:4 }}>{ei+1}. {e.name} <span style={{ fontWeight:400, fontSize:11, color: 'var(--text, #fff)' }}>({muscleLabel(e.muscle)})</span> <span style={{ fontSize:10, fontWeight:700, padding:'1px 6px', borderRadius:5, background:(isComp?'#00e68a':'#f59e0b')+'20', color:isComp?'#00e68a':'#f59e0b', marginLeft:6 }}>{isComp?'База':'Изо'}</span>
                     {(e as any).warmupActivator && <span style={{ fontSize:10, fontWeight:700, padding:'1px 6px', borderRadius:5, background:'rgba(148,163,184,0.15)', color:'#94a3b8', marginLeft:6 }}>🔥 Разминка</span>}
@@ -517,12 +542,29 @@ export const BbAdjustStep: React.FC<BbAdjustStepProps> = React.memo(({
                     {editBadges.map((fb, fbi) => <span key={fbi} style={{ fontSize:10, fontWeight:700, padding:'1px 6px', borderRadius:5, background:fb.color+'20', color:fb.color, marginLeft:6 }}>{fb.icon} {fb.label}</span>)}
                   </div>
                   <div style={{ display:'flex', gap:8, marginBottom:6, flexWrap:'wrap', alignItems:'center' }}>
-                    <div><span style={{ ...SMALL, fontSize:11 }}>Сеты</span><input type="number" value={edit.sets} min={0} max={20} onChange={e2 => commitEdits({ ...editsRef.current, [editKey]: { ...edit, sets: clampInlineNumber(e2.target.value, 0, 20, edit.sets) } })} style={{ width:45, background:'#18181b', color: 'var(--text, #fff)', border:'1px solid rgba(255,255,255,0.08)', borderRadius:8, padding:'4px 8px', fontSize:11 }} /></div>
+                    <div><span style={{ ...SMALL, fontSize:11 }}>Сеты</span><input type="number" value={edit.sets} min={0} max={20} onChange={e2 => commitEdits({ ...editsRef.current, [editKey]: { ...edit, sets: clampInlineNumber(e2.target.value, 0, 20, edit.sets) } })} style={{ width:45, background:'var(--surface-subtle, rgba(24,24,27,0.85))', color: 'var(--text, #fff)', border:'1px solid rgba(255,255,255,0.08)', borderRadius:8, padding:'4px 8px', fontSize:11 }} /></div>
                     <div><span style={{ ...SMALL, fontSize:11 }}>Повт</span><input type="number" value={edit.reps} min={1} max={30} onChange={e2 => commitEdits({ ...editsRef.current, [editKey]: { ...edit, reps: clampInlineNumber(e2.target.value, 1, 30, edit.reps) } })} style={{ width:45, ...IN }} /></div>
                     <div><span style={{ ...SMALL, fontSize:11 }}>Вес, кг</span><input type="number" value={edit.weight} min={0} max={500} onChange={e2 => commitEdits({ ...editsRef.current, [editKey]: { ...edit, weight: clampInlineNumber(e2.target.value, 0, 500, edit.weight) } })} style={{ width:55, ...IN }} /></div>
                     <div><span style={{ ...SMALL, fontSize:11 }}>RIR</span><input type="number" value={edit.rir ?? (e as any).rir ?? 2} min={0} max={5} onChange={e2 => commitEdits({ ...editsRef.current, [editKey]: { ...edit, rir: clampInlineNumber(e2.target.value, 0, 5, edit.rir ?? (e as any).rir ?? 2) } })} style={{ width:45, ...IN }} /></div>
-                    <div><span style={{ ...SMALL, fontSize:11 }}>Отдых, с</span><input type="number" value={edit.restSeconds ?? (e as any).restSeconds ?? 90} min={20} max={360} step={15} onChange={e2 => commitEdits({ ...editsRef.current, [editKey]: { ...edit, restSeconds: clampInlineNumber(e2.target.value, 20, 360, edit.restSeconds ?? (e as any).restSeconds ?? 90) } })} style={{ width:54, ...IN }} /></div>
+                    <div style={{ display:'flex', alignItems:'center', gap:3 }}>
+                      <span style={{ ...SMALL, fontSize:11 }}>Отдых, с</span>
+                      <button type="button" onClick={() => commitEdits({ ...editsRef.current, [editKey]: { ...edit, restSeconds: Math.max(20, curRest - 15) } })} style={{ padding:'3px 6px', borderRadius:6, fontSize:10, cursor:'pointer', border:'1px solid rgba(255,255,255,0.12)', background:'rgba(255,255,255,0.04)', color:'var(--text, #fff)' }}>−15</button>
+                      <input type="number" value={curRest} min={20} max={360} step={15} onChange={e2 => commitEdits({ ...editsRef.current, [editKey]: { ...edit, restSeconds: clampInlineNumber(e2.target.value, 20, 360, curRest) } })} style={{ width:52, ...IN }} />
+                      <button type="button" onClick={() => commitEdits({ ...editsRef.current, [editKey]: { ...edit, restSeconds: Math.min(360, curRest + 15) } })} style={{ padding:'3px 6px', borderRadius:6, fontSize:10, cursor:'pointer', border:'1px solid rgba(255,255,255,0.12)', background:'rgba(255,255,255,0.04)', color:'var(--text, #fff)' }}>+15</button>
+                    </div>
                     <button onClick={() => setExSwapModal({ si, ei, muscle: e.muscle, currentName: e.name })} style={{ padding:'3px 8px', borderRadius:8, fontSize:11, cursor:'pointer', border:'1px solid rgba(255,255,255,0.1)', background:'rgba(255,255,255,0.03)', color: 'var(--text, #fff)' }}>🔄 Заменить</button>
+                    <button type="button" title="Применить параметры этого упражнения ко всем неделям мезоцикла" onClick={() => {
+                      const res = propagateEditAcrossWeeks({
+                        weeks: builtPlan.weeks,
+                        sourceEdit: { ...edit, restSeconds: curRest, tempo: curTempo },
+                        exerciseIdentity: exerciseKey,
+                        siFallback: si,
+                        eiFallback: ei,
+                        existing: editsRef.current,
+                      });
+                      commitEdits(res.edits);
+                      flash(`📌 Применено ко всем неделям (${res.updated} слот.)`);
+                    }} style={{ padding:'3px 8px', borderRadius:8, fontSize:10, cursor:'pointer', border:'1px solid rgba(96,165,250,0.35)', background:'rgba(96,165,250,0.1)', color:'#60a5fa', fontWeight:700 }}>📌 На все недели</button>
                     <button onClick={() => handleMoveExercise(si, ei, -1)} disabled={ei === 0} style={{ padding:'3px 8px', borderRadius:8, fontSize:11, cursor:ei===0?'default':'pointer', border:'1px solid rgba(96,165,250,0.2)', background:ei===0?'transparent':'rgba(96,165,250,0.06)', color:ei===0?'rgba(255,255,255,0.2)':'#60a5fa' }}>↑</button>
                     <button onClick={() => handleMoveExercise(si, ei, 1)} disabled={ei === s.exercises.length - 1} style={{ padding:'3px 8px', borderRadius:8, fontSize:11, cursor:ei===s.exercises.length-1?'default':'pointer', border:'1px solid rgba(96,165,250,0.2)', background:ei===s.exercises.length-1?'transparent':'rgba(96,165,250,0.06)', color:ei===s.exercises.length-1?'rgba(255,255,255,0.2)':'#60a5fa' }}>↓</button>
                     {handleRemoveExercise && s.exercises.length > 1 && <button onClick={() => handleRemoveExercise(si, ei)} title="Удалить упражнение" style={{ padding:'3px 8px', borderRadius:8, fontSize:11, cursor:'pointer', border:'1px solid rgba(239,68,68,0.3)', background:'rgba(239,68,68,0.08)', color:'#f87171' }}>🗑</button>}
@@ -552,8 +594,14 @@ export const BbAdjustStep: React.FC<BbAdjustStepProps> = React.memo(({
                         { id: 'та же группа', label: '🔗 Та же группа' },
                       ]}
                     />
-                    <div style={{ display:'flex', alignItems:'center', gap:4 }}><span style={{ ...SMALL, fontSize:11 }}>Темп</span><input type="text" value={edit.tempo !== undefined ? edit.tempo : ((e as any).tempoSpec || '')} onChange={e2 => { const v = e2.target.value; commitEdits({ ...editsRef.current, [editKey]: { ...edit, tempo: v } }); }} onBlur={e2 => { const v = e2.target.value.trim(); commitEdits({ ...editsRef.current, [editKey]: { ...edit, tempo: v } }); }} placeholder="3-1-1-0" style={{ width:62, ...IN }} /></div>
-                    {(edit.technique && edit.technique !== 'none') || (edit.supersetWith && edit.supersetWith !== 'none') ? <span style={{ fontSize:9, color:'#f59e0b' }}>⚠ применяется при «💾 Сохранить план» / экспорте</span> : null}
+                    <div style={{ display:'flex', alignItems:'center', gap:4, flexWrap:'wrap' }}>
+                      <span style={{ ...SMALL, fontSize:11 }}>Темп</span>
+                      <input type="text" value={curTempo} onChange={e2 => { const v = e2.target.value; commitEdits({ ...editsRef.current, [editKey]: { ...edit, tempo: v } }); }} onBlur={e2 => { const v = e2.target.value.trim(); commitEdits({ ...editsRef.current, [editKey]: { ...edit, tempo: v } }); }} placeholder="3-1-1-0" style={{ width:62, ...IN }} />
+                      {['2-0-1-0', '3-1-1-0', '3-0-1-2', '4-0-1-0'].map(tp => (
+                        <button key={tp} type="button" onClick={() => commitEdits({ ...editsRef.current, [editKey]: { ...edit, tempo: tp } })} style={{ padding:'2px 6px', borderRadius:6, fontSize:10, cursor:'pointer', border: curTempo === tp ? '1px solid #a855f7' : '1px solid rgba(255,255,255,0.1)', background: curTempo === tp ? 'rgba(168,85,247,0.18)' : 'rgba(255,255,255,0.03)', color: 'var(--text, #fff)' }}>{tp}</button>
+                      ))}
+                    </div>
+                    {(edit.technique && edit.technique !== 'none') || (edit.supersetWith && edit.supersetWith !== 'none') ? <span style={{ fontSize:10, color:'#f59e0b' }}>⚠ применяется при «💾 Сохранить план» / экспорте</span> : null}
                   </div>
                   {(editSetLines.length > 0 || editSetChain) && (
                     <div style={{ marginTop:6, padding:'6px 8px', borderRadius:8, background:'rgba(255,255,255,0.03)', border:'0.5px solid rgba(255,255,255,0.07)', display:'flex', gap:5, flexWrap:'wrap', alignItems:'center' }}>

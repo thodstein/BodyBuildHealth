@@ -95,9 +95,9 @@ describe('tempoFor: phase param (ACSM 2023 eccentric 2-4s)', () => {
     expect(t.eccentric).toBe(2);
   });
 
-  it('tempoFor with deload → eccentric=4 (slow, recovery)', () => {
+  it('tempoFor with deload → eccentric=2 (recovery without prolonged eccentric)', () => {
     const t = tempoFor('памп', undefined, 'deload');
-    expect(t.eccentric).toBe(4);
+    expect(t.eccentric).toBe(2);
   });
 
   it('tempoFor with intensification → eccentric=2', () => {

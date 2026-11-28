@@ -25,15 +25,17 @@ export interface BbWeightsStepProps {
   onGoQuality: () => void;
   /** «← Назад» (шаг «План»). */
   onBack: () => void;
+  /** Синхронизировать пересчитанный план в `he_bb_plan_saved` / `he_pl_runtime`. */
+  onSyncPlan?: (plan: BBPlan) => void;
 }
 
 export const BbWeightsStep: React.FC<BbWeightsStepProps> = ({
   builtPlan, setBuiltPlan, weightEntries, setWeightEntries, weightsApplied, setWeightsApplied,
-  weightsCollapsed, setWeightsCollapsed, onGoQuality, onBack,
+  weightsCollapsed, setWeightsCollapsed, onGoQuality, onBack, onSyncPlan,
 }) => {
   if (!builtPlan) return null;
   const entries = weightEntries.length ? weightEntries : collectPlanExercises(builtPlan);
-  // P1-23: собираем фактические топ-веса по упражнениям из дневника тренировок для авто-подстановки
+  // P1-23 + Фаза 2.3: оцениваем e1RM / рабочий вес (5-10 ПМ) из дневника, а не только сырой weightKg.
   const diaryTopWeights = useMemo(() => {
     const map: Record<string, number> = {};
     try {
@@ -44,7 +46,12 @@ export const BbWeightsStep: React.FC<BbWeightsStepProps> = ({
           if (!key) continue;
           for (const st of ex?.sets || []) {
             const w = Number(st?.weightKg ?? 0);
-            if (w > 0 && w > (map[key] || 0)) map[key] = Math.round(w * 2) / 2;
+            const r = Number(st?.reps ?? 0);
+            if (w > 0) {
+              const estWork = r > 1 ? Math.round((w * (1 + r / 30) * 0.80) * 2) / 2 : Math.round(w * 2) / 2;
+              const best = Math.max(w, estWork);
+              if (best > (map[key] || 0)) map[key] = Math.round(best * 2) / 2;
+            }
           }
         }
       }
@@ -81,8 +88,20 @@ export const BbWeightsStep: React.FC<BbWeightsStepProps> = ({
   const apply = () => {
     if (!builtPlan) return;
     const res = recalibratePlanWeights(builtPlan, entries);
-    setBuiltPlan({ ...res.plan, rationale: [...res.plan.rationale, `⚖️ Реальные веса: применено к упражнениям — ${ruCount(res.applied, RU_OCCURRENCES)} (${filled} заполнено).`] });
+    const updatedPlan: BBPlan = {
+      ...res.plan,
+      rationale: [...res.plan.rationale, `⚖️ Реальные веса: применено к упражнениям — ${ruCount(res.applied, RU_OCCURRENCES)} (${filled} заполнено).`],
+    };
+    setBuiltPlan(updatedPlan);
+    onSyncPlan?.(updatedPlan);
     setWeightsApplied(res.applied);
+    try {
+      const rawSaved = localStorage.getItem('he_bb_plan_saved');
+      if (rawSaved) {
+        const parsed = JSON.parse(rawSaved);
+        localStorage.setItem('he_bb_plan_saved', JSON.stringify({ ...parsed, plan: updatedPlan }));
+      }
+    } catch { /* ignore */ }
     // Персистентность в training.workMaxByExercise (ключ = id упражнения)
     try {
       const saved: Record<string, number> = {};
@@ -98,8 +117,8 @@ export const BbWeightsStep: React.FC<BbWeightsStepProps> = ({
   };
   return (
     <div>
-      <div style={{ fontSize: 20, fontWeight: 800, color: '#fff', marginBottom: 4 }}>⚖️ Реальные веса по упражнениям</div>
-      <div style={{ fontSize: 12, color: '#fff', opacity: 0.85, marginBottom: 12, lineHeight: 1.5 }}>
+      <div style={{ fontSize: 20, fontWeight: 800, color: 'var(--text, #fff)', marginBottom: 4 }}>⚖️ Реальные веса по упражнениям</div>
+      <div style={{ fontSize: 12, color: 'var(--text, #fff)', opacity: 0.85, marginBottom: 12, lineHeight: 1.5 }}>
         Введите <b style={{ color: '#00e68a' }}>фактические рабочие веса</b> (кг) для упражнений плана, сгруппированных по группам мышц.
         Движок пересчитает сеты и тоннаж от реальных значений вместо формульной экстраполяции от рабочего максимума по группе.
         Сохранённые веса применятся и при следующей пересборке.
@@ -116,7 +135,7 @@ export const BbWeightsStep: React.FC<BbWeightsStepProps> = ({
       </div>
       {filled === 0 && <div style={{ fontSize: 11, color: '#fbbf24', marginBottom: 8 }}>Введите хотя бы один фактический вес, чтобы пересчитать нагрузку.</div>}
       {entries.length === 0
-        ? <div style={{ fontSize: 12, color: '#fff', opacity: 0.7, padding: 20, textAlign: 'center' }}>План пуст — сначала соберите план.</div>
+        ? <div style={{ fontSize: 12, color: 'var(--text, #fff)', opacity: 0.7, padding: 20, textAlign: 'center' }}>План пуст — сначала соберите план.</div>
         : (
           <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
             {groups.map(g => {
@@ -128,7 +147,7 @@ export const BbWeightsStep: React.FC<BbWeightsStepProps> = ({
                     type="button"
                     aria-expanded={!collapsed}
                     onClick={() => setWeightsCollapsed(p => ({ ...p, [g.muscle]: !collapsed }))}
-                    style={{ width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8, padding: '10px 12px', cursor: 'pointer', border: 'none', background: 'linear-gradient(135deg, rgba(0,230,138,0.14), rgba(0,230,138,0.05))', color: '#fff', fontWeight: 800, fontSize: 13, minHeight: 46 }}
+                    style={{ width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8, padding: '10px 12px', cursor: 'pointer', border: 'none', background: 'linear-gradient(135deg, rgba(0,230,138,0.14), rgba(0,230,138,0.05))', color: 'var(--text, #fff)', fontWeight: 800, fontSize: 13, minHeight: 46 }}
                   >
                     <span style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
                       <span style={{ width: 28, height: 28, borderRadius: 8, display: 'inline-flex', alignItems: 'center', justifyContent: 'center', background: 'rgba(0,230,138,0.18)', color: '#00e68a', fontSize: 14 }}>💪</span>
@@ -144,20 +163,20 @@ export const BbWeightsStep: React.FC<BbWeightsStepProps> = ({
                       {g.items.map((e) => (
                         <div key={e.id || e.name} style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.08)', borderRadius: 10, padding: '8px 10px', display: 'flex', alignItems: 'center', gap: 8, boxSizing: 'border-box' }}>
                           <div style={{ flex: 1, minWidth: 0 }}>
-                            <div style={{ fontSize: 12, fontWeight: 700, color: '#fff', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{e.name}</div>
-                            <div style={{ fontSize: 10, color: '#fff', opacity: 0.55 }}>
+                            <div style={{ fontSize: 12, fontWeight: 700, color: 'var(--text, #fff)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{e.name}</div>
+                            <div style={{ fontSize: 10, color: 'var(--text, #fff)', opacity: 0.55 }}>
                               {e.role === 'primary' ? 'Основное' : 'Добивка'} · план {e.referenceWeight} кг
                               {e.actualWeight != null && e.actualWeight > 0 ? ` · введено ${e.actualWeight} кг` : ''}
                             </div>
                           </div>
-                          <label style={{ fontSize: 10, color: '#fff', opacity: 0.6, display: 'inline-flex', alignItems: 'center', gap: 4 }}>
+                          <label style={{ fontSize: 10, color: 'var(--text, #fff)', opacity: 0.6, display: 'inline-flex', alignItems: 'center', gap: 4 }}>
                             Вес (кг)
                             <input
                               type="number" inputMode="decimal" min={0} step={0.5}
                               value={e.actualWeight ?? ''}
                               placeholder={String(e.referenceWeight)}
                               onChange={ev => setEntry(e, ev.target.value === '' ? null : Number(ev.target.value))}
-                              style={{ width: 84, textAlign: 'center', flexShrink: 0, background: e.actualWeight != null && e.actualWeight > 0 ? 'rgba(0,230,138,0.12)' : '#18181b', color: '#fff', border: e.actualWeight != null && e.actualWeight > 0 ? '1px solid rgba(0,230,138,0.4)' : '1px solid rgba(255,255,255,0.08)', borderRadius: 8, padding: '6px 8px', fontSize: 12 }}
+                              style={{ width: 84, textAlign: 'center', flexShrink: 0, background: e.actualWeight != null && e.actualWeight > 0 ? 'rgba(0,230,138,0.12)' : '#18181b', color: 'var(--text, #fff)', border: e.actualWeight != null && e.actualWeight > 0 ? '1px solid rgba(0,230,138,0.4)' : '1px solid rgba(255,255,255,0.08)', borderRadius: 8, padding: '6px 8px', fontSize: 12 }}
                             />
                           </label>
                         </div>

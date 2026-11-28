@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { programToBBPlan, cycleTemplateToFullProgram } from '../cycle-to-plan';
 import { getCyclesByDirection } from '../../../data/lms-cycles/lms-cycle-index';
-import { isWeightReachable } from '../bb-plates.engine';
+import { isWeightReachable, isBarbellExercise } from '../bb-plates.engine';
 
 const WM = {
   chest: 102.7, back: 121.3, shoulders: 61.7, quads: 141.3, hamstrings: 101.7,
@@ -35,6 +35,7 @@ describe('P0-12 — passthrough program-пути (паритет с generic)', (
     // Штанговые веса (≥ веса грифа) обязаны быть достижимы набором;
     // лёгкие гантели/блоки живут вне штанг-математики (target<0) — не проверяем.
     const barWeights = plan.weeks.flatMap(w => w.sessions).flatMap(s => s.exercises)
+      .filter(e => isBarbellExercise(e))
       .flatMap(e => (e.workSets || []).map(x => Number(x.weight))).filter(v => Number.isFinite(v) && v >= 20);
     expect(barWeights.length).toBeGreaterThan(0);
     const bad = barWeights.filter(v => !isWeightReachable(v, plates, 20));

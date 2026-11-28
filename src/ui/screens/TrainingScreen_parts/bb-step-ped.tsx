@@ -68,13 +68,16 @@ export interface BbPedWorkMaxStepProps {
   courseSummary?: string;
   coursePhase?: BBPharmaPhase;
   hasActiveCourse?: boolean;
+  /** Фаза 5: ручной выбор фазы курса поверх автодетекта. */
+  manualPedPhase?: 'auto' | 'on' | 'cruise' | 'pct' | 'off';
+  setManualPedPhase?: React.Dispatch<React.SetStateAction<'auto' | 'on' | 'cruise' | 'pct' | 'off'>>;
   onBuild: () => void;
   onNext: () => void;
   onBackToParams: () => void;
   flash: (m: string) => void;
 }
 
-const NOTE: React.CSSProperties = { fontSize: 10, color: '#fff', lineHeight: 1.45 };
+const NOTE: React.CSSProperties = { fontSize: 10, color: 'var(--text, #fff)', lineHeight: 1.45 };
 const GRID3: React.CSSProperties = { display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 6 };
 
 export const BbPedWorkMaxStep: React.FC<BbPedWorkMaxStepProps> = ({
@@ -85,6 +88,7 @@ export const BbPedWorkMaxStep: React.FC<BbPedWorkMaxStepProps> = ({
   bfrMode, setBfrMode, dcMode, setDcMode, blastCruiseEnabled, setBlastCruiseEnabled, blastWeeks, setBlastWeeks,
   cruiseWeeks, setCruiseWeeks, workMax, setWorkMax, planMode, age, sex,
   autoSyncCourse, onToggleAutoSyncCourse, courseSummary, coursePhase, hasActiveCourse,
+  manualPedPhase = 'auto', setManualPedPhase,
   onBuild, onNext, onBackToParams, flash,
 }) => {
   const isMinor = Number(age) > 0 && Number(age) < 18;
@@ -95,15 +99,22 @@ export const BbPedWorkMaxStep: React.FC<BbPedWorkMaxStepProps> = ({
   /* Пресет — явная макро-команда над настройками шага 1: применяем и СООБЩАЕМ,
      что изменили (раньше перезапись была тихой, а meadows не делал ничего). */
   const applyProPreset = (v: string) => {
+    const aasDose = Number(pedDoses?.AAS || 0);
+    if (v === 'dc' && ((level !== 'advanced' && level !== 'enhanced') || aasDose < 750)) {
+      flash('⚠ Пресет DC требует уровень Advanced/Enhanced и курс ААС ≥ 750 мг/нед — применена облегчённая конфигурация');
+    }
+    if (v === 'fortitude' && level !== 'enhanced') {
+      flash('⚠ FST-7 в Fortitude доступен только для Enhanced; применены гигант-суперсеты');
+    }
     setProPreset(v);
     const changes: string[] = [];
     if (v === 'dc') {
       if (dupMode === 'none') { setDupMode('strength_hypertrophy' as DUPMode); changes.push('DUP → сила/гипертрофия'); }
-      if (!dcMode) { setDcMode(true); changes.push('DC-лайт → вкл'); }
+      if (!dcMode && (level === 'advanced' || level === 'enhanced') && aasDose >= 750) { setDcMode(true); changes.push('DC-лайт → вкл'); }
       changes.push('сплит: рекомендация Upper/Lower или PPL');
     } else if (v === 'fortitude') {
       if (supersetMode !== 'giant') { setSupersetMode('giant'); changes.push('суперсеты → гигант'); }
-      if (volumeScheme === 'standard') { setVolumeScheme('fst7'); changes.push('схема объёма → FST-7'); }
+      if (volumeScheme === 'standard' && level === 'enhanced') { setVolumeScheme('fst7'); changes.push('схема объёма → FST-7'); }
       changes.push('сплит: рекомендация Upper/Lower 5 или FullBody 4');
     } else if (v === 'meadows') {
       if (methodology !== 'mountain_dog') { setMethodology('mountain_dog'); changes.push('порядок → Mountain Dog'); }
@@ -124,7 +135,7 @@ export const BbPedWorkMaxStep: React.FC<BbPedWorkMaxStepProps> = ({
       )}
 
       {!isMinor && hasActiveCourse && onToggleAutoSyncCourse && (
-        <div data-bb="course-sync-banner" style={{ marginBottom: 10, padding: '9px 11px', borderRadius: 10, background: autoSyncCourse ? 'rgba(56,189,248,0.10)' : 'rgba(255,255,255,0.04)', border: autoSyncCourse ? '1px solid rgba(56,189,248,0.35)' : '1px solid rgba(255,255,255,0.12)', fontSize: 11, lineHeight: 1.45, color: '#fff' }}>
+        <div data-bb="course-sync-banner" style={{ marginBottom: 10, padding: '9px 11px', borderRadius: 10, background: autoSyncCourse ? 'rgba(56,189,248,0.10)' : 'rgba(255,255,255,0.04)', border: autoSyncCourse ? '1px solid rgba(56,189,248,0.35)' : '1px solid rgba(255,255,255,0.12)', fontSize: 11, lineHeight: 1.45, color: 'var(--text, #fff)' }}>
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8, flexWrap: 'wrap' }}>
             <span style={{ fontWeight: 700, color: autoSyncCourse ? '#7dd3fc' : '#e2e8f0' }}>
               {autoSyncCourse ? '💉 Из активного курса' : '✍️ Ручной режим PED'}
@@ -148,7 +159,7 @@ export const BbPedWorkMaxStep: React.FC<BbPedWorkMaxStepProps> = ({
       )}
 
       {femaleSafety && femaleSafety.virilizationRisk !== 'none' && (
-        <div data-bb="female-ped-safety" style={{ marginBottom: 10, padding: '9px 11px', borderRadius: 10, background: 'rgba(244,114,182,0.10)', border: '1px solid rgba(244,114,182,0.40)', color: '#fff', fontSize: 11, lineHeight: 1.5 }}>
+        <div data-bb="female-ped-safety" style={{ marginBottom: 10, padding: '9px 11px', borderRadius: 10, background: 'rgba(244,114,182,0.10)', border: '1px solid rgba(244,114,182,0.40)', color: 'var(--text, #fff)', fontSize: 11, lineHeight: 1.5 }}>
           <div style={{ fontWeight: 800, color: '#f472b6', marginBottom: 4 }}>
             👩 Female PED Safety · риск вирилизации: {femaleSafety.virilizationRisk === 'high' ? 'высокий' : 'умеренный'}
           </div>
@@ -218,6 +229,26 @@ export const BbPedWorkMaxStep: React.FC<BbPedWorkMaxStepProps> = ({
         } catch { return null; }
       })()}
 
+      {!isMinor && setManualPedPhase && (
+        <BbCard icon="💉" accent="#a855f7" title="Фаза курса (ручной режим)"
+          desc="По умолчанию фаза определяется из «Курса ААС» автоматически. При необходимости зафиксируйте режим вручную."
+        >
+          <PopupSelect
+            label="Фаза фармакологии"
+            value={manualPedPhase}
+            onChange={v => setManualPedPhase(v as any)}
+            hint="course/on: полный объём; cruise: −15% объёма, RIR +1; pct: натуральный объём + защита ЦНС; off: натурал."
+            options={[
+              { id: 'auto', label: 'Авто (из Курса ААС)', desc: 'Автосинхронизация с текущим курсом/мостом/ПКТ.' },
+              { id: 'on', label: 'Курс (Blast)', desc: 'Полный курсовой MRV и интенсив-техники.' },
+              { id: 'cruise', label: 'Круиз / Мост', desc: 'Умеренный объём (×0.85), RIR +1, без FST-7/GVT.' },
+              { id: 'pct', label: 'ПКТ (PCT)', desc: 'Натуральный объём, защита ЦНС, отключение отказных техник.' },
+              { id: 'off', label: 'Вне курса (Натурал)', desc: 'Натуральные ориентиры MEV/MRV.' },
+            ]}
+          />
+        </BbCard>
+      )}
+
       <BbCard icon="⚙️" accent="#f59e0b" title="Особые режимы"
         desc="Дополнительные схемы поверх базовой сборки. Пресет — макро-команда: меняет настройки шага 1 (DUP / суперсеты / схема объёма / DC / порядок) и рекомендацию сплита, о чём сообщает всплывающим статусом."
       >
@@ -253,7 +284,7 @@ export const BbPedWorkMaxStep: React.FC<BbPedWorkMaxStepProps> = ({
           { id: 'fortitude', label: 'Fortitude (Скотт Стивенсон)', desc: '4×6, гигант-сеты, FST-7, волновая нагрузка — объёмный пресет для опытных. Включает: гигант-суперсеты + FST-7' },
           { id: 'meadows', label: 'Meadows (Джон Медоуз)', desc: 'Акцент на растянутой позиции, памп, медленный эксцентрик, проработка слабых мест. Включает: порядок Mountain Dog' },
         ]} />
-        {dcMode && <div style={{ fontSize: 10, color: '#fff', opacity: 0.85, marginTop: 2 }}>DC-лайт: ротация-3 топ-лифтов + widowmaker + круиз каждые 6 нед. Гейт: AAS от 750 + advanced/enhanced.</div>}
+        {dcMode && <div style={{ fontSize: 10, color: 'var(--text, #fff)', opacity: 0.85, marginTop: 2 }}>DC-лайт: ротация-3 топ-лифтов + widowmaker + круиз каждые 6 нед. Гейт: AAS от 750 + advanced/enhanced.</div>}
         {(peds.includes('MGF') && peds.includes('IGF1') && (pedDoses.MGF || 0) > 0 && (pedDoses.IGF1 || 0) > 0) && (
           <div style={{ marginTop: 6 }}>
             <PopupSelect label='Фаза MGF/IGF1' value={pedPhaseOverride} onChange={v => setPedPhaseOverride(v as any)} hint='Вручную поверх авто-фазировки. В режиме источника применяется (адаптировать) — фаза оживлена в обоих путях.' options={[

@@ -20,8 +20,10 @@ import { BbProgramLibraryPicker } from './BbProgramLibraryPicker';
 import { InjurySelectCard, type InjurySelectEntry } from './InjurySelectCard';
 import { BbRowSwitch, BbCard, BbFoldCard, WEAK_GROUPS, type PlanMode, type Step } from './bb-auto-constructor-shared';
 import { BTN, BTN_GHOST, H, IN } from './training-ui';
-import { PLATE_SET_PRESETS } from '../../../engines/bb/bb-plates.engine';
+import { PLATE_SET_PRESETS, type PlatePreset } from '../../../engines/bb/bb-plates.engine';
+import { loadGymProfiles, type GymProfile } from '../../../engines/bb/bb-gym-profiles.engine';
 import { DELOAD_PROTOCOLS, INTENSITY_TECHNIQUES, type LoadStrategy, type DeloadType, type IntensityTechnique } from '../../../engines/bb/bb-autocoach.engine';
+import type { TempoProfile } from '../../../engines/bb/bb-tempo-rest';
 import type { SessionMethodology } from '../../../engines/bb/bb-session-order.engine';
 import { methodologyOptions, methodologySpecFor } from '../../../engines/bb/bb-methodology-spec';
 import type { DUPMode } from '../../../engines/bb/bb-dup.engine';
@@ -35,11 +37,12 @@ import { getBBSuggestions } from './bb-compat';
 import { labTrainingAdjust } from './lab-training-adjust';
 import { sessionLimitsFor } from '../../../engines/bb/bb-volume.engine';
 import { loadSRPESessions } from '../../../engines/pro/srpe-store';
+import { loadSessions as loadDiarySessions } from '../../../engines/workout-logger.engine';
 import { acuteChronicRatio, toDailyLoads } from '../../../engines/pro/training-load.engine';
 import { MUSCLE_LABEL_RU } from '../../../engines/volume-landmarks.engine';
 import {
   isMEVCalibrationComplete, mevCalibrationProgress, mevSignalDegradation,
-  resolveMEVAfterCalibration, saveMEVCalibration, type MEVCalibration, type MEVSignal,
+  resolveMEVAfterCalibration, saveMEVCalibration, inferPersonalVolumeFromDiary, type MEVCalibration, type MEVSignal,
 } from '../../../engines/bb/bb-mev-calibration.engine';
 import type { TrainingProfile } from './training-profile';
 import type { SavedBBPlan } from './bb-plans-store';
@@ -164,6 +167,16 @@ export interface BbParamsStepProps {
   savedPlans: SavedBBPlan[];
   usePreviousPlan: boolean;
   setUsePreviousPlan: React.Dispatch<React.SetStateAction<boolean>>;
+  tempoProfile?: TempoProfile;
+  setTempoProfile?: React.Dispatch<React.SetStateAction<TempoProfile>>;
+  mesoTemplate?: 'classic' | 'resensitization' | 'metabolite';
+  setMesoTemplate?: React.Dispatch<React.SetStateAction<'classic' | 'resensitization' | 'metabolite'>>;
+  maxSessionMinutes?: number;
+  setMaxSessionMinutes?: React.Dispatch<React.SetStateAction<number>>;
+  rehabWeekStart?: number;
+  setRehabWeekStart?: React.Dispatch<React.SetStateAction<number>>;
+  vbtInput?: { lift: string; best: string; last: string };
+  setVbtInput?: React.Dispatch<React.SetStateAction<{ lift: string; best: string; last: string }>>;
   flash: (m: string) => void;
   setStep: React.Dispatch<React.SetStateAction<Step>>;
   /** Wave 6: быстрый старт — собрать план в 1 клик по профилю. */
@@ -171,7 +184,7 @@ export interface BbParamsStepProps {
 }
 
 const GRID2: React.CSSProperties = { display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 };
-const NOTE: React.CSSProperties = { fontSize: 10, color: '#fff', lineHeight: 1.45 };
+const NOTE: React.CSSProperties = { fontSize: 10, color: 'var(--text, #fff)', lineHeight: 1.45 };
 
 export const BbParamsStep: React.FC<BbParamsStepProps> = ({
   planMode, setPlanMode, specializationSelection,
@@ -195,13 +208,17 @@ export const BbParamsStep: React.FC<BbParamsStepProps> = ({
   cycleDay, setCycleDay, targetBodyFat, setTargetBodyFat,
   wearableData, setWearableTick, injuries, setInjuries, rehabMuscles, setRehabMuscles,
   mobilityRestrictions, setMobilityRestrictions, autoDeload, setAutoDeload,
-  savedPlans, usePreviousPlan, setUsePreviousPlan, flash, setStep, onQuickBuild,
+  savedPlans, usePreviousPlan, setUsePreviousPlan,
+  tempoProfile = 'auto', setTempoProfile, mesoTemplate = 'classic', setMesoTemplate, maxSessionMinutes = 0, setMaxSessionMinutes,
+  rehabWeekStart = 1, setRehabWeekStart, vbtInput, setVbtInput,
+  flash, setStep, onQuickBuild,
 }) => {
   const [paramsDepth, setParamsDepth] = React.useState<'basic' | 'pro'>(() => {
     try {
       const v = typeof localStorage !== 'undefined' ? localStorage.getItem('he_bb_params_depth') : null;
-      return v === 'basic' ? 'basic' : 'pro';
-    } catch { return 'pro'; }
+      if (v === 'pro' || v === 'basic') return v;
+      return 'basic';
+    } catch { return 'basic'; }
   });
   const toggleParamsDepth = (mode: 'basic' | 'pro') => {
     setParamsDepth(mode);
@@ -210,8 +227,17 @@ export const BbParamsStep: React.FC<BbParamsStepProps> = ({
   const isPrograms = planMode === 'programs';
   const isGeneric = planMode === 'generic_split';
   const limitText = (() => {
-    try { const l = sessionLimitsFor({ level: bbLevel, trainingYears: bbTrainingYears, peds }); return `${ruCount(l.maxWorkingSets, RU_SETS)} / ${l.maxExercises} упр.`; }
-    catch { return '24/10'; }
+    try {
+      const l = sessionLimitsFor({
+        level: bbLevel,
+        trainingYears: bbTrainingYears,
+        peds,
+        pedDoses,
+        onCourse: peds.length > 0 || undefined,
+        trainingVolumeMode,
+      });
+      return `${ruCount(l.maxWorkingSets, RU_SETS)} / ${l.maxExercises} упр.`;
+    } catch { return '24/10'; }
   })();
   const aasEquiv = computeAASEquivDose(pedDoses);
   // Joint-guard — из движка (canon bb-joint-guard): GH≥4 · GH≥2+AAS≥500 · lab<0.65.
@@ -372,6 +398,18 @@ export const BbParamsStep: React.FC<BbParamsStepProps> = ({
         badge={mevCal ? (isMEVCalibrationComplete(mevCal) ? '✅ калиброван' : `📈 нед ${mevCalibrationProgress(mevCal).weeksDone}`) : 'не начата'}
         desc="Протокол RP: старт с MEV−2, +1 сет/нед, пока крепатура ≤2 и производительность не падает; 2 подряд недели деградации → фикс личного MEV. Применяется вместо таблицы (внутри капов)."
       >
+        <button type="button" data-bb="mev-diary-calibrate" onClick={() => {
+          try {
+            const res = inferPersonalVolumeFromDiary(loadDiarySessions(), 8, bbLevel);
+            saveMEVCalibration(res.suggestedCalibration);
+            setMevCal(res.suggestedCalibration);
+            flash(`📊 MEV по дневнику (${res.confidence}): ${res.notes[0] || 'готово'}`);
+          } catch {
+            flash('⚠ Не удалось прочитать дневник тренировок');
+          }
+        }} style={{ ...BTN_GHOST, width: '100%', marginBottom: 6, borderColor: 'rgba(96,165,250,0.4)', color: '#93c5fd', fontSize: 11 }}>
+          📊 Откалибровать MEV по дневнику (8 нед)
+        </button>
         {!mevCal ? (
           <button style={{ ...BTN, width: '100%' }} onClick={startMEVCalibration}>🧪 Запустить калибровку MEV</button>
         ) : (
@@ -379,27 +417,27 @@ export const BbParamsStep: React.FC<BbParamsStepProps> = ({
             {isMEVCalibrationComplete(mevCal) && mevCal.userMevByMuscle && (
               <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4, marginBottom: 8 }}>
                 {Object.entries(mevCal.userMevByMuscle).map(([m, v]) => (
-                  <span key={m} style={{ fontSize: 9, fontWeight: 700, padding: '2px 7px', borderRadius: 999, background: 'rgba(96,165,250,0.12)', color: '#bfdbfe', border: '1px solid rgba(96,165,250,0.25)' }}>{MUSCLE_LABEL_RU[m] || m}: {v}</span>
+                  <span key={m} style={{ fontSize: 10, fontWeight: 700, padding: '2px 7px', borderRadius: 999, background: 'rgba(96,165,250,0.12)', color: '#bfdbfe', border: '1px solid rgba(96,165,250,0.25)' }}>{MUSCLE_LABEL_RU[m] || m}: {v}</span>
                 ))}
               </div>
             )}
             {!isMEVCalibrationComplete(mevCal) && (
               <div style={{ marginBottom: 8 }}>
-                <div style={{ fontSize: 9, fontWeight: 700, color: '#93c5fd', marginBottom: 4 }}>Сигнал этой недели (после недели №{mevCal.weeks.length + 1}):</div>
+                <div style={{ fontSize: 10, fontWeight: 700, color: '#93c5fd', marginBottom: 4 }}>Сигнал этой недели (после недели №{mevCal.weeks.length + 1}):</div>
                 {([['pump', 'Накачка 0-5'], ['soreness', 'Крепатура 0-5'], ['performance', 'Производительность 0-5']] as const).map(([k, label]) => (
                   <div key={k} style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 4 }}>
-                    <span style={{ fontSize: 9, width: 120, opacity: 0.85 }}>{label}</span>
+                    <span style={{ fontSize: 10, width: 120, opacity: 0.85 }}>{label}</span>
                     <input type="range" min={0} max={5} step={1} value={mevDraft[k]} onChange={e => setMevDraft({ ...mevDraft, [k]: Number(e.target.value) })} style={{ flex: 1, accentColor: '#60a5fa' }} />
-                    <span style={{ fontSize: 9, fontWeight: 800, width: 16 }}>{mevDraft[k]}</span>
+                    <span style={{ fontSize: 10, fontWeight: 800, width: 16 }}>{mevDraft[k]}</span>
                   </div>
                 ))}
-                {mevSignalDegradation(mevDraft) && <div style={{ fontSize: 9, color: '#fbbf24', marginBottom: 4 }}>⚠ Сигнал деградации — MEV зафиксируется на прошлой неделе (если это 2-я подряд).</div>}
+                {mevSignalDegradation(mevDraft) && <div style={{ fontSize: 10, color: '#fbbf24', marginBottom: 4 }}>⚠ Сигнал деградации — MEV зафиксируется на прошлой неделе (если это 2-я подряд).</div>}
                 <button style={{ ...BTN, width: '100%' }} onClick={commitMEVWeek}>📈 Записать неделю</button>
               </div>
             )}
             <div style={{ display: 'flex', gap: 6, marginTop: 4 }}>
-              {!isMEVCalibrationComplete(mevCal) && <button style={{ ...BTN_GHOST, flex: 1, fontSize: 9 }} onClick={() => { const r = resolveMEVAfterCalibration(mevCal); saveMEVCalibration(r); setMevCal(r); flash('🧪 MEV зафиксирован вручную'); }}>✅ Завершить сейчас</button>}
-              <button style={{ ...BTN_GHOST, flex: 1, fontSize: 9 }} onClick={resetMEVCalibration}>🗑 Сбросить</button>
+              {!isMEVCalibrationComplete(mevCal) && <button style={{ ...BTN_GHOST, flex: 1, fontSize: 10 }} onClick={() => { const r = resolveMEVAfterCalibration(mevCal); saveMEVCalibration(r); setMevCal(r); flash('🧪 MEV зафиксирован вручную'); }}>✅ Завершить сейчас</button>}
+              <button style={{ ...BTN_GHOST, flex: 1, fontSize: 10 }} onClick={resetMEVCalibration}>🗑 Сбросить</button>
             </div>
           </>
         )}
@@ -439,15 +477,15 @@ export const BbParamsStep: React.FC<BbParamsStepProps> = ({
         desc="Три рычага: цель объёма (MEV/MAV/MRV), режим (обычный/объёмный) и схема памп-дней. Режим «Объёмный» перебивает цель на MRV и добавляет объём — см. разбор ниже."
       >
         <div style={{ padding: '8px 10px', borderRadius: 10, background: 'rgba(59,130,246,0.06)', border: '1px solid rgba(59,130,246,0.18)', marginBottom: 8 }}>
-          <div style={{ fontSize: 11, fontWeight: 700, color: '#3b82f6', marginBottom: 6 }}>📦 Объёмный тренинг <span style={{ fontSize: 9, fontWeight: 400, color: '#fff' }}>капы от уровня — новичок без фармы 60 сетов недоступно</span></div>
+          <div style={{ fontSize: 11, fontWeight: 700, color: '#3b82f6', marginBottom: 6 }}>📦 Объёмный тренинг <span style={{ fontSize: 10, fontWeight: 400, color: 'var(--text, #fff)' }}>капы от уровня — новичок без фармы 60 сетов недоступно</span></div>
           <div style={{ display: 'flex', gap: 6 }}>
             <button onClick={() => setTrainingVolumeMode('standard')} style={{ flex: 1, padding: '8px 10px', borderRadius: 10, cursor: 'pointer', fontWeight: 700, fontSize: 11, border: trainingVolumeMode === 'standard' ? '2px solid #3b82f6' : '1px solid rgba(255,255,255,0.08)', background: trainingVolumeMode === 'standard' ? 'rgba(59,130,246,0.15)' : 'rgba(255,255,255,0.02)', color: trainingVolumeMode === 'standard' ? '#3b82f6' : '#fff' }}>Обычный</button>
             <button onClick={() => { if (bbLevel === 'beginner' && peds.length === 0) flash('Объёмный для новичка: капы 24/10, объём MRV, GVT/FST-7 доступны.'); setTrainingVolumeMode('high'); }} style={{ flex: 1, padding: '8px 10px', borderRadius: 10, cursor: 'pointer', fontWeight: 700, fontSize: 11, border: trainingVolumeMode === 'high' ? '2px solid #f59e0b' : '1px solid rgba(255,255,255,0.08)', background: trainingVolumeMode === 'high' ? 'rgba(245,158,11,0.15)' : 'rgba(255,255,255,0.02)', color: trainingVolumeMode === 'high' ? '#f59e0b' : '#fff' }}>Объёмный</button>
           </div>
           <div style={{ marginTop: 6, ...NOTE, lineHeight: 1.5 }}>
             {trainingVolumeMode === 'standard'
-              ? <>Обычный: цель MAV, без GVT/FST-7, капы по уровню. Лимит: {limitText} (дефолт 24 с фармой — норма).</>
-              : <>Объёмный разом включает: <b>цель MRV</b> · <b>+25/+30/+35%</b> к целевому объёму мышцы (natural/enhanced/enhanced 6+) · <b>капы сессии ×1.2</b> (×1.3 для enhanced 6+) и +2–3 упражнения · <b>MRV-кап ×1.15</b> (×1.25) · схема «Стандартная» исполняется как <b>GVT 10×10</b> (кап 5 сетов/упр сохраняется). Уровневые капы те же: новичок без фармы — 24/10, enhanced 3г+ — 40/15, 6+ лет — 44/16.</>}
+              ? <>Обычный: цель MAV (или выбранная), капы по уровню и фарме. Лимит: {limitText}.</>
+              : <>Объёмный: ставит цель <b>MRV (+25–35%</b> по опыту/фарме), поднимает капы сессии ({limitText}) и MRV-потолок. Схема «Стандартная» остаётся стандартной, а для GVT/FST-7/Gironda выберите нужный вариант ниже (GVT/8×8 — с advanced+).</>}
           </div>
         </div>
 
@@ -471,7 +509,7 @@ export const BbParamsStep: React.FC<BbParamsStepProps> = ({
                 раскладка % и есть кривая входа. Универсальный разгон применяется только к
                 генерик-сплиту.
               </div>}
-          <div style={{ ...NOTE, color: '#fff' }}>
+          <div style={{ ...NOTE, color: 'var(--text, #fff)' }}>
             {isGeneric
               ? 'Разгон: первые недели легче цели — есть запас под рост веса и повторов. Сразу разогнанный — старт на цели (возврат после перерыва, короткий блок, повторный мезо). Мышцы на минимумах (руки в PPL, мелкие группы) выбор не двигает — они и так держат минимум.'
               : ''}
@@ -490,10 +528,10 @@ export const BbParamsStep: React.FC<BbParamsStepProps> = ({
             onChange={v => setVolumeScheme(v as any)}
             hint={'Методики для памп-изоляций (кап 5 сетов/упр; FST-7 финишер — 7 одним движением). В коде: standard / gvt / fst7 / gironda.' + fst7Hint}
             options={[
-              { id: 'standard', label: trainingVolumeMode === 'high' ? 'Стандартная (при «Объёмном» исполняется как GVT 10×10)' : 'Стандартная (авто)', desc: 'Авто-распределение: тяж — база, памп — изоляция по необходимости. Баланс сила/объём.' },
-              { id: 'gvt', label: 'GVT 10×10 (10 сетов на мышцу)', desc: 'Немецкий объём 10×10, 60% 1ПМ, 60-90с пауза. Экстремальный объём, только для опытных.' },
+              { id: 'standard', label: 'Стандартная (сбалансированный объём)', desc: 'Авто-распределение: тяж — база, памп — изоляция. Баланс силы и объёма.' },
+              { id: 'gvt', label: 'GVT 10×10 (только advanced/enhanced)', desc: 'Немецкий объём 10×10, 60% 1ПМ, 60-90с пауза. Доступно с уровня advanced/enhanced.' },
               ...(fst7Allowed ? [{ id: 'fst7', label: 'FST-7 (7×8-12 одним финишером)', desc: 'Rambod: 7 сетов одной изоляцией в конце мышцы, 30-45с. Только enhanced без joint-guard.' } as any] : []),
-              { id: 'gironda', label: '8×8 Gironda (60с)', desc: '8×8, 45-60с пауза, умеренный вес — плотный объём Жиронды для сухой массы.' },
+              { id: 'gironda', label: '8×8 Gironda (только advanced/enhanced)', desc: '8×8, 45-60с пауза — плотный объём Жиронды. Доступно с уровня advanced/enhanced.' },
             ]}
           />
         </div>
@@ -512,7 +550,8 @@ export const BbParamsStep: React.FC<BbParamsStepProps> = ({
           <PopupSelect label="🧩 Методика порядка" value={bbMethodology} onChange={v => setBbMethodology(v as SessionMethodology)} hint={`Что методика реально меняет: порядок, отдых, схема объёма и финишер — подписи берутся из спека (${methodologySpecFor(bbMethodology).honestNote})`} options={methodologyOptions().map(o => ({ id: o.id, label: o.label, desc: o.desc }))} />
           {isGeneric
             ? <PopupSelectSmart label="🎯 Интенсив-техника" value={intensityTech} onChange={onUserIntensityTech} suggestedIds={bbSuggest.intensityTechnique} suggestionReason="По цели и уровню (цепочка)" options={[
-                { id: 'none', label: 'Авто по фазе', desc: 'Accumulation → пауза-репс, intensification/peaking → rest-pause/dropset по профилю мышцы.' },
+                { id: 'auto' as any, label: 'Авто по фазе', desc: 'Accumulation → пауза-репс, intensification/peaking → rest-pause/dropset по профилю мышцы.' },
+                { id: 'none', label: 'Выкл (без техник)', desc: 'Отключить интенсив-техники — чистые рабочие подходы (рекомендуется новичкам и при восстановлении).' },
                 { id: 'rest_pause', label: 'Рест-пауза', desc: 'Финал 8 повт + 15с пауза → 3-4 + 15с → 3-4. Продлевает подход без сброса веса.' },
                 { id: 'drop_set', label: 'Дроп-сет', desc: 'После отказа −20% веса → 6 повт, ещё −20% → 4 повт.' },
                 { id: 'myo_reps', label: 'Myo-reps', desc: 'Активация 12-15 повт, затем 4×4 с 5с паузой.' },
@@ -520,8 +559,9 @@ export const BbParamsStep: React.FC<BbParamsStepProps> = ({
                 { id: 'mechanical_drop', label: 'Мех. дроп-сет', desc: 'Смена угла/хвата без отдыха (жим гантелей → разводка).' },
                 { id: 'negative', label: 'Негативы (3-4с)', desc: 'Медленный негатив 3-4с, быстрый подъём — акцент на эксцентрике.' },
               ]} />
-            : <PopupSelect label="🎯 Интенсив-техника" value={intensityTech} onChange={v => setIntensityTech(v as IntensityTechnique)} hint='Техника на последнем подходе. В коде: none / rest_pause / drop_set / myo_reps / pause_rep / mechanical_drop / negative' options={[
-                { id: 'none', label: 'Авто по фазе', desc: 'Accumulation → пауза-репс, intensification → rest-pause/dropset.' },
+            : <PopupSelect label="🎯 Интенсив-техника" value={intensityTech} onChange={v => setIntensityTech(v as IntensityTechnique)} hint='Техника на последнем подходе. auto = авто по фазе, none = полностью выключено.' options={[
+                { id: 'auto' as any, label: 'Авто по фазе', desc: 'Accumulation → пауза-репс, intensification → rest-pause/dropset.' },
+                { id: 'none', label: 'Выкл (без техник)', desc: 'Отключить интенсив-техники полностью.' },
                 { id: 'rest_pause', label: 'Рест-пауза', desc: 'Финал 8 + 15с → 3-4 + 15с → 3-4.' },
                 { id: 'drop_set', label: 'Дроп-сет', desc: '−20% веса → 6 повт, ещё −20% → 4 повт.' },
                 { id: 'myo_reps', label: 'Myo-reps', desc: '12-15 + 4×4 с 5с паузой.' },
@@ -557,6 +597,32 @@ export const BbParamsStep: React.FC<BbParamsStepProps> = ({
             { id: 'moderate', label: '⚖️ Умеренная — стандарт', desc: 'Тяж 2-3 мин, памп 60с. Оптимум для большинства.' },
             { id: 'high', label: '🔥 Высокая — отдых −20%', desc: 'Тяж 1.5 мин, памп 45с. Высокая плотность, метаболический стресс.' },
           ]} />
+          {setMesoTemplate && (
+            <PopupSelect label="🧬 Шаблон мезоцикла" value={mesoTemplate} onChange={v => setMesoTemplate(v as any)} hint="classic: стандарт; resensitization: мягкая 1–2 нед (×0.65); metabolite: финишный памп 15–25 повт." options={[
+              { id: 'classic', label: 'Классический', desc: 'Стандартная периодизация накопление → интенсификация → делод.' },
+              { id: 'resensitization', label: 'Ресенситизация (1–2 нед)', desc: 'Низкий объём ×0.65 и высокий RIR в начале блока для восстановления чувствительности к стимулу.' },
+              { id: 'metabolite', label: 'Метаболитный финал', desc: 'Последние 1–2 рабочие недели: 15–25 повторов, короткий отдых 40с, высокий памп.' },
+            ]} />
+          )}
+          {setMaxSessionMinutes && (
+            <PopupSelect label="⏱ Лимит времени сессии" value={String(maxSessionMinutes)} onChange={v => setMaxSessionMinutes(Number(v) || 0)} hint="При превышении бюджета автоматически связывает антагонисты в суперсеты и бережно подрезает подсобку." options={[
+              { id: '0', label: 'Без лимита', desc: 'Полный расчётный объём без жёсткого ограничения минут.' },
+              { id: '45', label: 'до 45 мин (экспресс)', desc: 'Принудительные суперсеты и сжатие второстепенных сетов.' },
+              { id: '60', label: 'до 60 мин', desc: 'Оптимальный зал-бюджет с суперсетами при перегрузе.' },
+              { id: '75', label: 'до 75 мин', desc: 'Умеренный лимит для 4–5 групповых тренировок.' },
+              { id: '90', label: 'до 90 мин', desc: 'Просторный лимит для тяжёлых и объёмных сплитов.' },
+            ]} />
+          )}
+          {setTempoProfile && (
+            <PopupSelect label="🎼 Профиль темпа (TUT)" value={tempoProfile} onChange={v => setTempoProfile(v as TempoProfile)} hint="Схема эксцентрической/паузовой фазы для всех рабочих недель (в делоаде — 2-0-1-0)." options={[
+              { id: 'auto', label: 'Авто по упражнению/фазе', desc: 'Умный выбор (база 2-0-1-0, растяжение 3-1-1-0, пик 3-0-1-2).' },
+              { id: 'hypertrophy_controlled', label: 'Контроль гипертрофии (3-0-1-1)', desc: 'Управляемый 3с спуск + 1с фиксация пика.' },
+              { id: 'lengthened_pause', label: 'Пауза в растяжении (3-2-1-0)', desc: '2с пауза в нижней растянутой позиции — акцент на растяжение.' },
+              { id: 'explosive_power', label: 'Взрывной силовой (2-0-1-0)', desc: 'Чёткий спуск 2с и мощный быстрый подъём.' },
+              { id: 'constant_tension', label: 'Постоянное напряжение (2-0-2-1)', desc: 'Непрерывная работа без расслабления в нижней/верхней точках.' },
+              { id: 'slow_eccentric', label: 'Медленный негатив (4-1-1-0)', desc: '4с опускание + 1с пауза — максимальный механический стимул.' },
+            ]} />
+          )}
         </div>
         <div style={{ marginTop: 4, ...NOTE }}>
           {INTENSITY_TECHNIQUES[intensityTech]?.description || 'Без техники'}
@@ -564,13 +630,13 @@ export const BbParamsStep: React.FC<BbParamsStepProps> = ({
         {dupRecommendChip}
         {dupMode !== 'none' && (
           <div style={{ marginTop: 6 }}>
-            <div style={{ fontSize: 9, fontWeight: 700, color: '#22d3ee', marginBottom: 4 }}>🎯 Per-muscle DUP (пусто = ко всем primary):</div>
+            <div style={{ fontSize: 10, fontWeight: 700, color: '#22d3ee', marginBottom: 4 }}>🎯 Per-muscle DUP (пусто = ко всем primary):</div>
             <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4 }}>
               {WEAK_GROUPS.map(([id, l]) => {
                 const on = dupMuscles.includes(id);
                 return (
                   <button key={id} onClick={() => setDupMuscles(on ? dupMuscles.filter(x => x !== id) : [...dupMuscles, id])}
-                    style={{ padding: '3px 7px', borderRadius: 999, fontSize: 9, fontWeight: 700, cursor: 'pointer', minHeight: 26,
+                    style={{ padding: '3px 7px', borderRadius: 999, fontSize: 10, fontWeight: 700, cursor: 'pointer', minHeight: 26,
                       background: on ? 'rgba(34,211,238,0.15)' : 'rgba(255,255,255,0.03)',
                       border: on ? '1px solid rgba(34,211,238,0.4)' : '1px solid rgba(255,255,255,0.08)',
                       color: on ? '#22d3ee' : '#fff' }}>
@@ -593,18 +659,30 @@ export const BbParamsStep: React.FC<BbParamsStepProps> = ({
               { id: 'linear', label: '📈 Линейная: +2.5 кг/нед для compounds, +1 кг для изоляции' },
               { id: 'wave', label: '🌊 Волновая: 3-нед микроциклы (тяж/ср/лёг)' },
               { id: 'rpe_based', label: '🎯 RPE-базированная: авто-подбор веса по ощущению (продвинутый)' },
+              { id: 'top_set_backoff', label: '🏆 Топ-сет + бэк-офф (−12% веса на 2..N сеты)' },
+              { id: 'dynamic_double', label: '⚡ Динамическая двойная (посетовая прогрессия)' },
+              { id: 'rep_goal', label: '🎯 Суммарная цель повторов (Rep Goal)' },
+              { id: 'step_loading', label: '📶 Ступенчатая (2–3 нед плато → шаг вверх)' },
             ]} />
           : <PopupSelect label="📈 Стратегия прогрессии" value={loadStrategy} onChange={v => setLoadStrategy(v as LoadStrategy)} options={[
               { id: 'double_progression', label: 'Двойная прогрессия', desc: 'Сначала добить повторы, затем +5% веса.' },
               { id: 'linear', label: 'Линейная', desc: '+2.5 кг/нед компаунд, +1 кг изоляция.' },
               { id: 'wave', label: 'Волновая', desc: '3-нед волны тяж/сред/лёг.' },
               { id: 'rpe_based', label: 'RPE-based', desc: 'Вес по ощущению RPE (авто-регуляция).' },
+              { id: 'top_set_backoff', label: 'Топ-сет + бэк-офф', desc: '1-й тяжёлый топ-сет, далее −12% и +2 повт.' },
+              { id: 'dynamic_double', label: 'Динамическая двойная', desc: 'Каждый сет прогрессирует независимо.' },
+              { id: 'rep_goal', label: 'Rep Goal', desc: 'Фиксированный суммарный порог повторов до шага.' },
+              { id: 'step_loading', label: 'Step-loading', desc: 'Закрепление веса 2-3 недели, затем шаг.' },
             ]} />}
         <div style={{ marginTop: 4, ...NOTE }}>
-          {loadStrategy === 'double_progression' && 'Стратегия PRO-бодибилдеров: добейте повторы до верхней границы, затем повысьте вес на 5%.'}
+          {loadStrategy === 'double_progression' && 'Стратегия PRO-бодибилдеров: добейте повторы до верхней границы, затем повысьте вес на 1 шаг.'}
           {loadStrategy === 'linear' && 'Классическая силовая прогрессия: еженедельное прибавление веса. Эффективно для новичков и intermediates.'}
           {loadStrategy === 'wave' && 'Продвинутая периодизация: 3-нед циклы тяжёлая/средняя/лёгкая неделя. Управление утомлением.'}
           {loadStrategy === 'rpe_based' && 'Для опытных: вес подбирается по ощущению (RPE). Авто-регуляция под текущее состояние.'}
+          {loadStrategy === 'top_set_backoff' && 'Первый рабочий сет тяжёлый на силу/натяжение, сеты 2..N со сбросом 12% для объёма гипертрофии.'}
+          {loadStrategy === 'dynamic_double' && 'Независимая прогрессия в каждом подходе без ожидания отстающих сетов.'}
+          {loadStrategy === 'rep_goal' && 'Накапливайте повторы до целевого суммарного порога подхода, затем повышайте вес.'}
+          {loadStrategy === 'step_loading' && 'Удерживайте рабочий вес 2–3 недели для адаптации связок, затем уверенный шаг вверх.'}
         </div>
         <div style={{ marginTop: 8 }}>
           <BbRowSwitch checked={autoDeload} onChange={setAutoDeload} icon="🛡️" accent="#22c55e"
@@ -645,7 +723,7 @@ export const BbParamsStep: React.FC<BbParamsStepProps> = ({
             Множитель восстановления (0.6–1.5, авто 1.0):
             <input type="number" step="0.05" min={0.6} max={1.5} value={recoveryOverride ?? ''} placeholder="1.0" onChange={e2 => { const v = e2.target.value === '' ? null : parseFloat(e2.target.value); setRecoveryOverride(v != null && Number.isFinite(v) ? Math.max(0.6, Math.min(1.5, v)) : null); }} style={{ width: 55, ...IN }} />
           </label>
-          <button onClick={() => { setLabMultOverride(null); setRecoveryOverride(null); flash('Оверрайды сброшены — авто'); }} style={{ padding: '3px 8px', borderRadius: 6, fontSize: 10, cursor: 'pointer', border: '1px solid rgba(255,255,255,0.15)', background: 'transparent', color: '#fff' }}>Сбросить</button>
+          <button onClick={() => { setLabMultOverride(null); setRecoveryOverride(null); flash('Оверрайды сброшены — авто'); }} style={{ padding: '3px 8px', borderRadius: 6, fontSize: 10, cursor: 'pointer', border: '1px solid rgba(255,255,255,0.15)', background: 'transparent', color: 'var(--text, #fff)' }}>Сбросить</button>
         </div>
         <div style={{ marginTop: 8, padding: '6px 10px', borderRadius: 10, background: 'rgba(16,185,129,0.06)', border: '1px solid rgba(16,185,129,0.15)', ...NOTE, display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 8 }}>
           {(() => {
@@ -655,10 +733,21 @@ export const BbParamsStep: React.FC<BbParamsStepProps> = ({
               const acwr = (acuteChronicRatio as any)((toDailyLoads as any)(srpe));
               const ratio = acwr?.ratio ?? 1;
               const zone = ratio > 1.5 ? '🔴 опасно' : ratio > 1.3 ? '🟡 осторожность' : ratio < 0.8 ? '🔵 недогруз' : '🟢 норма';
-              return <><span>📊 ACWR {ratio.toFixed(2)} — {zone}</span><span style={{ fontSize: 9 }}>дефицит/восстановление — Авто-делод</span></>;
+              return <><span>📊 ACWR {ratio.toFixed(2)} — {zone}</span><span style={{ fontSize: 10 }}>дефицит/восстановление — Авто-делод</span></>;
             } catch { return <span>📊 ACWR: —</span>; }
           })()}
         </div>
+        {setVbtInput && (
+          <div style={{ marginTop: 8, padding: '8px 10px', borderRadius: 10, background: 'rgba(139,92,246,0.06)', border: '1px solid rgba(139,92,246,0.18)' }}>
+            <div style={{ fontSize: 11, fontWeight: 700, color: '#c4b5fd', marginBottom: 4 }}>⚡ VBT (потеря скорости до сборки)</div>
+            <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', alignItems: 'center' }}>
+              <input type="text" placeholder="Упражнение" value={vbtInput?.lift ?? ''} onChange={e2 => setVbtInput(p => ({ ...p, lift: e2.target.value }))} style={{ width: 120, ...IN }} />
+              <input type="number" step="0.02" min={0} max={2} placeholder="лучш. м/с" value={vbtInput?.best ?? ''} onChange={e2 => setVbtInput(p => ({ ...p, best: e2.target.value }))} style={{ width: 85, ...IN }} />
+              <input type="number" step="0.02" min={0} max={2} placeholder="посл. м/с" value={vbtInput?.last ?? ''} onChange={e2 => setVbtInput(p => ({ ...p, last: e2.target.value }))} style={{ width: 85, ...IN }} />
+            </div>
+            <div style={{ fontSize: 10, color: 'var(--text-dim, rgba(255,255,255,0.72))', marginTop: 4 }}>Если потеря скорости ≥25%, срез объёма и +1 RIR применяются только к Неделе 1.</div>
+          </div>
+        )}
       </BbCard>
 
       {/* 8. Подбор упражнений — единый список в обоих режимах */}
@@ -693,12 +782,36 @@ export const BbParamsStep: React.FC<BbParamsStepProps> = ({
       <BbCard icon="🏗️" accent="#60a5fa" title="Оборудование и загрузка"
         desc="Ограничивает пул отбора и округляет веса к реально достижимым на вашем наборе пластин."
       >
+        <div style={{ marginBottom: 8 }}>
+          <div style={{ fontSize: 11, fontWeight: 700, color: '#93c5fd', marginBottom: 4 }}>🏛 Профиль зала (быстрый выбор)</div>
+          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4 }}>
+            {loadGymProfiles().map((gp: GymProfile) => (
+              <button
+                key={gp.id}
+                type="button"
+                data-bb={`gym-profile-${gp.id}`}
+                onClick={() => {
+                  setBbEquipment([...gp.equipment]);
+                  if (gp.platePreset) setPlatePreset(gp.platePreset as PlatePreset['id']);
+                  if (setMaxSessionMinutes && typeof gp.maxSessionMinutes === 'number') setMaxSessionMinutes(gp.maxSessionMinutes);
+                  flash(`🏛 Профиль «${gp.name}» применён`);
+                }}
+                style={{
+                  padding: '4px 10px', borderRadius: 10, fontSize: 10.5, fontWeight: 700, cursor: 'pointer', minHeight: 34,
+                  border: '1px solid rgba(96,165,250,0.35)', background: 'rgba(96,165,250,0.1)', color: 'var(--text, #fff)',
+                }}
+              >
+                {gp.icon ? `${gp.icon} ` : ''}{gp.name}
+              </button>
+            ))}
+          </div>
+        </div>
         <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4 }}>
           {([['barbell', 'Штанга'], ['dumbbell', 'Гантели'], ['cable', 'Блок/кроссовер'], ['machine', 'Тренажёр'], ['kettlebell', 'Гири'], ['bodyweight', 'Свой вес'], ['bands', 'Резинки']] as const).map(([id, label]) => {
             const on = bbEquipment.includes(id);
             return (
               <button key={id} onClick={() => setBbEquipment(prev => prev.includes(id) ? prev.filter(x => x !== id) : [...prev, id])}
-                style={{ padding: '5px 10px', borderRadius: 14, fontSize: 10, fontWeight: 700, cursor: 'pointer', minHeight: 38, border: on ? '1px solid #60a5fa' : '1px solid rgba(255,255,255,0.08)', background: on ? 'rgba(96,165,250,0.15)' : 'rgba(255,255,255,0.02)', color: on ? '#60a5fa' : '#fff' }}>
+                style={{ padding: '5px 10px', borderRadius: 14, fontSize: 10, fontWeight: 700, cursor: 'pointer', minHeight: 38, border: on ? '1px solid #60a5fa' : '1px solid rgba(255,255,255,0.08)', background: on ? 'rgba(96,165,250,0.15)' : 'rgba(255,255,255,0.02)', color: on ? '#60a5fa' : 'var(--text, #fff)' }}>
                 {label}{on ? ' ✓' : ''}
               </button>
             );
@@ -710,10 +823,10 @@ export const BbParamsStep: React.FC<BbParamsStepProps> = ({
           <div style={{ ...NOTE, opacity: 0.9, marginBottom: 6 }}>Веса плана округляются к реально достижимым на вашем наборе (стандарт / микрозагрузка / домашний / машины-шаг 1).</div>
           <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4 }}>
             {PLATE_SET_PRESETS.map(p => (
-              <button key={p.id} onClick={() => setPlatePreset(p.id)} style={{ padding: '3px 8px', borderRadius: 999, fontSize: 9, fontWeight: 700, cursor: 'pointer', minHeight: 28,
+              <button key={p.id} onClick={() => setPlatePreset(p.id)} style={{ padding: '3px 8px', borderRadius: 999, fontSize: 10, fontWeight: 700, cursor: 'pointer', minHeight: 28,
                 background: platePreset === p.id ? 'rgba(147,197,253,0.15)' : 'rgba(255,255,255,0.03)',
                 border: platePreset === p.id ? '1px solid rgba(147,197,253,0.4)' : '1px solid rgba(255,255,255,0.08)',
-                color: platePreset === p.id ? '#93c5fd' : '#fff' }}>{p.label}</button>
+                color: platePreset === p.id ? '#93c5fd' : 'var(--text, #fff)' }}>{p.label}</button>
             ))}
           </div>
         </div>
@@ -740,7 +853,7 @@ export const BbParamsStep: React.FC<BbParamsStepProps> = ({
                   setWearableTick(t => t + 1);
                 } catch { /* noop */ }
               }}
-              style={{ background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.15)', borderRadius: 6, color: '#fff', fontSize: 11, padding: '6px 8px', width: 115, minHeight: 36 }} />
+              style={{ background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.15)', borderRadius: 6, color: 'var(--text, #fff)', fontSize: 11, padding: '6px 8px', width: 115, minHeight: 36 }} />
             <input type="number" min={1} max={14} step="0.5" placeholder="сон (ч)"
               value={wearableData?.sleepHours ?? ''}
               onChange={e => {
@@ -754,7 +867,7 @@ export const BbParamsStep: React.FC<BbParamsStepProps> = ({
                   setWearableTick(t => t + 1);
                 } catch { /* noop */ }
               }}
-              style={{ background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.15)', borderRadius: 6, color: '#fff', fontSize: 11, padding: '6px 8px', width: 95, minHeight: 36 }} />
+              style={{ background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.15)', borderRadius: 6, color: 'var(--text, #fff)', fontSize: 11, padding: '6px 8px', width: 95, minHeight: 36 }} />
             {(wearableData?.morningHRV != null || wearableData?.sleepHours != null) && (
               <button type="button" onClick={() => { try { localStorage.removeItem('he_wearable_daily'); setWearableTick(t => t + 1); } catch { /* noop */ } }}
                 style={{ padding: '6px 10px', borderRadius: 6, border: '1px solid rgba(239,68,68,0.35)', background: 'rgba(239,68,68,0.1)', color: '#f87171', fontSize: 11, cursor: 'pointer', minHeight: 36 }}>
@@ -771,7 +884,7 @@ export const BbParamsStep: React.FC<BbParamsStepProps> = ({
                 <div style={{ fontSize: 11, fontWeight: 700, color: '#f472b6', marginBottom: 4 }}>🌸 Женский цикл</div>
                 <div style={{ ...NOTE, opacity: 0.9, marginBottom: 4 }}>День цикла (1-28): в лютеиновую фазу объём −5%.</div>
                 <input type="number" min={1} max={60} value={cycleDay ?? ''} placeholder="день цикла" onChange={e => setCycleDay(e.target.value ? Number(e.target.value) : undefined)}
-                  style={{ background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.15)', borderRadius: 6, color: '#fff', fontSize: 11, padding: '4px 8px', width: 90 }} />
+                  style={{ background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.15)', borderRadius: 6, color: 'var(--text, #fff)', fontSize: 11, padding: '4px 8px', width: 90 }} />
               </div>
             )}
             {(bbGoal === 'cut' || bbGoal === 'recomp') && (
@@ -779,13 +892,13 @@ export const BbParamsStep: React.FC<BbParamsStepProps> = ({
                 <div style={{ fontSize: 11, fontWeight: 700, color: '#f87171', marginBottom: 4 }}>🎯 Целевой % жира</div>
                 <div style={{ ...NOTE, opacity: 0.9, marginBottom: 4 }}>Далеко от цели → объём ближе к MEV (сохранение мышц); близко → полный объём.</div>
                 <input type="number" min={3} max={50} step={0.5} value={targetBodyFat ?? ''} placeholder="%" onChange={e => setTargetBodyFat(e.target.value ? Number(e.target.value) : undefined)}
-                  style={{ background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.15)', borderRadius: 6, color: '#fff', fontSize: 11, padding: '4px 8px', width: 80 }} />
+                  style={{ background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.15)', borderRadius: 6, color: 'var(--text, #fff)', fontSize: 11, padding: '4px 8px', width: 80 }} />
               </div>
             )}
           </div>
         )}
 
-        <InjurySelectCard injuries={injuries} onChange={setInjuries} />
+        {paramsDepth === 'pro' && <InjurySelectCard injuries={injuries} onChange={setInjuries} />}
 
         <div style={{ marginTop: 8, padding: 10, borderRadius: 10, background: 'rgba(16,185,129,0.04)', border: '1px solid rgba(16,185,129,0.15)' }}>
           <div style={{ fontSize: 11, fontWeight: 700, color: '#34d399', marginBottom: 4 }}>🩹 Реабилитация (возврат мышцы)</div>
@@ -795,7 +908,7 @@ export const BbParamsStep: React.FC<BbParamsStepProps> = ({
               const on = rehabMuscles.includes(id);
               return (
                 <button key={id} onClick={() => setRehabMuscles(on ? rehabMuscles.filter(x => x !== id) : [...rehabMuscles, id])}
-                  style={{ padding: '3px 8px', borderRadius: 999, fontSize: 9, fontWeight: 700, cursor: 'pointer', minHeight: 28,
+                  style={{ padding: '3px 8px', borderRadius: 999, fontSize: 10, fontWeight: 700, cursor: 'pointer', minHeight: 28,
                     background: on ? 'rgba(16,185,129,0.15)' : 'rgba(255,255,255,0.03)',
                     border: on ? '1px solid rgba(16,185,129,0.4)' : '1px solid rgba(255,255,255,0.08)',
                     color: on ? '#34d399' : '#fff' }}>
@@ -804,10 +917,16 @@ export const BbParamsStep: React.FC<BbParamsStepProps> = ({
               );
             })}
           </div>
+          {rehabMuscles.length > 0 && setRehabWeekStart && (
+            <div style={{ marginTop: 8, display: 'flex', alignItems: 'center', gap: 8 }}>
+              <span style={{ fontSize: 11, color: 'var(--text, #fff)' }}>Старт реабилитации (неделя):</span>
+              <PopupNumber label="" value={rehabWeekStart} min={1} max={12} suffix=" нед" onChange={v => setRehabWeekStart(Math.max(1, Math.round(v)))} />
+            </div>
+          )}
         </div>
 
         <div style={{ marginTop: 8, padding: 10, borderRadius: 10, background: 'rgba(245,158,11,0.04)', border: '1px solid rgba(245,158,11,0.18)' }}>
-          <div style={{ fontSize: 11, fontWeight: 800, color: '#f59e0b', marginBottom: 4 }}>🦴 Ограничения мобильности <span style={{ fontSize: 9, fontWeight: 700, padding: '2px 8px', borderRadius: 999, background: 'rgba(245,158,11,0.12)', border: '1px solid rgba(245,158,11,0.3)' }}>биомеханика</span></div>
+          <div style={{ fontSize: 11, fontWeight: 800, color: '#f59e0b', marginBottom: 4 }}>🦴 Ограничения мобильности <span style={{ fontSize: 10, fontWeight: 700, padding: '2px 8px', borderRadius: 999, background: 'rgba(245,158,11,0.12)', border: '1px solid rgba(245,158,11,0.3)' }}>биомеханика</span></div>
           <div style={{ ...NOTE, opacity: 0.9, marginBottom: 6 }}>Такие упражнения будут заменены на биомеханически безопасные альтернативы.</div>
           <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
             {([
@@ -823,12 +942,12 @@ export const BbParamsStep: React.FC<BbParamsStepProps> = ({
                   style={{ padding: '7px 10px', borderRadius: 10, fontSize: 11, cursor: 'pointer', textAlign: 'left', minWidth: '110px', flex: '1 1 auto',
                     border: active ? '1px solid #f59e0b' : '1px solid rgba(255,255,255,0.1)', background: active ? 'rgba(245,158,11,0.15)' : 'rgba(255,255,255,0.03)', color: active ? '#f59e0b' : '#fff' }}>
                   <div style={{ fontWeight: 700, display: 'flex', alignItems: 'center', gap: 5 }}>{r.icon} {r.label} {active && <span style={{ marginLeft: 'auto', fontSize: 10 }}>✕</span>}</div>
-                  <div style={{ fontSize: 8.5, opacity: 0.75, marginTop: 2, lineHeight: 1.3 }}>{r.desc}</div>
+                  <div style={{ fontSize: 10, opacity: 0.75, marginTop: 2, lineHeight: 1.3 }}>{r.desc}</div>
                 </button>
               );
             })}
           </div>
-          <div style={{ marginTop: 8, fontSize: 9, color: '#fff', lineHeight: 1.45 }}>
+          <div style={{ marginTop: 8, fontSize: 10, color: 'var(--text, #fff)', lineHeight: 1.45 }}>
             💡 <b>Чем отличается от «Травм»:</b> травмы защищают <b>мышцу</b> (исключение или щадящая нагрузка), а мобильность — конкретные <b>движения</b>. Работают вместе, не дублируя друг друга.
           </div>
         </div>

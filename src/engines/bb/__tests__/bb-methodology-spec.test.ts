@@ -11,10 +11,20 @@ import { describe, expect, it } from 'vitest';
 import { METHODOLOGY_SPECS, methodologyLabelRu, methodologyOptions, methodologySpecFor } from '../bb-methodology-spec';
 import type { SessionMethodology } from '../bb-session-order.engine';
 
-const ALL: SessionMethodology[] = ['compound_first', 'pre_exhaust', 'post_exhaust', 'mountain_dog', 'fst7', 'hyperemia'];
+const ALL: SessionMethodology[] = [
+  'compound_first',
+  'pre_exhaust',
+  'post_exhaust',
+  'mountain_dog',
+  'fst7',
+  'hyperemia',
+  'hit_heavy_duty',
+  'smh_lengthened',
+  'myo_rep_match',
+];
 
 describe('METHODOLOGY_SPEC: полнота', () => {
-  it('каждая из 6 методик описана полным спеком', () => {
+  it('каждая из 9 методик описана полным спеком', () => {
     for (const id of ALL) {
       const spec = METHODOLOGY_SPECS[id];
       expect(spec, id).toBeTruthy();
@@ -62,7 +72,7 @@ describe('METHODOLOGY_SPEC: протокольные поля', () => {
 });
 
 describe('METHODOLOGY_SPEC: подписи UI', () => {
-  it('селектор получает все 6 вариантов с честной оговоркой', () => {
+  it('селектор получает все 9 вариантов с честной оговоркой', () => {
     const opts = methodologyOptions();
     expect(opts.map(o => o.id)).toEqual(ALL);
     for (const o of opts) {

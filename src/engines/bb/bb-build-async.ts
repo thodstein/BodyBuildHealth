@@ -63,6 +63,8 @@ export const BB_WORKER_STORAGE_KEYS = [
   'he_workout_stats_cache',
   'he_bb_plan_saved',
   'he_bb_plans',
+  'he_bb_gym_profiles_v1',
+  'he_bb_custom_splits_v1',
 ] as const;
 
 const DEFAULT_TIMEOUT_MS = 30000;

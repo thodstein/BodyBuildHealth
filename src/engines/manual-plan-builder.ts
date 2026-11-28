@@ -10,6 +10,13 @@
  * getExcludedMuscles, getGradedInjuries). Используются bb-builder и
  * cycle-to-plan.
  */
+export type InjuryJointSyndrome =
+  | 'lower_back'
+  | 'shoulder_impingement'
+  | 'knee_patellar'
+  | 'elbow_epicondylitis'
+  | 'wrist';
+
 export interface Injury {
   muscle: string;
   from: string;
@@ -18,6 +25,9 @@ export interface Injury {
   volumePct?: number;
   repsCap?: number;
   exclude?: boolean;
+  /** Суставной/биомеханический синдром (отличается от мышечной травмы). */
+  jointSyndrome?: InjuryJointSyndrome;
+  severity?: 'mild' | 'moderate' | 'severe';
 }
 
 /**
@@ -25,18 +35,21 @@ export interface Injury {
  * InjurySelectCard/LoadSafetyCard используют зонные ключи (legs/arms/core),
  * а bb-builder работает с PRO-ключами (quads/biceps/abs). Без раскрытия
  * травма «Колено» (legs) не матчилась ни с одной мышцей — план не менялся.
+ * Поясница (`lower_back`) отделена от `core`/`abs`, чтобы травма поясницы
+ * убирала осевые/тяги, а не скручивания на пресс.
  */
 const INJURY_GROUP_EXPANSION: Record<string, string[]> = {
   legs: ['quads', 'hamstrings', 'glutes', 'calves'],
   arms: ['biceps', 'triceps', 'forearms'],
-  core: ['abs', 'lower_back'],
+  core: ['abs'],
+  lower_back: ['lower_back'],
 };
 
 export function expandInjuryMuscle(muscle: string): string[] {
   return INJURY_GROUP_EXPANSION[muscle] || [muscle];
 }
 
-/** Коэффициент объёма травмы с постинсультной реабилитацией:
+/** Коэффициент объёма травмы с посттравматической реабилитацией:
  *  если `to` прошла → 50% → 75% → 100% за 3 недели после, иначе volumePct или 0.6. */
 export function getInjuryVolumeFactor(inj: Injury, today: string): number {
   if (inj.to && inj.to < today) {

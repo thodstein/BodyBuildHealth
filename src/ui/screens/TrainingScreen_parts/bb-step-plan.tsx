@@ -12,6 +12,8 @@ import { buildWarmup } from '../../../engines/bb/bb-builder.engine';
 import type { BBPlanMetrics } from '../../../engines/bb/bb-metrics.engine';
 import { isCompoundEx, explainSessionOrder, explainSessionOrderPerExercise, shouldInterleave } from '../../../engines/bb/bb-session-order.engine';
 import { methodologySpecFor } from '../../../engines/bb/bb-methodology-spec';
+import { estimateBBSessionCost, estimateSessionTimeWithSupersets } from '../../../engines/bb/bb-fatigue.engine';
+import { aggregateBBVolume } from '../../../engines/bb/bb-volume.engine';
 import type { DUPMode } from '../../../engines/bb/bb-dup.engine';
 import { loadSRPESessions } from '../../../engines/pro/srpe-store';
 import { acuteChronicRatio, toDailyLoads } from '../../../engines/pro/training-load.engine';
@@ -24,7 +26,7 @@ import type { PrepPhaseKey } from '../../../engines/bb/bb-contest-prep.engine';
 import { PREP_PHASE_COLORS } from '../../../engines/bb/bb-contest-prep.engine';
 import type { PlanWeightEntry } from '../../../engines/bb/bb-weight-calibration.engine';
 import { collectPlanExercises } from '../../../engines/bb/bb-weight-calibration.engine';
-import { CollapsibleCard, phaseForWeek, isWeakMuscle, exerciseComment, backSubgroupLabel, armHeadLabel, bbExerciseIdentity, clampInlineNumber, type Step, type BBInlineEdit } from './bb-auto-constructor-shared';
+import { CollapsibleCard, phaseForWeek, isWeakMuscle, exerciseComment, backSubgroupLabel, armHeadLabel, bbExerciseIdentity, clampInlineNumber, propagateEditAcrossWeeks, type Step, type BBInlineEdit } from './bb-auto-constructor-shared';
 import { PHASE_COLORS, PHASE_LABELS } from './PlanOutput';
 import { Chip, BTN, BTN_GHOST, H, SMALL, IN } from './training-ui';
 import { sessionTagLabel, muscleLabel, exerciseTargetNote } from './bb-labels';
@@ -69,6 +71,12 @@ export interface BbPlanStepProps {
   setStartDateInput?: React.Dispatch<React.SetStateAction<string>>;
   /** 1-клик авто-фикс объёма при предупреждении валидатора (Wave 7 C2). */
   onAutoFixVolume?: () => void;
+  /** Бюджет времени сессии и 1-клик суперсеты (Фаза 3). */
+  maxSessionMinutes?: number;
+  onApplySupersetsToSession?: (weekNo: number, sessionIdx: number) => void;
+  /** Фаза 4: командировка на выбранную неделю + мастер травмы/пропуска. */
+  onAdaptTravelWeek?: (weekNo: number, equipment: string[]) => void;
+  onMidMesoReplan?: (opts: { missedDays?: number; skipWeek?: boolean; newInjuries?: any[]; gymEquipment?: string[] }) => void;
   /** `renderActionRow(false)` — низ шага (кнопки действий). */
   actionRow: React.ReactNode;
 }
@@ -79,7 +87,13 @@ export const BbPlanStep: React.FC<BbPlanStepProps> = React.memo(({
   collapsedDays, setCollapsedDays, collapsedExercises, setCollapsedExercises,
   bbTrainingFocus, bbLevel, bbTrainingYears, onCourse, trainingVolumeMode, setSubTarget, handleSendToExecution,
   setWeightEntries, setWeightsApplied, setStep, actionRow, startDateInput, setStartDateInput, onAutoFixVolume,
+  maxSessionMinutes = 0, onApplySupersetsToSession, onAdaptTravelWeek, onMidMesoReplan,
 }) => {
+  const [midWizardOpen, setMidWizardOpen] = React.useState(false);
+  const [midMissedDays, setMidMissedDays] = React.useState(0);
+  const [midSkipWeek, setMidSkipWeek] = React.useState(false);
+  const [midInjuryMuscle, setMidInjuryMuscle] = React.useState('');
+  const [midTravelEq, setMidTravelEq] = React.useState(false);
   const acwr = useMemo(() => {
     try {
       const srpe = loadSRPESessions();
@@ -96,14 +110,35 @@ export const BbPlanStep: React.FC<BbPlanStepProps> = React.memo(({
   if (!builtPlan || !metrics) return null;
   const W = builtPlan.weeks;
   const wk = W[Math.min(bbWeekSel, W.length) - 1] || W[0];
-  const currentPhase = phaseForWeek(wk.week, bbWeeks);
+  const currentPhase = ((wk as any).phase || ((wk as any).deload ? 'deload' : phaseForWeek(wk.week, bbWeeks))) as keyof typeof PHASE_LABELS;
   const needsDeload = autoDeload && acwr && acwr.ratio > 1.3;
 
   return (
     <div>
-        <div style={{ ...H, display:'flex', justifyContent:'space-between', alignItems:'center' }}>
+        <div style={{ ...H, display:'flex', justifyContent:'space-between', alignItems:'center', gap:8, flexWrap:'wrap' }}>
         <span>📋 Шаг 4: План — {builtPlan.pattern.name}</span>
-        <div style={{ display:'flex', alignItems:'center', gap:6 }}>
+        <div style={{ display:'flex', alignItems:'center', gap:6, flexWrap:'wrap' }}>
+          {onAdaptTravelWeek && (
+            <button
+              type="button"
+              data-bb="travel-week-btn"
+              onClick={() => onAdaptTravelWeek(wk.week, ['bodyweight', 'bands'])}
+              style={{ ...BTN_GHOST, borderColor:'rgba(56,189,248,0.45)', color:'#38bdf8', fontSize:11, padding:'4px 10px' }}
+              title="Адаптировать текущую неделю под командировку (без железа)"
+            >
+              ✈️ Командировка на нед. {wk.week}
+            </button>
+          )}
+          {onMidMesoReplan && (
+            <button
+              type="button"
+              data-bb="mid-meso-wizard-btn"
+              onClick={() => setMidWizardOpen(v => !v)}
+              style={{ ...BTN_GHOST, borderColor:'rgba(245,158,11,0.45)', color:'#fbbf24', fontSize:11, padding:'4px 10px' }}
+            >
+              🩹 Травма / пропуск
+            </button>
+          )}
           <button
           style={{ ...BTN_GHOST, borderColor:'#22c55e', color:'#22c55e', fontSize:11, padding:'4px 10px' }}
           onClick={handleSendToExecution}
@@ -113,6 +148,57 @@ export const BbPlanStep: React.FC<BbPlanStepProps> = React.memo(({
         </button>
         </div>
       </div>
+
+      {midWizardOpen && onMidMesoReplan && (
+        <div data-bb="mid-meso-wizard" style={{ marginBottom: 10, padding: '10px 12px', borderRadius: 12, background: 'rgba(245,158,11,0.08)', border: '1px solid rgba(245,158,11,0.28)' }}>
+          <div style={{ fontSize: 12, fontWeight: 800, color: '#fbbf24', marginBottom: 6 }}>🩹 Мастер корректировки с недели {wk.week}</div>
+          <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center', fontSize: 11, color: 'var(--text, #fff)' }}>
+            <label style={{ display: 'inline-flex', alignItems: 'center', gap: 4 }}>
+              <span>Пропущено дней:</span>
+              <input type="number" min={0} max={5} value={midMissedDays} onChange={e => setMidMissedDays(Math.max(0, Math.min(5, Number(e.target.value) || 0)))} style={{ width: 48, ...IN }} />
+            </label>
+            <label style={{ display: 'inline-flex', alignItems: 'center', gap: 4, cursor: 'pointer' }}>
+              <input type="checkbox" checked={midSkipWeek} onChange={e => setMidSkipWeek(e.target.checked)} />
+              <span>Облегчить неделю (пропуск/восст.)</span>
+            </label>
+            <label style={{ display: 'inline-flex', alignItems: 'center', gap: 4 }}>
+              <span>Новая травма:</span>
+              <select value={midInjuryMuscle} onChange={e => setMidInjuryMuscle(e.target.value)} style={{ padding: '4px 6px', borderRadius: 7, background: 'rgba(15,18,24,0.85)', border: '1px solid rgba(255,255,255,0.14)', color: 'var(--text, #fff)', fontSize: 11 }}>
+                <option value="">Нет</option>
+                <option value="shoulder">Плечо (сустав)</option>
+                <option value="lower_back">Поясница</option>
+                <option value="knee">Колено</option>
+                <option value="elbow">Локоть</option>
+                <option value="chest">Грудь</option>
+                <option value="hamstrings">Бицепс бедра</option>
+              </select>
+            </label>
+            <label style={{ display: 'inline-flex', alignItems: 'center', gap: 4, cursor: 'pointer' }}>
+              <input type="checkbox" checked={midTravelEq} onChange={e => setMidTravelEq(e.target.checked)} />
+              <span>Инвентарь командировки</span>
+            </label>
+          </div>
+          <div style={{ display: 'flex', gap: 8, marginTop: 8 }}>
+            <button
+              type="button"
+              data-bb="mid-meso-apply-btn"
+              onClick={() => {
+                onMidMesoReplan({
+                  missedDays: midMissedDays > 0 ? midMissedDays : undefined,
+                  skipWeek: midSkipWeek || undefined,
+                  newInjuries: midInjuryMuscle ? [{ muscle: midInjuryMuscle, exclude: false, weightPct: 0.7, volumePct: 0.7 }] : undefined,
+                  gymEquipment: midTravelEq ? ['dumbbell', 'bodyweight', 'bands'] : undefined,
+                });
+                setMidWizardOpen(false);
+              }}
+              style={{ ...BTN, padding: '6px 12px', fontSize: 11 }}
+            >
+              🔁 Пересчитать остаток мезоцикла
+            </button>
+            <button type="button" onClick={() => setMidWizardOpen(false)} style={{ ...BTN_GHOST, padding: '6px 10px', fontSize: 11 }}>Закрыть</button>
+          </div>
+        </div>
+      )}
 
       {/* 🧪 Валидация плана — адаптирована под выбор пользователя (аудит 2026-09):
           технические коды скрыты, повторы сгруппированы, мышцы по-русски, у
@@ -179,7 +265,7 @@ export const BbPlanStep: React.FC<BbPlanStepProps> = React.memo(({
                 </details>
               )}
               {view.hiddenCount > 0 && (
-                <div style={{ fontSize: 9, color: 'var(--text-dim, rgba(255,255,255,0.7))', marginTop: 4 }}>
+                <div style={{ fontSize: 10, color: 'var(--text-dim, rgba(255,255,255,0.7))', marginTop: 4 }}>
                   Скрыто {view.hiddenCount} технических строк (классификация каталога, добивки малых мышц, движковые пороги) — они не влияют на выполнение.
                 </div>
               )}
@@ -189,7 +275,10 @@ export const BbPlanStep: React.FC<BbPlanStepProps> = React.memo(({
 
       {/* Верхняя инфо перенесена в шаг Качество — здесь только план упражнений */}
       {(() => {
-        const vol = builtPlan.rotationMuscleVolume || {};
+        const wkAgg = aggregateBBVolume(wk.sessions || []);
+        const vol = Object.keys(wkAgg).length > 0
+          ? Object.fromEntries(Object.entries(wkAgg).map(([k, v]) => [k, v.directSets]))
+          : (builtPlan.rotationMuscleVolume || {});
         const lm = builtPlan.volumeLandmarks || [];
         const MUSCLE_RU_H: Record<string, string> = { chest: 'Грудь', back: 'Спина', shoulders: 'Плечи', delt_front: 'Передняя дельта', delt_mid: 'Средняя дельта', delt_rear: 'Задняя дельта', quads: 'Квадр', hamstrings: 'Бицепс б', glutes: 'Ягодицы', calves: 'Икры', biceps: 'Бицепс', triceps: 'Трицепс', forearms: 'Предпл', abs: 'Пресс', traps: 'Трапец' };
         const muscles = Object.keys(vol).filter(m => MUSCLE_RU_H[m]);
@@ -204,12 +293,13 @@ export const BbPlanStep: React.FC<BbPlanStepProps> = React.memo(({
         };
         const findLandmark = (m: string) => lm.find((l: any) => l.group === m || l.label === m);
         return (
-          <CollapsibleCard title="🔥 Тепловая карта объёма" defaultOpen={true} headerStyle={{ background: 'linear-gradient(135deg, rgba(96,165,250,0.12), rgba(96,165,250,0.04))', color: '#60a5fa' }} badge={`${ruCount(muscles.length, RU_MUSCLES)} · прям/косв`}>
+          <CollapsibleCard title={`🔥 Тепловая карта объёма (неделя ${wk.week})`} defaultOpen={true} headerStyle={{ background: 'linear-gradient(135deg, rgba(96,165,250,0.12), rgba(96,165,250,0.04))', color: '#60a5fa' }} badge={`${ruCount(muscles.length, RU_MUSCLES)} · прям/косв`}>
             <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fill, minmax(118px, 1fr))', gap:6 }}>
               {muscles.sort((a,b) => (vol[b]||0) - (vol[a]||0)).map(m => {
+                const aggEntry = (wkAgg as any)[m];
                 const mm = metrics.perMuscle.find((x:any)=> x.muscle===m);
-                const direct = mm ? Math.round(((mm as any).directSets ?? (vol[m]||0))*10)/10 : (vol[m]||0);
-                const effective = mm ? Math.round(((mm as any).effectiveSets ?? (vol[m]||0))*10)/10 : (vol[m]||0);
+                const direct = aggEntry ? Math.round((aggEntry.directSets || 0) * 10) / 10 : (mm ? Math.round(((mm as any).directSets ?? (vol[m]||0))*10)/10 : (vol[m]||0));
+                const effective = aggEntry ? Math.round((aggEntry.effectiveSets || 0) * 10) / 10 : (mm ? Math.round(((mm as any).effectiveSets ?? (vol[m]||0))*10)/10 : (vol[m]||0));
                 const indirect = Math.max(0, Math.round((effective - direct)*10)/10);
                 const sets = effective > 0 ? effective : (vol[m]||0);
                 const landmark = findLandmark(m);
@@ -219,12 +309,12 @@ export const BbPlanStep: React.FC<BbPlanStepProps> = React.memo(({
                   <div key={m} style={{ padding:'6px 8px', borderRadius:8, background:'rgba(0,0,0,0.2)', border:`2px solid ${color}` }}>
                     <div style={{ fontSize:10, color: 'var(--text, #fff)', fontWeight:600 }}>{MUSCLE_RU_H[m]}</div>
                     <div style={{ fontSize:16, fontWeight:800, color }}>{direct}</div>
-                    <div style={{ fontSize:9, color:'#60a5fa' }}>косв +{indirect} · эфф {effective}</div>
+                    <div style={{ fontSize:10, color:'#60a5fa' }}>косв +{indirect} · эфф {effective}</div>
                     <div style={{ height:4, borderRadius:2, background:'rgba(255,255,255,0.1)', marginTop:4 }}>
                       <div style={{ height:'100%', borderRadius:2, background:color, width:`${pct}%` }} />
                     </div>
                     {landmark && (
-                      <div style={{ fontSize:8, color: 'var(--text, #fff)', marginTop:2 }}>
+                      <div style={{ fontSize:10, color: 'var(--text, #fff)', marginTop:2 }}>
                         Мин {landmark.mev} · Опт {landmark.mav} · Макс {landmark.mrv}
                       </div>
                     )}
@@ -232,7 +322,7 @@ export const BbPlanStep: React.FC<BbPlanStepProps> = React.memo(({
                 );
               })}
             </div>
-            <div style={{ marginTop:6, fontSize:9, color: 'var(--text, #fff)', display:'flex', gap:12, flexWrap:'wrap' }}>
+            <div style={{ marginTop:6, fontSize:10, color: 'var(--text, #fff)', display:'flex', gap:12, flexWrap:'wrap' }}>
               <span>🟢 MEV–MAV (оптимум)</span><span>🟡 Выше оптимума</span><span>🔴 Перегруз (выше максимума)</span><span>🔵 Ниже минимума</span>
               <span style={{ opacity:0.65 }}>· большое число — прямой объём · косв — вклад базы (жимы→трицепс/плечи, тяги→бицепс, присед→ягодицы/б.б.) · цвет — по эффективному</span>
             </div>
@@ -259,20 +349,20 @@ export const BbPlanStep: React.FC<BbPlanStepProps> = React.memo(({
             if (!cp) return null;
             const c = PREP_PHASE_COLORS[cp] ?? '#f472b6';
             return (
-              <span style={{ marginLeft: 8, padding: '1px 8px', borderRadius: 999, fontSize: 9, fontWeight: 800, color: c, background: c + '22', border: `1px solid ${c}55` }}>
+              <span style={{ marginLeft: 8, padding: '1px 8px', borderRadius: 999, fontSize: 10, fontWeight: 800, color: c, background: c + '22', border: `1px solid ${c}55` }}>
                 {cp === 'preparation' ? '🏁 Подготовка' : cp === 'final_preparation' ? '🏁 Финальная подготовка' : cp === 'taper' ? '📉 Тапер' : '🎭 Пик-неделя'}
               </span>
             );
           })()}
           {(wk as any).peakWeek === true && !(wk as any).contestPhase && (
-            <span style={{ marginLeft: 8, padding: '1px 8px', borderRadius: 999, fontSize: 9, fontWeight: 800, color: '#ec4899', background: 'rgba(236,72,153,0.15)', border: '1px solid rgba(236,72,153,0.4)' }}>
+            <span style={{ marginLeft: 8, padding: '1px 8px', borderRadius: 999, fontSize: 10, fontWeight: 800, color: '#ec4899', background: 'rgba(236,72,153,0.15)', border: '1px solid rgba(236,72,153,0.4)' }}>
               🎭 Пик-неделя
             </span>
           )}
         </div>
         <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fill, minmax(36px, 1fr))', gap:4 }}>
           {W.map(w => {
-            const ph = phaseForWeek(w.week, bbWeeks);
+            const ph = ((w as any).phase || ((w as any).deload ? 'deload' : phaseForWeek(w.week, bbWeeks))) as keyof typeof PHASE_COLORS;
             const active = w.week === wk.week;
             return <button key={w.week} onClick={() => setBbWeekSel(w.week)}
               style={{ padding:'7px 0', borderRadius:7, fontSize:11, fontWeight:700, cursor:'pointer',
@@ -348,9 +438,9 @@ export const BbPlanStep: React.FC<BbPlanStepProps> = React.memo(({
                       title={`Неделя ${t.week}: ${t.sets} сетов${t.deload ? ' (разгрузка)' : ''}`}
                       style={{ flex: 1, minHeight: 42, display: 'flex', flexDirection: 'column', justifyContent: 'flex-end', alignItems: 'center', gap: 2, background: 'transparent', border: 'none', padding: 0, cursor: 'pointer' }}
                     >
-                      <span style={{ fontSize: 9, color: active ? 'var(--accent, #00e68a)' : 'var(--text-dim, rgba(255,255,255,0.7))', fontWeight: active ? 800 : 600 }}>{t.sets}</span>
+                      <span style={{ fontSize: 10, color: active ? 'var(--accent, #00e68a)' : 'var(--text-dim, rgba(255,255,255,0.7))', fontWeight: active ? 800 : 600 }}>{t.sets}</span>
                       <span style={{ width: '100%', height: `${Math.round(pct * 0.24)}px`, borderRadius: 4, background: t.deload ? '#38bdf8' : active ? 'var(--accent, #00e68a)' : 'rgba(168,85,247,0.55)' }} />
-                      <span style={{ fontSize: 8.5, opacity: active ? 1 : 0.65, color: 'var(--text, #fff)' }}>W{t.week}</span>
+                      <span style={{ fontSize: 10, opacity: active ? 1 : 0.65, color: 'var(--text, #fff)' }}>W{t.week}</span>
                     </button>
                   );
                 })}
@@ -364,7 +454,7 @@ export const BbPlanStep: React.FC<BbPlanStepProps> = React.memo(({
       <CollapsibleCard title="📅 Календарь мезоцикла (цвет = фаза)" defaultOpen={true} headerStyle={{ background: 'linear-gradient(135deg, rgba(168,85,247,0.12), rgba(168,85,247,0.04))', color: '#a78bfa' }} badge={`${W.length} нед`}>
         <div style={{ display:'flex', flexDirection:'column', gap:3 }}>
           {W.map(w => {
-            const ph = phaseForWeek(w.week, bbWeeks);
+            const ph = ((w as any).phase || ((w as any).deload ? 'deload' : phaseForWeek(w.week, bbWeeks))) as keyof typeof PHASE_COLORS;
             const active = w.week === wk.week;
             const daySets = w.sessions.map(s => s.exercises.reduce((ss, e) => ss + e.sets, 0));
             const maxD = Math.max(1, ...W.flatMap(ww => ww.sessions.map(s => s.exercises.reduce((ss, e) => ss + e.sets, 0))));
@@ -456,7 +546,7 @@ export const BbPlanStep: React.FC<BbPlanStepProps> = React.memo(({
       {/* Progression chart across all weeks */}
       {(() => {
         const wkStats = W.map(w => {
-          const ph = phaseForWeek(w.week, bbWeeks);
+          const ph = ((w as any).phase || ((w as any).deload ? 'deload' : phaseForWeek(w.week, bbWeeks))) as keyof typeof PHASE_COLORS;
           const exs = w.sessions.flatMap(s => s.exercises);
           const sets = exs.reduce((s, e) => s + e.sets, 0);
           const rir = sets > 0 ? exs.reduce((s, e) => s + e.rir * e.sets, 0) / sets : 0;
@@ -545,6 +635,9 @@ export const BbPlanStep: React.FC<BbPlanStepProps> = React.memo(({
         {wk.sessions.map((s, si) => {
           const dayColor = PHASE_COLORS[currentPhase];
           const daySets = s.exercises.reduce((ss, e) => ss + e.sets, 0);
+          const dayCost = estimateBBSessionCost(s);
+          const dayTimeEst = estimateSessionTimeWithSupersets(s);
+          const dayMinutes = Math.max(5, Math.round((dayTimeEst.supersetSeconds || dayCost.timeSeconds) / 60));
           const isDayCollapsed = collapsedDays.has(si);
           const dayExCount = s.exercises.length;
           return (
@@ -588,10 +681,21 @@ export const BbPlanStep: React.FC<BbPlanStepProps> = React.memo(({
                     <div style={{ fontSize:15, fontWeight:800, color: 'var(--text, #fff)', lineHeight:1.2 }}>День {si+1} · {sessionTagLabel(s.sessionTag)}</div>
                     <div style={{ fontSize:11, color: 'var(--text, #fff)', opacity:0.85, marginTop:2, display:'flex', gap:8, flexWrap:'wrap' }}>
                       <span style={{ padding:'2px 7px', borderRadius:6, background: dayColor+'22', color:dayColor, border:`1px solid ${dayColor}35`, fontWeight:700 }}>{PHASE_LABELS[currentPhase]}</span>
-                      <span>{s.character} · {dayExCount} упр · {ruCount(daySets, RU_SETS)}</span>
+                      <span>{s.character} · {dayExCount} упр · {ruCount(daySets, RU_SETS)} · ⏱ ~{dayMinutes} мин · TUT {Math.round(dayCost.tutSeconds)}с{maxSessionMinutes > 0 && dayMinutes > maxSessionMinutes ? ` (лимит ${maxSessionMinutes}м!)` : ''}</span>
                     </div>
                   </div>
                 </div>
+                {onApplySupersetsToSession && (
+                  <button
+                    type="button"
+                    data-bb="apply-supersets-btn"
+                    onClick={ev => { ev.stopPropagation(); onApplySupersetsToSession(wk.week, si); }}
+                    title="Связать антагонисты в суперсеты и сократить время сессии"
+                    style={{ ...BTN_GHOST, padding: '4px 8px', fontSize: 10, borderColor: 'rgba(168,85,247,0.4)', color: '#c084fc', flexShrink: 0 }}
+                  >
+                    ⚡ Уложить в время (суперсеты)
+                  </button>
+                )}
                 <span style={{
                   width:32, height:32, borderRadius:8, display:'inline-flex', alignItems:'center', justifyContent:'center',
                   background:'rgba(255,255,255,0.06)', border:'1px solid rgba(255,255,255,0.1)', color: 'var(--text, #fff)', fontSize:14, flexShrink:0,
@@ -658,7 +762,7 @@ export const BbPlanStep: React.FC<BbPlanStepProps> = React.memo(({
                     ? { ...storedEdit, exerciseKey }
                     : { sets: adjSets0, reps: e.workSets[0]?.reps || 10, weight: adjW, exerciseKey };
                   const isEditing = editMode?.dayIdx === si && editMode?.exIdx === ei;
-                  const comment = e.comment || exerciseComment(e, weakPoints, '', currentPhase);
+                  const comment = e.comment || exerciseComment(e, weakPoints, '', ((currentPhase === 'resensitization' || currentPhase === 'metabolite' ? 'accumulation' : currentPhase) as any));
                   const roleColor = e.role === 'primary' ? '#00e68a' : '#a855f7';
                   const isCompound = isCompoundEx(e);
                   const _cat = EXERCISE_CATALOG.find(c => c.name === (e.exerciseName || e.name));
@@ -668,7 +772,8 @@ export const BbPlanStep: React.FC<BbPlanStepProps> = React.memo(({
                   const featureBadges = exerciseFeatureBadges(e, dupMode);
                   const { lines: setLines, chain: setChain } = planSetsBreakdown(e, edit);
                   const charColor = e.character === 'тяж' ? '#ef4444' : '#60a5fa';
-                  const exCollapsed = collapsedExercises.has(`${si}-${ei}`);
+                  const exCollapseKey = `${wk.week}-${si}-${ei}`;
+                  const exCollapsed = collapsedExercises.has(exCollapseKey);
                   return (
                     <div key={ei} style={{
                       padding:'10px 12px', marginBottom:8,
@@ -680,9 +785,8 @@ export const BbPlanStep: React.FC<BbPlanStepProps> = React.memo(({
                         <button
                           onClick={() => setCollapsedExercises(prev => {
                             const next = new Set(prev);
-                            const key = `${si}-${ei}`;
-                            if (next.has(key)) next.delete(key);
-                            else next.add(key);
+                            if (next.has(exCollapseKey)) next.delete(exCollapseKey);
+                            else next.add(exCollapseKey);
                             return next;
                           })}
                           aria-expanded={!exCollapsed}
@@ -709,7 +813,7 @@ export const BbPlanStep: React.FC<BbPlanStepProps> = React.memo(({
                             </span>
                             {e.supersetGroup != null && (
                               <span style={{ fontSize:11, fontWeight:800, padding:'2px 7px', borderRadius:5, background:'rgba(168,85,247,0.18)', color:'#c084fc', border:'0.5px solid rgba(168,85,247,0.35)' }}>
-                                🔗 {(e.supersetSlot === 1 ? 'B' : 'A')}{e.supersetGroup}
+                                🔗 {(['A', 'B', 'C', 'D'][Number(e.supersetSlot) || 0] || 'A')}{e.supersetGroup}
                               </span>
                             )}
                             {(e as any).warmupActivator && (
@@ -753,13 +857,45 @@ export const BbPlanStep: React.FC<BbPlanStepProps> = React.memo(({
                       {!exCollapsed && (
                         <>
                       {/* Редактирование (inline) */}
-                      {isEditing && (
-                        <div style={{ display:'flex', gap:8, marginBottom:8, alignItems:'center', padding:'6px 10px', borderRadius:10, background:'rgba(255,255,255,0.04)' }}>
-                          <div><span style={SMALL}>Сеты</span><input type="number" value={edit.sets} min={0} max={20} onChange={e2 => { const next = { ...exerciseEdits, [editKey]: { ...edit, sets: clampInlineNumber(e2.target.value, 0, 20, edit.sets) } }; commitEdits ? commitEdits(next) : setExerciseEdits(next); }} style={{ width:48, ...IN }} /></div>
-                          <div><span style={SMALL}>Повт</span><input type="number" value={edit.reps} min={1} max={30} onChange={e2 => { const next = { ...exerciseEdits, [editKey]: { ...edit, reps: clampInlineNumber(e2.target.value, 1, 30, edit.reps) } }; commitEdits ? commitEdits(next) : setExerciseEdits(next); }} style={{ width:48, ...IN }} /></div>
-                          <div><span style={SMALL}>Вес</span><input type="number" value={edit.weight} min={0} max={500} onChange={e2 => { const next = { ...exerciseEdits, [editKey]: { ...edit, weight: clampInlineNumber(e2.target.value, 0, 500, edit.weight) } }; commitEdits ? commitEdits(next) : setExerciseEdits(next); }} style={{ width:55, ...IN }} /></div>
+                      {isEditing && (() => {
+                        const curRest = edit.restSeconds ?? (e as any).restSeconds ?? e.workSets[0]?.restSeconds ?? 90;
+                        const curTempo = edit.tempo !== undefined ? edit.tempo : ((e as any).tempoSpec || e.workSets[0]?.tempo || '');
+                        const writeEdit = (patch: Partial<BBInlineEdit>) => {
+                          const next = { ...exerciseEdits, [editKey]: { ...edit, ...patch } };
+                          commitEdits ? commitEdits(next) : setExerciseEdits(next);
+                        };
+                        return (
+                        <div style={{ display:'flex', gap:8, marginBottom:8, alignItems:'center', flexWrap:'wrap', padding:'6px 10px', borderRadius:10, background:'rgba(255,255,255,0.04)' }}>
+                          <div><span style={SMALL}>Сеты</span><input type="number" value={edit.sets} min={0} max={20} onChange={e2 => writeEdit({ sets: clampInlineNumber(e2.target.value, 0, 20, edit.sets) })} style={{ width:48, ...IN }} /></div>
+                          <div><span style={SMALL}>Повт</span><input type="number" value={edit.reps} min={1} max={30} onChange={e2 => writeEdit({ reps: clampInlineNumber(e2.target.value, 1, 30, edit.reps) })} style={{ width:48, ...IN }} /></div>
+                          <div><span style={SMALL}>Вес</span><input type="number" value={edit.weight} min={0} max={500} onChange={e2 => writeEdit({ weight: clampInlineNumber(e2.target.value, 0, 500, edit.weight) })} style={{ width:55, ...IN }} /></div>
+                          <div style={{ display:'flex', alignItems:'center', gap:3 }}>
+                            <span style={SMALL}>Отдых</span>
+                            <button type="button" onClick={() => writeEdit({ restSeconds: Math.max(20, curRest - 15) })} style={{ padding:'2px 6px', borderRadius:6, fontSize:10, cursor:'pointer', border:'1px solid rgba(255,255,255,0.12)', background:'rgba(255,255,255,0.05)', color:'var(--text, #fff)' }}>−15</button>
+                            <input type="number" value={curRest} min={20} max={360} step={15} onChange={e2 => writeEdit({ restSeconds: clampInlineNumber(e2.target.value, 20, 360, curRest) })} style={{ width:50, ...IN }} />
+                            <button type="button" onClick={() => writeEdit({ restSeconds: Math.min(360, curRest + 15) })} style={{ padding:'2px 6px', borderRadius:6, fontSize:10, cursor:'pointer', border:'1px solid rgba(255,255,255,0.12)', background:'rgba(255,255,255,0.05)', color:'var(--text, #fff)' }}>+15</button>
+                          </div>
+                          <div style={{ display:'flex', alignItems:'center', gap:4, flexWrap:'wrap' }}>
+                            <span style={SMALL}>Темп</span>
+                            <input type="text" value={curTempo} placeholder="3-1-1-0" onChange={e2 => writeEdit({ tempo: e2.target.value })} style={{ width:60, ...IN }} />
+                            {['2-0-1-0', '3-1-1-0', '3-0-1-2', '4-0-1-0'].map(tp => (
+                              <button key={tp} type="button" onClick={() => writeEdit({ tempo: tp })} style={{ padding:'2px 6px', borderRadius:6, fontSize:10, cursor:'pointer', border: curTempo === tp ? '1px solid #a855f7' : '1px solid rgba(255,255,255,0.1)', background: curTempo === tp ? 'rgba(168,85,247,0.18)' : 'rgba(255,255,255,0.03)', color:'var(--text, #fff)' }}>{tp}</button>
+                            ))}
+                          </div>
+                          <button type="button" onClick={() => {
+                            const res = propagateEditAcrossWeeks({
+                              weeks: builtPlan.weeks,
+                              sourceEdit: { ...edit, restSeconds: curRest, tempo: curTempo },
+                              exerciseIdentity: bbExerciseIdentity(e),
+                              siFallback: si,
+                              eiFallback: ei,
+                              existing: exerciseEdits,
+                            });
+                            commitEdits ? commitEdits(res.edits) : setExerciseEdits(res.edits);
+                          }} style={{ padding:'4px 8px', borderRadius:7, fontSize:10, fontWeight:700, cursor:'pointer', border:'1px solid rgba(96,165,250,0.4)', background:'rgba(96,165,250,0.12)', color:'#60a5fa' }}>📌 На все недели</button>
                         </div>
-                      )}
+                        );
+                      })()}
 
                       {/* Параметры: грид чипсов */}
                       <div style={{
@@ -770,8 +906,8 @@ export const BbPlanStep: React.FC<BbPlanStepProps> = React.memo(({
                         <Chip label="Подходы" value={edit.sets + '×' + edit.reps} color="#22c55e" />
                         <Chip label="RIR" value={String(e.rir)} color="#f59e0b" />
                         <Chip label="Вес" value={edit.weight > 0 ? edit.weight + ' кг' : 'Свой вес'} color="#60a5fa" />
-                        {e.workSets[0]?.restSeconds && <Chip label="Отдых" value={e.workSets[0].restSeconds + 'с'} color="#fff" />}
-                        <Chip label="Группа" value={muscleLabel(e.muscle)} color="#fff" />
+                        {e.workSets[0]?.restSeconds && <Chip label="Отдых" value={e.workSets[0].restSeconds + 'с'} color="var(--text, #fff)" />}
+                        <Chip label="Группа" value={muscleLabel(e.muscle)} color="var(--text, #fff)" />
                       </div>
 
                       {/* Разбивка по подходам (включая дроп-цепочки финального сета) */}
@@ -827,7 +963,7 @@ export const BbPlanStep: React.FC<BbPlanStepProps> = React.memo(({
                                   {prof.peak && <div><b>Пиковое сокращение:</b> {prof.peak}</div>}
                                   {cues.length > 0 && <div><b>Ключи:</b> {cues.join('; ')}</div>}
                                   {prof.mistakes.length > 0 && <div><b>Ошибки:</b> {prof.mistakes.join('; ')}</div>}
-                                  <div style={{ marginTop: 3, fontSize: 9.5, opacity: 0.8 }}>
+                                  <div style={{ marginTop: 3, fontSize: 10, opacity: 0.8 }}>
                                     Источник: {prof.source === 'exercise-lab' ? 'лаборатория' : prof.source === 'catalog' ? 'каталог' : 'базовый шаблон'} · Темп {e.workSets[0]?.tempo || prof.tempo}
                                     {e.workSets[0]?.tempo && tempoExplain(e.workSets[0].tempo) ? ` (${tempoExplain(e.workSets[0].tempo)})` : ''}
                                   </div>
@@ -859,7 +995,7 @@ export const BbPlanStep: React.FC<BbPlanStepProps> = React.memo(({
                                 <div style={{ fontWeight: 700, color: '#60a5fa', marginBottom: 2 }}>🧠 Почему именно это упражнение?</div>
                                 <div><b>Логика подбора:</b> {cleanRationale || e.rationale}</div>
                                 {targetNote && <div style={{ marginTop: 4, padding: '4px 6px', background: 'rgba(59,130,246,0.08)', borderRadius: 6 }}>{targetNote}</div>}
-                                <div style={{ marginTop: 4, fontSize: 9.5, opacity: 0.85 }}>
+                                <div style={{ marginTop: 4, fontSize: 10, opacity: 0.85 }}>
                                   Роль: {e.role === 'primary' ? 'основное движение дня — даёт 60-70% стимула' : 'добивка/изоляция — добивает объём и формирует детали'} · Характер: {e.character === 'тяж' ? 'тяж (6-10 повт, RIR 1-2)' : e.character === 'памп' ? 'памп (12-20, RIR 3)' : 'лёгкий'} · Паттерн: {SUMMARY_PATTERN_RU[(e as any).movementPattern || ''] || (e as any).movementPattern || 'силовой'}
                                 </div>
                               </div>

@@ -2,6 +2,7 @@ import type { BBPlan } from './bb-builder.engine';
 import type { VolumeRegime } from './bb-ped-profile';
 import { syncBBPlanSetShape, validateBBPlan, resolveExerciseCatalogEntry, BB_MRV_TOLERANCE } from './bb-validator.engine';
 import { tidySessionExercises, orderSessionExercises, arrangeSupersetBlocks, axialCostOf, isCompoundEx, shouldInterleave, MUSCLE_RU_SHORT, type SessionMethodology } from './bb-session-order.engine';
+import { sanitizeTempoNotation } from './bb-tempo-rest';
 import { aggregateBBVolume, buildBBVolumeTarget, exerciseVolumeContributions, indirectMuscleContributions, normalizeBBMuscle, sessionLimitsFor as centralizedSessionLimits, perExerciseCap, sessionMuscleRealismCap, sessionMuscleClass, prescribedSessionCap, weeklyCapFor, perSessionMuscleCap, sessionMuscleExerciseCap, distributeSetsByRole } from './bb-volume.engine';
 
 /**
@@ -4887,8 +4888,9 @@ function applyControlledAccessoryRotation(plan: BBPlan, options: Pick<BBFinalize
 function repairAdaptiveSafety(plan: BBPlan, options: BBFinalizeOptions): void {
   const equipment = options.equipment || [];
   const excludedExercises = new Set(options.excludedExercises || []);
-  const excludedMuscles = new Set(options.excludedMuscles || []);
-  for (const week of plan.weeks) for (const session of week.sessions) for (const exercise of session.exercises) {
+  for (const week of plan.weeks) {
+    const excludedMuscles = new Set((week as any).excludedMuscles ?? options.excludedMuscles ?? []);
+    for (const session of week.sessions) for (const exercise of session.exercises) {
     const equipmentAllowed = (candidate: typeof EXERCISE_CATALOG[number]) => {
       if (!candidate || !candidate.name) return false;
       const raw = Array.isArray(candidate.equipment) ? candidate.equipment : [String(candidate.equipment || '')];
@@ -4938,6 +4940,7 @@ function repairAdaptiveSafety(plan: BBPlan, options: BBFinalizeOptions): void {
     exercise.comment = [exercise.comment?.replace(/\.\s*$/, ''), `Safety repair: ${oldName} → ${replacement.name}; вес скорректирован ×${ratio.toFixed(2)}`].filter(Boolean).join('. ');
     exercise.rationale = [exercise.rationale, 'Adaptive safety replacement'].filter(Boolean).join(' | ');
   }
+  }
 }
 
 /**
@@ -4953,25 +4956,32 @@ function repairAdaptiveSafety(plan: BBPlan, options: BBFinalizeOptions): void {
  * (`reorder:false`) — удаление не является перестановкой.
  */
 function purgeExcludedMuscleExercises(plan: BBPlan, options: BBFinalizeOptions): void {
-  const excludedMuscles = new Set(options.excludedMuscles || []);
-  if (!excludedMuscles.size) return;
+  const globalExcluded = new Set(options.excludedMuscles || []);
+  const allRemovedMuscles = new Set<string>();
   const removedNames: string[] = [];
-  for (const week of plan.weeks) for (const session of week.sessions) {
-    const kept = session.exercises.filter(exercise => !excludedMuscles.has(exercise.muscle));
-    if (kept.length === session.exercises.length) continue;
-    for (const exercise of session.exercises) {
-      if (excludedMuscles.has(exercise.muscle)) removedNames.push(exercise.name || exercise.exerciseName || exercise.muscle);
-    }
-    session.exercises = kept;
-    if (kept.length > 0 && !kept.some(exercise => exercise.role === 'primary')) {
-      const promoted = kept.find(exercise => exercise.role === 'accessory') || kept[0];
-      promoted.role = 'primary';
-      promoted.comment = [promoted.comment?.replace(/\.\s*$/, ''), 'Роль primary: прежнее основное движение исключено ограничениями травм'].filter(Boolean).join('. ');
+  for (const week of plan.weeks) {
+    const excludedMuscles = new Set<string>((week as any).excludedMuscles ?? [...globalExcluded]);
+    if (!excludedMuscles.size) continue;
+    for (const session of week.sessions) {
+      const kept = session.exercises.filter(exercise => !excludedMuscles.has(exercise.muscle));
+      if (kept.length === session.exercises.length) continue;
+      for (const exercise of session.exercises) {
+        if (excludedMuscles.has(exercise.muscle)) {
+          allRemovedMuscles.add(exercise.muscle);
+          removedNames.push(exercise.name || exercise.exerciseName || exercise.muscle);
+        }
+      }
+      session.exercises = kept;
+      if (kept.length > 0 && !kept.some(exercise => exercise.role === 'primary')) {
+        const promoted = kept.find(exercise => exercise.role === 'accessory') || kept[0];
+        promoted.role = 'primary';
+        promoted.comment = [promoted.comment?.replace(/\.\s*$/, ''), 'Роль primary: прежнее основное движение исключено ограничениями травм'].filter(Boolean).join('. ');
+      }
     }
   }
   if (!removedNames.length) return;
   const unique = [...new Set(removedNames)];
-  const note = `🚫 Исключённые мышцы (${[...excludedMuscles].join(', ')}): убрано упражнений ${removedNames.length} (${unique.slice(0, 4).join(', ')}${unique.length > 4 ? '…' : ''}).`;
+  const note = `🚫 Исключённые мышцы (${[...allRemovedMuscles].join(', ')}): убрано упражнений ${removedNames.length} (${unique.slice(0, 4).join(', ')}${unique.length > 4 ? '…' : ''}).`;
   if (!plan.rationale.some(line => line.startsWith('🚫 Исключённые мышцы'))) plan.rationale.push(note);
 }
 
@@ -7988,9 +7998,10 @@ for (const week of next.weeks) {
     }
     if (!ex.workSets?.[0]?.tempo && !(ex as any).tempoSpec) {
       const prof2: any = (ex as any).executionProfile;
-      if (prof2?.tempo) {
-        for (const ws of ex.workSets || []) if (!(ws as any).tempo) (ws as any).tempo = prof2.tempo;
-        (ex as any).tempoSpec = prof2.tempo;
+      const cleanTempo = sanitizeTempoNotation(prof2?.tempo);
+      if (cleanTempo) {
+        for (const ws of ex.workSets || []) if (!(ws as any).tempo) (ws as any).tempo = cleanTempo;
+        (ex as any).tempoSpec = cleanTempo;
       }
     }
   }
@@ -8040,6 +8051,7 @@ for (const week of next.weeks) {
       }
     }
   }
+  if (!options.preserveSource) purgeExcludedMuscleExercises(next, options);
   normalizeIsolationRoles(next);
   finalOrderSessions(next, options);
   // ── Итерация C (D-1): правило прогрессии на каждое упражнение ──

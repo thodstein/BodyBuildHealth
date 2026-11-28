@@ -584,6 +584,67 @@ export const SPLIT_PATTERNS: SplitPattern[] = [
   },
 ];
 
+export const CUSTOM_SPLITS_STORAGE_KEY = 'he_bb_custom_splits_v1';
+
+/** Загрузить пользовательские сплит-шаблоны (Шаг 3 «Свой сплит»). */
+export function loadCustomSplitPatterns(): SplitPattern[] {
+  try {
+    if (typeof localStorage === 'undefined') return [];
+    const raw = localStorage.getItem(CUSTOM_SPLITS_STORAGE_KEY);
+    if (!raw) return [];
+    const parsed = JSON.parse(raw);
+    if (!Array.isArray(parsed)) return [];
+    return parsed.filter((p: any) => p && typeof p.id === 'string' && Array.isArray(p.schedule) && p.schedule.length > 0);
+  } catch {
+    return [];
+  }
+}
+
+/** Создать SplitPattern из конструктора недели (дни 1..7 или произвольной длины). */
+export function createCustomSplitPattern(
+  name: string,
+  schedule: ScheduleDay[],
+  opts?: { id?: string; description?: string; level?: string[] },
+): SplitPattern {
+  const safeSchedule = schedule.length > 0 ? schedule : [{ kind: 'тренировка' as const, character: 'тяж' as const, sessionTag: 'FullBody' }];
+  const sessions = safeSchedule.filter(d => d.kind === 'тренировка').length;
+  return {
+    id: opts?.id || `custom_${Date.now().toString(36)}`,
+    name: name.trim() || `Свой сплит ${sessions}×`,
+    rotationDays: safeSchedule.length,
+    sessionsPerRotation: sessions,
+    schedule: safeSchedule,
+    level: opts?.level || ['beginner', 'intermediate', 'advanced', 'enhanced'],
+    description: opts?.description || `Пользовательский сплит: ${sessions} тренировок за ${safeSchedule.length} дн.`,
+    direction: 'bodybuilding',
+  };
+}
+
+/** Сохранить или обновить пользовательский сплит в localStorage. */
+export function saveCustomSplitPattern(pattern: SplitPattern): SplitPattern[] {
+  const list = loadCustomSplitPatterns();
+  const idx = list.findIndex(p => p.id === pattern.id);
+  if (idx >= 0) list[idx] = pattern;
+  else list.push(pattern);
+  try {
+    if (typeof localStorage !== 'undefined') {
+      localStorage.setItem(CUSTOM_SPLITS_STORAGE_KEY, JSON.stringify(list));
+    }
+  } catch { /* quota */ }
+  return list;
+}
+
+/** Удалить пользовательский сплит по ID. */
+export function deleteCustomSplitPattern(id: string): SplitPattern[] {
+  const next = loadCustomSplitPatterns().filter(p => p.id !== id);
+  try {
+    if (typeof localStorage !== 'undefined') {
+      localStorage.setItem(CUSTOM_SPLITS_STORAGE_KEY, JSON.stringify(next));
+    }
+  } catch { /* noop */ }
+  return next;
+}
+
 export function getPattern(id: string): SplitPattern | undefined {
   const legacyIds: Record<string, string> = {
     ppl_6day: 'ppl_6',
@@ -599,8 +660,9 @@ export function getPattern(id: string): SplitPattern | undefined {
   const raw = String(id || '');
   const norm = raw.toLowerCase().trim().replace(/\s+/g, '_');
   const resolvedId = legacyIds[raw] ?? legacyIds[norm] ?? raw;
-  let found = SPLIT_PATTERNS.find(p => p.id === resolvedId);
-  if (!found) found = SPLIT_PATTERNS.find(p => p.id.toLowerCase() === String(resolvedId || '').toLowerCase());
+  const all = [...SPLIT_PATTERNS, ...loadCustomSplitPatterns()];
+  let found = all.find(p => p.id === resolvedId);
+  if (!found) found = all.find(p => p.id.toLowerCase() === String(resolvedId || '').toLowerCase());
   if (!found) {
     console.warn(`[bb-split-patterns] getPattern: pattern id="${id}" не найден. Доступные: ${SPLIT_PATTERNS.map(p => p.id).join(', ')}`);
   }

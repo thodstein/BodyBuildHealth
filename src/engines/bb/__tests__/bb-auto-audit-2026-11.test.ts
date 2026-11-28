@@ -144,8 +144,11 @@ describe('BB-11: пересборка остатка не подменяет с�
     inputSnapshot: { level: 'intermediate', goal: 'mass', volumeGoal: 'mav' },
   }) as any;
 
-  it('план программы (pattern.id = id программы) → честный null, а не чужой сплит', () => {
-    expect(replanBBMesoFromFact(fakePlan('program_xyz'), [], { currentWeek: 2 })).toBeNull();
+  it('план программы (pattern.id = id программы) → адаптируется in-place без подмены сплита', () => {
+    const res = replanBBMesoFromFact(fakePlan('program_xyz'), [], { currentWeek: 2 });
+    expect(res).not.toBeNull();
+    expect(res!.plan.pattern.id).toBe('program_xyz');
+    expect(res!.frozenWeeks).toBe(1);
   });
 
   it('план сплита → остаток пересобирается', () => {

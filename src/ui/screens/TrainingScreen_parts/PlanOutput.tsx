@@ -9,13 +9,15 @@ import React from 'react';
 
 export const ACCENT = '#00e68a';
 
-export type PhaseKey = 'accumulation' | 'intensification' | 'peaking' | 'deload';
+export type PhaseKey = 'accumulation' | 'intensification' | 'peaking' | 'deload' | 'resensitization' | 'metabolite';
 
 export const PHASE_COLORS: Record<PhaseKey, string> = {
   accumulation: '#22c55e',
   intensification: '#f59e0b',
   deload: '#60a5fa',
   peaking: '#ef4444',
+  resensitization: '#14b8a6',
+  metabolite: '#ec4899',
 };
 
 export const PHASE_LABELS: Record<PhaseKey, string> = {
@@ -23,6 +25,8 @@ export const PHASE_LABELS: Record<PhaseKey, string> = {
   intensification: 'Интенсификация',
   deload: 'Разгрузка',
   peaking: 'Пик',
+  resensitization: 'Ресенситизация',
+  metabolite: 'Метаболит',
 };
 
 export interface PlanExerciseView {

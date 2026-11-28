@@ -79,7 +79,7 @@ export function roundToAvailablePlates(weight: number, plates: number[], barWeig
 }
 
 /** Определить, является ли упражнение штанговым (гриф 20 кг), или гантелями/блоком/тренажёром. */
-function isBarbellExercise(ex: { name?: string; exerciseName?: string; equipment?: string | string[] }): boolean {
+export function isBarbellExercise(ex: { name?: string; exerciseName?: string; equipment?: string | string[] }): boolean {
   const eq = Array.isArray(ex.equipment) ? ex.equipment.join(' ').toLowerCase() : String(ex.equipment || '').toLowerCase();
   const n = String(ex.exerciseName || ex.name || '').toLowerCase();
   if (!eq && !n) return true;
@@ -114,12 +114,13 @@ export function applyPlateRoundingToPlan(plan: PlatePlan, plates: number[] | und
   if (norm.length === 0) return { changed: 0 };
   let changed = 0;
   for (const wk of plan.weeks || []) for (const s of wk.sessions || []) for (const ex of s.exercises || []) {
-    const exBar = isBarbellExercise(ex) ? barWeight : 0;
-    const minStep = exBar > 0 ? 0 : Math.min(2.5, Math.max(0.5, Math.min(...norm)));
+    const isBar = isBarbellExercise(ex);
+    const minStep = isBar ? 0 : Math.min(2.5, Math.max(0.5, Math.min(...norm)));
     for (const st of ex.workSets || []) {
       const w = Number(st.weight ?? 0);
       if (w <= 0) continue;
-      const r = exBar > 0 || (barWeight > 0 && w >= barWeight)
+      // Гантели/блоки/тренажёры не получают штанговый гриф 20 кг даже при весе ≥ 20 кг.
+      const r = isBar
         ? roundToAvailablePlates(w, norm, barWeight)
         : Math.max(minStep, Math.round(w / minStep) * minStep);
       if (r !== w) { st.weight = Math.round(r * 100) / 100; changed++; }

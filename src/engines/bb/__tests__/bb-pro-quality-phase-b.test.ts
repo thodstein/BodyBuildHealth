@@ -80,9 +80,9 @@ describe('B2: Per-exercise tempo override', () => {
     expect(tempo).toBe('3-1-1-0');
   });
 
-  it('exerciseTempoOverride: кроссовер → 3-2-1-0 (пиковое сокращение)', () => {
+  it('exerciseTempoOverride: кроссовер → 3-0-1-2 (пиковое сокращение)', () => {
     const tempo = exerciseTempoOverride('Сведение в кроссовере');
-    expect(tempo).toBe('3-2-1-0');
+    expect(tempo).toBe('3-0-1-2');
   });
 
   it('tempoFor с exerciseName: присед → 2-0-1-0', () => {

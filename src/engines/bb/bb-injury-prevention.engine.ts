@@ -34,9 +34,9 @@ const JOINT_MUSCLE_MAP: Record<string, string[]> = {
 };
 
 const STRESS_THRESHOLDS = {
-  low: 15,
-  moderate: 25,
-  high: 40,
+  low: 65,
+  moderate: 110,
+  high: 165,
 };
 
 function getJointStress(exercise: BBExercise): number {
@@ -75,6 +75,7 @@ export function calculateSessionStress(session: BBSession): JointStressReport {
   const exercises: any[] = Array.isArray((session as any)?.exercises) ? (session as any).exercises : [];
 
   for (const ex of exercises) {
+    if ((ex as any).warmupActivator) continue;
     const stress = getJointStress(ex);
     total += stress;
     const trueMuscle = trueMuscleOf({ name: ex.name, group: ex.muscle, movementPattern: ex.exerciseName }) || ex.muscle;
@@ -87,7 +88,7 @@ export function calculateSessionStress(session: BBSession): JointStressReport {
   const issues: string[] = [];
   for (const [joint, stress] of Object.entries(byJoint)) {
     if (stress > STRESS_THRESHOLDS.high) {
-      issues.push(`⚠ ${joint}: высокий суставной стресс (${stress}) — рассмотрите замену упражнений.`);
+      issues.push(`⚠ ${joint}: высокий суставной стресс (${Math.round(stress)}) — рассмотрите замену упражнений.`);
     }
   }
 
@@ -121,17 +122,21 @@ export function calculateWeeklyStress(week: { sessions: BBSession[] }): JointStr
     allIssues.push(...sessionReport.issues);
   }
 
-  // Проверка конфликтов: плечи + жим лёжа + жим стоя в одну неделю
+  // Проверка конфликтов плеча только при реально запредельном недельном стрессе + >2 тяжёлых жимов со штангой.
   const shoulderStress = byJoint['shoulder'] || 0;
-  if (shoulderStress > STRESS_THRESHOLDS.high) {
-    const hasBenchPress = sessions.some((s: any) =>
-      (Array.isArray(s?.exercises) ? s.exercises : []).some((ex: any) => /жим.*лёж|bench.*press/i.test(ex.name))
-    );
-    const hasOverheadPress = sessions.some((s: any) =>
-      (Array.isArray(s?.exercises) ? s.exercises : []).some((ex: any) => /жим.*стоя|жим.*сидя|overhead|ohp|армей/i.test(ex.name))
-    );
-    if (hasBenchPress && hasOverheadPress) {
-      allIssues.push('⚠ Конфликт плечевого сустава: жим лёжа + жим стоя в одну неделю — высокий риск травмы плеча.');
+  if (shoulderStress > STRESS_THRESHOLDS.high * 2.5) {
+    let barbellBenchCount = 0;
+    let barbellOhpCount = 0;
+    for (const s of sessions) {
+      for (const ex of (Array.isArray(s?.exercises) ? s.exercises : [])) {
+        if ((ex as any).warmupActivator) continue;
+        const n = String(ex?.name || '');
+        if (/жим.*штанг.*лёж|bench.*press/i.test(n)) barbellBenchCount++;
+        if (/армей.*жим|жим.*стоя|ohp|behind.?neck/i.test(n)) barbellOhpCount++;
+      }
+    }
+    if (barbellBenchCount + barbellOhpCount > 2) {
+      allIssues.push('⚠ Конфликт плечевого сустава: >2 тяжёлых жимов со штангой при высоком стрессе — снизьте нагрузку на переднюю дельту.');
     }
   }
 

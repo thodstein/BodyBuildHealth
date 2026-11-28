@@ -29,6 +29,8 @@ export const BB_PHASE_COLOR: Record<string, string> = {
   deload: '#10b981',
   peaking: '#a855f7',
   taper: '#e11d48',
+  resensitization: '#14b8a6',
+  metabolite: '#ec4899',
 };
 
 export const BB_PHASE_LABEL_RU: Record<string, string> = {
@@ -37,6 +39,8 @@ export const BB_PHASE_LABEL_RU: Record<string, string> = {
   deload: 'Делод',
   peaking: 'Пик',
   taper: 'Тапер',
+  resensitization: 'Ресенситизация',
+  metabolite: 'Метаболит',
 };
 
 export interface HeatmapCell {

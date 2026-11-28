@@ -98,7 +98,16 @@ function loadRank(ex: BBExercise): number {
 
 /* ───────────────────────── Главная функция порядка ───────────────────────── */
 
-export type SessionMethodology = 'compound_first' | 'pre_exhaust' | 'post_exhaust' | 'mountain_dog' | 'fst7' | 'hyperemia';
+export type SessionMethodology =
+  | 'compound_first'
+  | 'pre_exhaust'
+  | 'post_exhaust'
+  | 'mountain_dog'
+  | 'fst7'
+  | 'hyperemia'
+  | 'hit_heavy_duty'
+  | 'smh_lengthened'
+  | 'myo_rep_match';
 
 export interface OrderOpts {
   sessionTag?: string;
@@ -435,7 +444,8 @@ function rankKey(ex: BBExercise, ctx: RankCtx, occIndex = 0): number[] {
     ? (ex.character === 'памп' ? 0 : ex.character === 'лёг' ? 1 : 2)
     : (ex.character === 'тяж' ? 0 : ex.character === 'памп' ? 1 : 2);
   let subOrder: number;
-  if (tier === 2) subOrder = stretchRank(ex.name || '');
+  if (methodology === 'smh_lengthened') subOrder = stretchRank(ex.name || '');
+  else if (tier === 2) subOrder = stretchRank(ex.name || '');
   else if (compound) subOrder = isPress(ex.name || '') ? pressPositionRank(ex.name || '', primaryMuscle) : 0;
   else subOrder = 0;
   if (plSpec) subOrder += strengthSpec ? -20 : 50;

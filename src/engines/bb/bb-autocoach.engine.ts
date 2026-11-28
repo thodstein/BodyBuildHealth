@@ -15,7 +15,15 @@ import { reconcileSchemeComments, reconcileSchemeCommentsIn } from './bb-scheme-
 export type BBPhase = 'accumulation' | 'intensification' | 'deload' | 'peaking';
 
 /* ──────────── Load strategies ──────────── */
-export type LoadStrategy = 'double_progression' | 'linear' | 'wave' | 'rpe_based';
+export type LoadStrategy =
+  | 'double_progression'
+  | 'linear'
+  | 'wave'
+  | 'rpe_based'
+  | 'top_set_backoff'
+  | 'dynamic_double'
+  | 'rep_goal'
+  | 'step_loading';
 
 export interface LoadStrategyPrescription {
   nextWeight: number;
@@ -106,6 +114,47 @@ export function prescribeLoad(
       const rirDelta = currentRIR - targetRir;
       const weightMult = rirDelta >= 1 ? 1.025 : rirDelta <= -1 ? 0.97 : 1.0;
       return { nextWeight: Math.round(currentWeight * weightMult * 10) / 10, nextReps: currentReps, nextRIR: targetRir, label: `RPE: RIR ${currentRIR} → target ${targetRir}` };
+    }
+    case 'top_set_backoff': {
+      const plate = plateStepFor(exType, role, microPlates);
+      const isPrimary = role === 'primary' || exType === 'compound';
+      const stepUp = currentWeight > 0 ? roundToPlate(currentWeight + (isPrimary ? plate : plate * 0.5), plate) : currentWeight;
+      const targetReps = phase === 'peaking' ? Math.max(4, Math.min(6, currentReps)) : Math.max(6, Math.min(10, currentReps));
+      return {
+        nextWeight: stepUp,
+        nextReps: targetReps,
+        nextRIR: Math.max(1, currentRIR),
+        label: `Топ-сет ${stepUp}кг + бэк-офф −12%`,
+      };
+    }
+    case 'dynamic_double': {
+      const isIsol = exType === 'isolation' || exType === 'cable' || exType === 'machine' || role === 'accessory';
+      const cap = isIsol ? 15 : (phase === 'peaking' ? 6 : phase === 'intensification' ? 8 : 12);
+      const plate = plateStepFor(exType, role, microPlates);
+      if (currentReps >= cap) {
+        const nextW = roundToPlate(currentWeight + plate, plate);
+        return { nextWeight: nextW, nextReps: Math.max(5, cap - 3), nextRIR: currentRIR, label: `Динамическая 2×прогрессия → ${nextW}кг` };
+      }
+      return { nextWeight: currentWeight, nextReps: currentReps + 1, nextRIR: Math.max(0, currentRIR - (week % 2 === 0 ? 1 : 0)), label: `Динамическая: +1 повтор в сете (${currentReps + 1})` };
+    }
+    case 'rep_goal': {
+      const isIsol = exType === 'isolation' || exType === 'cable' || role === 'accessory';
+      const setGoal = isIsol ? 14 : 10;
+      const plate = plateStepFor(exType, role, microPlates);
+      if (currentReps >= setGoal) {
+        const nextW = roundToPlate(currentWeight + plate, plate);
+        return { nextWeight: nextW, nextReps: Math.max(6, setGoal - 3), nextRIR: currentRIR, label: `Rep Goal достигнут → ${nextW}кг` };
+      }
+      return { nextWeight: currentWeight, nextReps: Math.min(setGoal, currentReps + 2), nextRIR: currentRIR, label: `Rep Goal: ${currentReps + 2} повторов` };
+    }
+    case 'step_loading': {
+      const stepInBlock = (week - 1) % 3;
+      const plate = plateStepFor(exType, role, microPlates);
+      if (week > 1 && stepInBlock === 0) {
+        const nextW = roundToPlate(currentWeight + plate, plate);
+        return { nextWeight: nextW, nextReps: Math.max(6, currentReps - 2), nextRIR: Math.max(1, currentRIR), label: `Step-loading шаг ${nextW}кг` };
+      }
+      return { nextWeight: currentWeight, nextReps: currentReps + 1, nextRIR: currentRIR, label: `Step-loading: накопление повторов (${currentReps + 1})` };
     }
     default: return { nextWeight: currentWeight, nextReps: currentReps, nextRIR: currentRIR, label: 'Продолжайте по плану' };
   }
@@ -824,16 +873,18 @@ export function applyPostPhaseProcessing(input: PostPhaseInput): BBPlan {
     : (explicitDeloadType ? resolveDeloadProtocol(deloadType) : null);
 
   // FIX-5: источник фаз владеет разметкой — берём phase/deload из плана как есть.
-  const phaseMap = new Map<number, BBPhase>();
+  const phaseMap = new Map<number, string>();
   // P0-9 (аудит 2026-09): legacy-ветка пересборки фаз удалена — ВСЕ продовые
   // вызывающие (bb-builder, cycle-to-plan ×2) и тесты передают
   // skipPhaseRedistribution: true: источник фаз всегда владеет разметкой,
   // иначе двойное распределение рассинхронизировало план.
   for (const week of plan.weeks) {
     const raw = String((week as any).phase || '').toLowerCase();
-    const phase: BBPhase = raw === 'deload' || (week as any).deload ? 'deload'
+    const phase = raw === 'deload' || (week as any).deload ? 'deload'
       : raw === 'peaking' || raw === 'peak' ? 'peaking'
-        : raw === 'intensification' ? 'intensification' : 'accumulation';
+        : raw === 'intensification' ? 'intensification'
+          : raw === 'resensitization' ? 'resensitization'
+            : raw === 'metabolite' ? 'metabolite' : 'accumulation';
     phaseMap.set(week.week, phase);
   }
   for (let wk = 1; wk <= totalWeeks; wk++) {
@@ -863,9 +914,14 @@ export function applyPostPhaseProcessing(input: PostPhaseInput): BBPlan {
     }
   };
 
+  const EXTRA_PHASE_CONFIGS: Record<string, typeof PHASE_CONFIGS.accumulation> = {
+    resensitization: { ...PHASE_CONFIGS.accumulation, volumeMultiplier: 0.65, rirRange: [3, 2], repRange: [10, 14], restBase: 90, intensityMultiplier: 0.78, tempo: '3-1-1-0' },
+    metabolite: { ...PHASE_CONFIGS.accumulation, volumeMultiplier: 1.05, rirRange: [2, 1], repRange: [15, 25], restBase: 40, intensityMultiplier: 0.68, tempo: '2-0-1-0' },
+  };
+
   for (const w of weeks) {
     const ph = phaseMap.get(w.week) || 'accumulation';
-    const cfg = PHASE_CONFIGS[ph as keyof typeof PHASE_CONFIGS];
+    const cfg = PHASE_CONFIGS[ph as keyof typeof PHASE_CONFIGS] || EXTRA_PHASE_CONFIGS[ph];
     if (!cfg) continue;
     // Волна 5.3: структурный флаг ставится там же, где пишется `[Разгрузка]`
     // в комментарии (rebuildComment ниже) — потребители (finalize) читают флаг.
@@ -877,39 +933,73 @@ export function applyPostPhaseProcessing(input: PostPhaseInput): BBPlan {
     const phaseWeeksTotal = phaseWeekTotals[ph] || 1;
 
     if ((needsDeload || explicitDeloadType) && ph === 'deload' && deloadProtocol) {
-      // Структурированный делод-протокол (если ACWR>1.3). Поверх делода фазы.
-      // P1: НЕ перезаписывать reps/rir/tempo (buildSession уже выставил по фазе).
-      // Только дополнительное снижение веса/сетов по протоколу.
+      // Структурированный делод-протокол: neural (тяжёлая неврологическая на 3-5 только для compound,
+      // изоляции 10-12 × >=2 сета), mini (~70% рабочих сетов и ~92% рабочих весов от не-deload недели),
+      // full_rest (активное восстановление 2×10-12 на базовых движениях без 1-сетовых огрызков).
+      const prevWorkWeek = weeks.slice(0, weeks.indexOf(w)).reverse().find(pw => {
+        const pph = phaseMap.get(pw.week) || 'accumulation';
+        return pph !== 'deload' && !(pw as any).deload;
+      });
+      const findPrevEx = (e: BBExercise) =>
+        prevWorkWeek?.sessions.flatMap(ps => ps.exercises).find(pe => pe.name === e.name && pe.muscle === e.muscle)
+        || prevWorkWeek?.sessions.flatMap(ps => ps.exercises).find(pe => pe.muscle === e.muscle && pe.role === e.role);
       for (const s of w.sessions) {
+        if (deloadProtocol.type === 'full_rest') {
+          // Оставляем основные движения (primary или 1 на мышцу) в формате 2×10-12 @ ~45% веса
+          const seenMuscles = new Set<string>();
+          s.exercises = s.exercises.filter(e => {
+            if ((e as any).warmupActivator) return true;
+            if (e.role === 'primary') { seenMuscles.add(e.muscle); return true; }
+            if (!seenMuscles.has(e.muscle)) { seenMuscles.add(e.muscle); return true; }
+            return false;
+          });
+        }
         for (const e of s.exercises) {
-          const baseSets = Math.round(e.sets / Math.max(0.3, cfg.volumeMultiplier));
-          e.sets = Math.max(1, Math.round(baseSets * deloadProtocol.volumeMultiplier));
+          if ((e as any).warmupActivator) continue;
+          const prevEx = findPrevEx(e);
+          const isIso = String((e as any).exerciseType || (e as any).type || '').toLowerCase() === 'isolation' || e.role === 'accessory';
+          const baseSets = prevEx?.sets || Math.round(e.sets / Math.max(0.3, cfg.volumeMultiplier));
+          if (deloadProtocol.type === 'full_rest') {
+            e.sets = 2;
+          } else if (deloadProtocol.type === 'neural') {
+            e.sets = Math.max(2, Math.round(baseSets * deloadProtocol.volumeMultiplier));
+          } else {
+            e.sets = Math.max(2, Math.round(baseSets * deloadProtocol.volumeMultiplier));
+          }
           const template = e.workSets[e.workSets.length - 1] || {
             reps: e.repsRange[0], rir: e.rir, weight: 0,
           };
           e.workSets = e.workSets.slice(0, e.sets);
           while (e.workSets.length < e.sets) e.workSets.push({ ...template });
-          const targetLo = deloadProtocol.repRange?.[0];
-          const targetHi = deloadProtocol.repRange?.[1];
+
+          const useIsoRanges = deloadProtocol.type === 'neural' && isIso;
+          const targetLo = useIsoRanges ? 10 : deloadProtocol.repRange?.[0];
+          const targetHi = useIsoRanges ? 12 : deloadProtocol.repRange?.[1];
           const midRep = Number.isFinite(targetLo) && Number.isFinite(targetHi)
-            ? Math.round((targetLo + targetHi) / 2)
+            ? Math.round(((targetLo as number) + (targetHi as number)) / 2)
             : null;
           if (!deloadProtocol.keepOriginalReps && Number.isFinite(targetLo) && Number.isFinite(targetHi)) {
-            e.repsRange = [targetLo, targetHi];
+            e.repsRange = [targetLo as number, targetHi as number];
           }
           if (Number.isFinite(deloadProtocol.restSeconds)) {
-            e.restSeconds = deloadProtocol.restSeconds;
+            e.restSeconds = useIsoRanges ? 90 : deloadProtocol.restSeconds;
           }
+          const prevTopW = prevEx?.workSets?.[0]?.weight || 0;
           for (const ws of e.workSets) {
-            const protocolMult = deloadProtocol.intensityMultiplier / cfg.intensityMultiplier;
-            if (ws.weight > 0 && protocolMult !== 1) {
-              ws.weight = Math.max(2.5, Math.round(ws.weight * protocolMult * 10) / 10);
+            if (prevTopW > 0 && (deloadProtocol.type === 'mini' || deloadProtocol.type === 'full_rest' || deloadProtocol.type === 'neural')) {
+              const rawW = prevTopW * deloadProtocol.intensityMultiplier;
+              ws.weight = Math.max(2.5, Math.round(rawW * 10) / 10);
+            } else {
+              const protocolMult = deloadProtocol.intensityMultiplier / cfg.intensityMultiplier;
+              if (ws.weight > 0 && protocolMult !== 1) {
+                ws.weight = Math.max(2.5, Math.round(ws.weight * protocolMult * 10) / 10);
+              }
             }
             if (!deloadProtocol.keepOriginalReps && midRep != null) {
               ws.reps = midRep;
             }
-            if (Number.isFinite(deloadProtocol.restSeconds)) {
-              ws.restSeconds = deloadProtocol.restSeconds;
+            if (Number.isFinite(e.restSeconds)) {
+              ws.restSeconds = e.restSeconds;
             }
             if (Number.isFinite(deloadProtocol.rirTarget) && ws.rir < deloadProtocol.rirTarget) ws.rir = deloadProtocol.rirTarget;
           }
@@ -918,23 +1008,48 @@ export function applyPostPhaseProcessing(input: PostPhaseInput): BBPlan {
         }
       }
     } else if (loadStrategy && ph !== 'deload' && !((input as any).skipDoubleProgressionApplied && loadStrategy === 'double_progression' && w.week > 1)) {
-      // P1: стратегия прогрессии нагрузки (если выбрана) — модифицирует ВЕС относительно
-      // базового из buildSession. reps/rir/tempo НЕ трогаем (они уже фазо-корректные).
-      // P3: RPE-based стратегия теперь реально работает (targetRPE-корректировка).
-      // P4: передаём exType + role в prescribeLoad для разделения linear-increment.
-      // BUG-FIX: loadStrategy НЕ применяется к deload-неделям — иначе prescribeLoad
-      // прогрессирует веса, отменяя протокол разгрузки (×0.55).
+      const prevWorkWeek = w.week > 1
+        ? weeks.slice(0, weeks.indexOf(w)).reverse().find(pw => {
+            const pph = phaseMap.get(pw.week) || 'accumulation';
+            return pph !== 'deload' && !(pw as any).deload;
+          })
+        : undefined;
       for (const s of w.sessions) {
         for (const e of s.exercises) {
-          for (const ws of e.workSets) {
-            if (ws.weight <= 0) continue;
+          if ((e as any).warmupActivator) continue;
+          const prevEx = prevWorkWeek?.sessions.flatMap(ps => ps.exercises).find(pe => pe.name === e.name && pe.muscle === e.muscle);
+          if (loadStrategy === 'top_set_backoff' && e.workSets.length >= 2 && e.workSets[0].weight > 0) {
+            const refW = prevEx?.workSets?.[0]?.weight || e.workSets[0].weight;
+            const refR = prevEx?.workSets?.[0]?.reps || e.workSets[0].reps;
+            const maxW = workMax[e.muscle] || defaultWorkMax(e.muscle);
+            const prescr = w.week > 1
+              ? prescribeLoad('top_set_backoff', refW, refR, e.rir, maxW, w.week, totalWeeks, ph, (e as any).exerciseType, e.role)
+              : { nextWeight: refW, nextReps: refR, nextRIR: e.rir, label: '' };
+            const topW = Math.round(prescr.nextWeight * 10) / 10;
+            const backoffW = Math.max(2.5, roundToPlate(topW * 0.88, plateStepFor((e as any).exerciseType, e.role)));
+            e.workSets[0].weight = topW;
+            e.workSets[0].reps = prescr.nextReps;
+            for (let si = 1; si < e.workSets.length; si++) {
+              if (e.workSets[si].weight > 0) e.workSets[si].weight = Math.min(topW, backoffW);
+              e.workSets[si].reps = Math.min(20, prescr.nextReps + 2);
+            }
+            continue;
+          }
+          if (w.week === 1) continue;
+          for (let si = 0; si < e.workSets.length; si++) {
+            const ws = e.workSets[si];
+            const prevWs = prevEx?.workSets?.[si] || prevEx?.workSets?.[0] || ws;
+            if (prevWs.weight <= 0) continue;
             const maxW = workMax[e.muscle] || defaultWorkMax(e.muscle);
             const prescr = prescribeLoad(
-              loadStrategy, ws.weight, ws.reps, e.rir, maxW, w.week, totalWeeks, ph,
+              loadStrategy, prevWs.weight, prevWs.reps, e.rir, maxW, w.week, totalWeeks, ph,
               (e as any).exerciseType,
               e.role,
             );
             ws.weight = Math.round(prescr.nextWeight * 10) / 10;
+            if (loadStrategy === 'dynamic_double' || loadStrategy === 'rep_goal' || loadStrategy === 'step_loading') {
+              ws.reps = prescr.nextReps;
+            }
           }
         }
       }
@@ -960,8 +1075,9 @@ export function applyPostPhaseProcessing(input: PostPhaseInput): BBPlan {
       ? 'none'
       : (input as any).intensityTechnique;
     let technique = (techAlias[String(rawTech || '')] || rawTech) as IntensityTechnique | ExtendedTechnique | undefined;
+    const canonPhase: BBPhase = (ph === 'resensitization' || ph === 'metabolite' ? 'accumulation' : ph) as BBPhase;
     if (!technique) {
-      const def = DEFAULT_TECHNIQUE_BY_PHASE[ph] || 'none';
+      const def = DEFAULT_TECHNIQUE_BY_PHASE[canonPhase] || 'none';
       // P0-1/P0-5: rest_pause по умолчанию — только advanced/enhanced (intermediate — drop_set).
       technique = def === 'rest_pause' && lv === 'intermediate' ? 'drop_set' : def;
     }
@@ -970,7 +1086,7 @@ export function applyPostPhaseProcessing(input: PostPhaseInput): BBPlan {
     }
     if (technique && technique !== 'none') {
       const meta = INTENSITY_TECHNIQUES[technique as IntensityTechnique];
-      if (!meta || meta.phases.includes(ph)) {
+      if (!meta || meta.phases.includes(canonPhase)) {
         for (const s of w.sessions) {
           // Группируем по мышце, чтобы техника была на логичном упражнении, а не на 2/5 подряд
           const byMuscle = new Map<string, typeof s.exercises>();
@@ -997,7 +1113,7 @@ export function applyPostPhaseProcessing(input: PostPhaseInput): BBPlan {
             if (meta) {
               if ((technique === 'drop_set' || technique === 'myo_reps') && target.role !== 'accessory') continue;
             }
-            applyIntensityTechniqueToExercise(target, technique, ph);
+            applyIntensityTechniqueToExercise(target, technique, canonPhase);
           }
         }
       }
@@ -1012,7 +1128,14 @@ export function applyPostPhaseProcessing(input: PostPhaseInput): BBPlan {
 
   // Авто-регуляция (последний слой — поверх всего)
   if (autoRegResult) {
-    const phaseLabels: Record<string, string> = { accumulation: 'Накопление', intensification: 'Интенсификация', deload: 'Разгрузка', peaking: 'Пик' };
+    const phaseLabels: Record<string, string> = {
+      accumulation: 'Накопление',
+      intensification: 'Интенсификация',
+      deload: 'Разгрузка',
+      peaking: 'Пик',
+      resensitization: 'Ресенситизация',
+      metabolite: 'Метаболит',
+    };
     // Readiness-deload — не просто ×0.6 объёма: помечаем первую рабочую
     // неделю и накладываем протокол, иначе deload:true не создавал разгрузку.
     if (autoRegResult.deload && !weeks.some(w => (w as any).autoRegDeload === true)) {

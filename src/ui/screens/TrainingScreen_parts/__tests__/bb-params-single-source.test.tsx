@@ -132,12 +132,11 @@ describe('Шаг 1: один контрол на настройку (нет ду
 
   it('объёмный режим честно перечисляет эффекты и не подменяет селект схемы', () => {
     const high = renderToStaticMarkup(React.createElement(BbParamsStep, baseParams({ planMode: 'generic_split', trainingVolumeMode: 'high' })));
-    expect(high).toContain('цель MRV');
-    expect(high).toContain('+25/+30/+35%');
-    expect(high).toContain('кап 5 сетов/упр сохраняется');
+    expect(high).toContain('MRV');
+    expect(high).toContain('+25–35%');
     // Цель объёма помечена перебитой (в секции атлета), селект схемы показывает реальное значение
     expect(high).toContain('Цель объёма перебита режимом «Объёмный»');
-    expect(high).toContain('Стандартная (при «Объёмном» исполняется как GVT 10×10)');
+    expect(high).toContain('Стандартная (сбалансированный объём)');
   });
 });
 

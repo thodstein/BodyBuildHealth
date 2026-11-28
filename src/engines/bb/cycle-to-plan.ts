@@ -33,6 +33,10 @@ import { reconcileSchemeComments } from './bb-scheme-comment-reconcile';
 import { mergeWearableIntoRecovery, type WearableDaily } from './bb-wearable.engine';
 import { getExcludedMuscles, getGradedInjuries, type Injury } from '../manual-plan-builder';
 import { applyPostPhaseProcessing, applyDeloadToWeek, resolveDeloadProtocol, type LoadStrategy, type IntensityTechnique, type DeloadType } from './bb-autocoach.engine';
+import type { TempoProfile } from './bb-tempo-rest';
+import { tempoFor } from './bb-tempo-rest';
+import { bbVbtRecommendation } from './bb-vbt.engine';
+import { applySupersetPairsToSession, estimateSessionTimeWithSupersets } from './bb-fatigue.engine';
 import { tidySessionExercises, SESSION_TIDY_RATIONALE, isIsolationByName, type SessionMethodology } from './bb-session-order.engine';
 import { isAxialLoadExercise } from '../exercise-selector.engine';
 import { trueMuscleOf, derivePattern } from '../movement-pattern';
@@ -825,6 +829,18 @@ export interface CycleToPlanInput {
    *  (auto-progress весов, ротация упражнений, объёмная прогрессия).
    *  Ранее не передавался в cycle/program пути — continuity работала только для generic split. */
   previousPlan?: BBPlan;
+  previousPlans?: BBPlan[];
+  cooldownHistory?: Array<{ exerciseName: string; pattern?: string }>;
+  pedPhase?: 'auto' | 'on' | 'cruise' | 'pct' | 'off';
+  pedPhaseOverride?: 'auto' | 'proliferation' | 'differentiation';
+  estradiolPgMl?: number;
+  bannedPatterns?: string[];
+  vbt?: { lift?: string; bestVelocity: number; lastVelocity: number; weightKg?: number };
+  tempoProfile?: TempoProfile;
+  mesoTemplate?: 'classic' | 'resensitization' | 'metabolite';
+  maxSessionMinutes?: number;
+  rehabWeekStart?: number;
+  cycleLength?: number;
 }
 
 function muscleGroupFromExName(exName: string, catalog: typeof EXERCISE_CATALOG): string {
@@ -2252,6 +2268,17 @@ export interface ProgramToBBPlanOpts {
   rehabWeekStart?: number;
   /** DC-лайт: widowmaker по гейту (уровень+доза ААС), как в builder. */
   dcMode?: boolean;
+  /** Профиль темпа, VBT, фаза курса, эстрадиол, запрещённые паттерны, история (паритет с generic). */
+  tempoProfile?: TempoProfile;
+  mesoTemplate?: 'classic' | 'resensitization' | 'metabolite';
+  maxSessionMinutes?: number;
+  pedPhase?: 'auto' | 'on' | 'cruise' | 'pct' | 'off';
+  pedPhaseOverride?: 'auto' | 'proliferation' | 'differentiation';
+  estradiolPgMl?: number;
+  bannedPatterns?: string[];
+  vbt?: { lift?: string; bestVelocity: number; lastVelocity: number; weightKg?: number };
+  previousPlans?: BBPlan[];
+  cooldownHistory?: Array<{ exerciseName: string; pattern?: string }>;
 }
 
 function parseReps(repsStr: string | undefined): number {
@@ -2443,7 +2470,18 @@ export function programToBBPlan(program: FullProgram, opts: ProgramToBBPlanOpts)
   const _todayProgram = (opts as any).planStartWeek || localIsoDate();
   const excludedMuscles = getExcludedMuscles(opts.injuries || [], _todayProgram);
   const gradedInjuries = getGradedInjuries(opts.injuries || [], _todayProgram);
-  const exclIds = new Set(opts.excludedExercises || []);
+  const progBannedNeedles = (opts.bannedPatterns || []).map(b => String(b || '').toLowerCase().trim()).filter(Boolean);
+  const exclIds = new Set([
+    ...(opts.excludedExercises || []),
+    ...(progBannedNeedles.length > 0
+      ? EXERCISE_CATALOG
+          .filter((ex: any) => {
+            const hay = `${ex.id || ''} ${ex.name || ''} ${ex.movementPattern || ''}`.toLowerCase();
+            return progBannedNeedles.some(n => hay.includes(n));
+          })
+          .flatMap((ex: any) => [ex.id, ex.name].filter(Boolean))
+      : []),
+  ]);
   const favIds = new Set(opts.favoriteExercises || []);
   // favoriteExercises могут быть id или именами — строим множество имён для приоритета при замене.
   const favNames = new Set<string>((opts.favoriteExercises || []).flatMap(id => { const cat = EXERCISE_CATALOG.find(e => e.id === id); return cat ? [cat.name] : [id]; }));
@@ -2457,8 +2495,10 @@ export function programToBBPlan(program: FullProgram, opts: ProgramToBBPlanOpts)
   const levelForLandmarks = (['beginner', 'intermediate', 'advanced', 'enhanced'].includes(level) ? level : 'intermediate') as 'beginner' | 'intermediate' | 'advanced' | 'enhanced';
   const allLandmarks = withMEVCalibration(levelForLandmarks, getAllVolumeLandmarks(levelForLandmarks));
   const landmarks = Object.fromEntries(Object.entries(allLandmarks).map(([m, v]) => [m, (v as { mrv: number }).mrv]));
-  const pedAdapt = adaptForPEDs(opts.peds || [], landmarks, opts.pedDoses, opts.courseIntensity);
-  const mrvMult = pedAdapt.combinedMrvMultiplier || 1.0;
+  const pedAdapt = opts.pedPhase === 'pct'
+    ? adaptForPEDs([], landmarks, undefined, undefined)
+    : adaptForPEDs(opts.peds || [], landmarks, opts.pedDoses, opts.courseIntensity);
+  const mrvMult = opts.pedPhase === 'pct' ? 0.80 : (pedAdapt.combinedMrvMultiplier || 1.0);
   // P0-12 (аудит 2026-09): wearable-данные сливаются в recovery-вход — паритет с generic.
   const wearableRecoveryProgram = mergeWearableIntoRecovery(
     { hrvMs: opts.hrvMs, sleepHours: opts.sleepHours, stressLevel: opts.stressLevel },
@@ -3449,12 +3489,57 @@ export function programToBBPlan(program: FullProgram, opts: ProgramToBBPlanOpts)
     specialization: opts.specialization,
     availablePlates: opts.availablePlates,
     rehabMuscles: opts.rehabMuscles,
+    rehabWeekStart: opts.rehabWeekStart,
     dcMode: opts.dcMode,
+    tempoProfile: opts.tempoProfile,
+    mesoTemplate: opts.mesoTemplate,
+    maxSessionMinutes: opts.maxSessionMinutes,
+    pedPhase: opts.pedPhase,
+    pedPhaseOverride: opts.pedPhaseOverride,
+    estradiolPgMl: opts.estradiolPgMl,
+    bannedPatterns: opts.bannedPatterns,
+    vbt: opts.vbt,
+    cooldownHistory: opts.cooldownHistory,
+    cycleLength: opts.cycleLength,
     wearable: opts.wearable ? true : undefined,
     // P3-3: флаг методики доезжает до снимка — replan пересобирает остаток с DUP.
     dupMode: opts.dupMode,
     dupMuscles: opts.dupMuscles,
   };
+  if (opts.tempoProfile && opts.tempoProfile !== 'auto') {
+    for (const w of finalized.weeks) {
+      if ((w as any).phase === 'deload' || (w as any).deload) continue;
+      for (const s of w.sessions) {
+        for (const e of s.exercises) {
+          if ((e as any).warmupActivator) continue;
+          const tSpec = tempoFor((e.character || 'памп') as any, undefined, (w as any).phase, e.name, { tempoProfile: opts.tempoProfile, eccentricMult: opts.eccentricMult });
+          (e as any).tempoSpec = tSpec.notation;
+          for (const ws of e.workSets || []) (ws as any).tempo = tSpec.notation;
+        }
+      }
+    }
+  }
+  if (opts.vbt && Number.isFinite(opts.vbt.bestVelocity) && Number.isFinite(opts.vbt.lastVelocity)) {
+    const vbtRec = bbVbtRecommendation(opts.vbt.lift || '', opts.vbt.bestVelocity, opts.vbt.lastVelocity, opts.vbt.weightKg, {
+      goal: opts.goal === 'strength_mass' ? 'strength' : 'mass',
+    });
+    finalized.rationale.push(`⚡ VBT: ${vbtRec.recommendation}`);
+    const vMult = vbtRec.lossPct >= 40 ? 0.8 : vbtRec.lossPct >= 25 ? 0.9 : 1;
+    const rShift = vbtRec.lossPct >= 40 ? 2 : vbtRec.lossPct >= 25 ? 1 : 0;
+    if (vMult < 1 && finalized.weeks[0] && (finalized.weeks[0] as any).phase !== 'deload') {
+      for (const s of finalized.weeks[0].sessions) {
+        for (const e of s.exercises) {
+          if ((e as any).warmupActivator) continue;
+          e.sets = Math.max(1, Math.round((e.sets || 0) * vMult));
+          e.rir = Math.min(5, (Number(e.rir) || 2) + rShift);
+          if (Array.isArray(e.workSets)) {
+            e.workSets = e.workSets.slice(0, e.sets);
+            for (const ws of e.workSets) ws.rir = e.rir;
+          }
+        }
+      }
+    }
+  }
   // G5: боль/крепатура — паритет с generic-путём. Раньше painLevel/soreness010
   // существовали только в BBBuilderInput, и «программный» путь (циклы/программы)
   // игнорировал монитор боли хаба (срез объёма не применялся).
@@ -3511,6 +3596,31 @@ export function programToBBPlan(program: FullProgram, opts: ProgramToBBPlanOpts)
   }
   if (opts.availablePlates?.length) {
     applyPlateRoundingToPlan(finalized as any, opts.availablePlates, 20);
+  }
+  if (opts.maxSessionMinutes && opts.maxSessionMinutes >= 20) {
+    const budgetSec = opts.maxSessionMinutes * 60;
+    let timeChanged = false;
+    for (const w of finalized.weeks) {
+      for (const s of w.sessions) {
+        if (estimateSessionTimeWithSupersets(s).supersetSeconds > budgetSec) {
+          const r = applySupersetPairsToSession(s, opts.maxSessionMinutes);
+          if (r.pairsApplied > 0) timeChanged = true;
+          while (estimateSessionTimeWithSupersets(s).supersetSeconds > budgetSec) {
+            const candidate = [...s.exercises].reverse().find(e => !(e as any).warmupActivator && e.role === 'accessory' && (e.sets || 0) > 2)
+              || [...s.exercises].reverse().find(e => !(e as any).warmupActivator && (e.sets || 0) > 2);
+            if (!candidate) break;
+            candidate.sets -= 1;
+            if (Array.isArray(candidate.workSets) && candidate.workSets.length > candidate.sets) {
+              candidate.workSets = candidate.workSets.slice(0, candidate.sets);
+            }
+            timeChanged = true;
+          }
+        }
+      }
+    }
+    if (timeChanged) {
+      finalized.rationale.push(`⏱ Бюджет ${opts.maxSessionMinutes} мин: применены суперсеты/сжатие подсобки для укладки в лимит времени.`);
+    }
   }
   // Аудит Y: тот же класс, что и в цикл-пути — MRV-трим/rehab-relief правят
   // план после finalizeBBPlan, поэтому снимки факта пересобираются последними.

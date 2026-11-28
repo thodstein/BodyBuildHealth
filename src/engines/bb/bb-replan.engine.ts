@@ -21,8 +21,9 @@ import type { BBPlan, BBBuilderInput } from './bb-builder.engine';
 import { buildBBPlan } from './bb-builder.engine';
 import { refreshBBPlanSnapshots } from './bb-plan-snapshot.engine';
 import { stampBBPlanFinalizeSignature } from './bb-finalize.engine';
-import { SPLIT_PATTERNS } from './bb-split-patterns';
+import { SPLIT_PATTERNS, loadCustomSplitPatterns } from './bb-split-patterns';
 import { normalizeBBMuscle } from './bb-volume.engine';
+import { adaptWeekForTravel } from './bb-gym-profiles.engine';
 import type { WorkoutSession } from '../workout-logger.engine';
 
 function addDaysIsoLocal(iso: string, days: number): string {
@@ -45,6 +46,16 @@ export interface ReplanBBOptions {
   currentWeek: number;
   /** ISO-дата недели 1 (для сохранения календаря). */
   planStartWeek?: string;
+  /** Опциональные переопределения входов при пересборке (травмы, зал, цели, акценты). */
+  overrides?: Partial<BBBuilderInput>;
+  /** Пропущено тренировочных дней на текущей неделе (уплотнение/коррекция). */
+  missedDays?: number;
+  /** Полный пропуск / лёгкая неделя реабилитации на currentWeek. */
+  skipWeek?: boolean;
+  /** Новые травмы, добавляемые с currentWeek. */
+  newInjuries?: any[];
+  /** Временный/новый инвентарь зала для оставшихся недель. */
+  gymEquipment?: string[];
 }
 
 /** Финальный «отчёт» пересборки: что именно изменится в остатке. */
@@ -82,10 +93,14 @@ export function replanBBMesoFromFact(
 
   const patternId = String((plan as any).pattern?.id || (plan as any).patternId || snap.patternId || '');
   if (!patternId) return null;
-  // Аудит 2026-11: план из «ПРОФ-программы/цикла» несёт pattern.id = program.id —
-  // это НЕ id сплита. `buildBBPlan` на неизвестном id молча падает в SPLIT_PATTERNS[0],
-  // поэтому пересборка остатка программы выдавала бы ЧУЖОЙ сплит. Честный null.
-  if (!SPLIT_PATTERNS.some(p => p.id === patternId)) return null;
+  const customSplits = loadCustomSplitPatterns();
+  const resolvedCustomPattern = opts.overrides?.customPattern
+    || snap.customPattern
+    || customSplits.find(p => p.id === patternId);
+  const isKnownSplitPattern = SPLIT_PATTERNS.some(p => p.id === patternId)
+    || customSplits.some(p => p.id === patternId)
+    || !!snap.customPattern
+    || !!opts.overrides?.customPattern;
 
   const frozen = plan.weeks.slice(0, current - 1);
   const previousPlan: BBPlan = { ...plan, weeks: frozen };
@@ -99,25 +114,30 @@ export function replanBBMesoFromFact(
     const d = String(s.date || '').slice(0, 10);
     return !d || (d >= baseStartIso && d <= frozenEndIso);
   });
-  const baseWorkMax: Record<string, number> = { ...(((plan as any).workMax || {}) as Record<string, number>) };
+  const baseWorkMax: Record<string, number> = { ...((snap.workMax || (plan as any).workMax || {}) as Record<string, number>) };
   const factE1rmByMuscle: Record<string, number> = {};
   let loggedSets = 0;
   let actualRirSum = 0;
   let actualRirCount = 0;
+  const smallDirectWorkMax = new Set(['biceps', 'triceps', 'calves', 'forearms', 'abs']);
+  const highRatioNonCompoundRe = /leg.?press|жим ногами|hack|гакк|smith|смит|развод|fly|мах|raise|сгибан|разгибан|curl|extension|кроссов|butterfly|пек.?дек/i;
   for (const sess of relevantSessions) {
     for (const ex of sess.exercises || []) {
       const m = normalizeBBMuscle((ex as any).muscle || ex.muscleGroup || '');
+      const exTitle = String((ex as any).name || (ex as any).exerciseName || (ex as any).exerciseId || '');
+      const allowWorkMaxSample = !highRatioNonCompoundRe.test(exTitle) || smallDirectWorkMax.has(m);
       for (const st of ex.sets || []) {
         loggedSets += 1;
         const w = Number(st?.weightKg ?? (st as any)?.weight ?? 0);
         const r = Number(st?.reps ?? 0);
-        if (m && w > 0 && r > 0) {
-          const e1rm = Math.round(w * (1 + r / 30) * 10) / 10;
+        const rirRaw = Number(st?.rir);
+        const effRir = (Number.isFinite(rirRaw) && rirRaw >= 0 && rirRaw <= 6) ? rirRaw : 0;
+        if (m && w > 0 && r > 0 && allowWorkMaxSample) {
+          const e1rm = Math.round(w * (1 + (r + effRir) / 30) * 10) / 10;
           if (e1rm > (factE1rmByMuscle[m] || 0)) factE1rmByMuscle[m] = e1rm;
         }
-        const rirVal = Number(st?.rir);
-        if (Number.isFinite(rirVal) && rirVal >= 0 && rirVal <= 6) {
-          actualRirSum += rirVal;
+        if (Number.isFinite(rirRaw) && rirRaw >= 0 && rirRaw <= 6) {
+          actualRirSum += rirRaw;
           actualRirCount += 1;
         }
       }
@@ -128,7 +148,10 @@ export function replanBBMesoFromFact(
   for (const [m, e1rm] of Object.entries(factE1rmByMuscle)) {
     const prevWm = Number(baseWorkMax[m]) || 0;
     if (e1rm > prevWm * 1.02 || (prevWm > 0 && e1rm < prevWm * 0.90)) {
-      baseWorkMax[m] = Math.round(e1rm * 10) / 10;
+      const bounded = prevWm > 0
+        ? Math.max(prevWm * 0.85, Math.min(prevWm * 1.15, e1rm))
+        : e1rm;
+      baseWorkMax[m] = Math.round(bounded * 10) / 10;
       updatedMaxCount += 1;
     }
   }
@@ -158,6 +181,111 @@ export function replanBBMesoFromFact(
   // Fallback для планов, собранных до расширения снапшота: buildContext/plan
   // хранят пол, PED-адаптацию и капы, без которых реплан стартовал «натуралом».
   const ctx: any = (plan as any).buildContext || {};
+  const mergedNewInjuries = Array.isArray(opts.newInjuries) && opts.newInjuries.length > 0 ? opts.newInjuries : [];
+  const effEquipment = Array.isArray(opts.gymEquipment) && opts.gymEquipment.length > 0
+    ? opts.gymEquipment
+    : (Array.isArray(snap.equipment) ? snap.equipment : []);
+
+  // Ветка для планов из «Программ / Циклов» (in-place адаптация недель current..total без подмены сплита):
+  if (!isKnownSplitPattern) {
+    let workingPlan: BBPlan = structuredClone(plan);
+    const inPlaceChanges: string[] = [...factChanges];
+    const exclInj = new Set(mergedNewInjuries.filter((i: any) => i?.exclude !== false).map((i: any) => normalizeBBMuscle(i.muscle || '')));
+    const gradedInj = mergedNewInjuries.filter((i: any) => i?.exclude === false);
+
+    if (mergedNewInjuries.length > 0) {
+      inPlaceChanges.push(`🩹 Учтены новые ограничения (${mergedNewInjuries.length}) с недели ${current}`);
+    }
+    for (let wi = current - 1; wi < workingPlan.weeks.length; wi++) {
+      const wObj = workingPlan.weeks[wi];
+      if (!wObj) continue;
+      if (opts.skipWeek && wObj.week === current) {
+        (wObj as any).deload = true;
+        (wObj as any).phase = 'deload';
+        for (const s of wObj.sessions) {
+          for (const e of s.exercises) {
+            if ((e as any).warmupActivator) continue;
+            e.sets = Math.max(2, Math.round((e.sets || 2) * 0.6));
+            e.rir = Math.min(5, (e.rir ?? 2) + 2);
+            if (Array.isArray(e.workSets)) {
+              e.workSets = e.workSets.slice(0, e.sets).map(ws => ({
+                ...ws,
+                rir: e.rir,
+                weight: ws.weight > 0 ? Math.max(2.5, Math.round(ws.weight * 0.8 * 2) / 2) : 0,
+              }));
+            }
+          }
+        }
+        inPlaceChanges.push(`⏭ Неделя ${current}: переведена в разгрузочный / реабилитационный режим`);
+      }
+      if (opts.missedDays && opts.missedDays > 0 && wObj.week === current && wObj.sessions.length > 1) {
+        const dropCount = Math.min(opts.missedDays, wObj.sessions.length - 1);
+        wObj.sessions = wObj.sessions.slice(0, wObj.sessions.length - dropCount);
+        inPlaceChanges.push(`📅 Неделя ${current}: сжата до ${wObj.sessions.length} тренировок (пропуск ${dropCount} дн.)`);
+      }
+      for (const s of wObj.sessions) {
+        if (exclInj.size > 0) {
+          s.exercises = s.exercises.filter(e => !exclInj.has(normalizeBBMuscle(e.muscle || '')));
+        }
+        for (const e of s.exercises) {
+          const nm = normalizeBBMuscle(e.muscle || '');
+          const g = gradedInj.find((x: any) => normalizeBBMuscle(x.muscle || '') === nm);
+          if (g) {
+            const vPct = Number.isFinite(g.volumePct) ? Number(g.volumePct) : 0.7;
+            const wPct = Number.isFinite(g.weightPct) ? Number(g.weightPct) : 0.8;
+            e.sets = Math.max(2, Math.round((e.sets || 2) * vPct));
+            e.rir = Math.min(5, (e.rir ?? 2) + 1);
+            if (Array.isArray(e.workSets)) {
+              e.workSets = e.workSets.slice(0, e.sets).map(ws => ({
+                ...ws,
+                rir: e.rir,
+                weight: ws.weight > 0 ? Math.max(2.5, Math.round(ws.weight * wPct * 2) / 2) : 0,
+              }));
+            }
+          }
+        }
+      }
+    }
+    if (opts.gymEquipment && opts.gymEquipment.length > 0) {
+      let totalReplaced = 0;
+      for (let wNum = current; wNum <= total; wNum++) {
+        const adapted = adaptWeekForTravel(workingPlan, wNum, opts.gymEquipment);
+        workingPlan = adapted.plan;
+        totalReplaced += adapted.replaced;
+      }
+      inPlaceChanges.push(`✈️ Инвентарь [${opts.gymEquipment.join(', ')}] применён к неделям ${current}–${total} (заменено ${totalReplaced} упр.)`);
+    }
+    workingPlan.inputSnapshot = {
+      ...(snap as Record<string, unknown>),
+      workMax: baseWorkMax,
+      equipment: effEquipment,
+      injuries: [...(Array.isArray(snap.injuries) ? snap.injuries : []), ...mergedNewInjuries],
+    } as any;
+    refreshBBPlanSnapshots(workingPlan, {
+      validationOptions: {
+        level: ctx.level || snap.level || (plan as any).level || 'intermediate',
+        equipment: effEquipment,
+        excludedExercises: snap.excludedExercises,
+        excludedMuscles: [...exclInj, ...((plan as any).safetyConstraints?.excludedMuscles || [])],
+        checkOrder: true,
+        methodology: snap.methodology,
+        onCourse: (workingPlan as any).onCourse,
+        maxWorkingSets: (workingPlan as any).maxWorkingSets,
+        maxExercises: (workingPlan as any).maxExercises,
+      },
+      specTargets: ctx.priorityMuscles || (workingPlan as any).priorityMuscles || [],
+      refreshFrequency: true,
+      refreshValidationRationale: true,
+    });
+    stampBBPlanFinalizeSignature(workingPlan);
+    return {
+      plan: workingPlan,
+      changes: inPlaceChanges.length > 0 ? inPlaceChanges : [`🔁 Остаток программы пересчитан: недели ${current}–${total}`],
+      frozenWeeks: frozen.length,
+      rebuiltWeeks: Math.max(1, total - frozen.length),
+    };
+  }
+
   const pedDoses: Record<string, number> | undefined = (snap.pedDoses && typeof snap.pedDoses === 'object')
     ? { ...snap.pedDoses }
     : (plan as any).pedAdaptation?.pedDoses
@@ -165,8 +293,19 @@ export function replanBBMesoFromFact(
       : undefined;
 
   const tailStartWeek = baseStartIso ? addDaysIsoLocal(baseStartIso, (current - 1) * 7) : undefined;
-  const input: BBBuilderInput = {
+  const shiftedSpecSchedule = Array.isArray(snap.specializationSchedule)
+    ? snap.specializationSchedule
+        .map((b: any) => ({
+          ...b,
+          weekStart: (Number(b?.weekStart) || 1) - (current - 1),
+          weekEnd: (Number(b?.weekEnd) || 1) - (current - 1),
+        }))
+        .filter((b: any) => b.weekEnd >= 1)
+        .map((b: any) => ({ ...b, weekStart: Math.max(1, b.weekStart) }))
+    : undefined;
+  const baseInput: BBBuilderInput = {
     patternId,
+    customPattern: resolvedCustomPattern,
     level: String(snap.level || (plan as any).level || 'intermediate'),
     goal: (snap.goal || 'mass') as BBBuilderInput['goal'],
     weeks: remaining,
@@ -174,11 +313,14 @@ export function replanBBMesoFromFact(
     weakPoints: Array.isArray(snap.weakPoints) ? snap.weakPoints : [],
     focusGroup: snap.focusGroup || undefined,
     specialization: snap.specialization,
-    specializationSchedule: Array.isArray(snap.specializationSchedule) ? snap.specializationSchedule : undefined,
-    equipment: Array.isArray(snap.equipment) ? snap.equipment : [],
+    specializationSchedule: shiftedSpecSchedule && shiftedSpecSchedule.length > 0 ? shiftedSpecSchedule : undefined,
+    equipment: effEquipment,
     volumeGoal: (snap.volumeGoal || 'mav') as BBBuilderInput['volumeGoal'],
     trainingFocus: snap.trainingFocus,
     methodology: snap.methodology,
+    mesoTemplate: snap.mesoTemplate,
+    maxSessionMinutes: snap.maxSessionMinutes,
+    tempoProfile: snap.tempoProfile,
     supersetMode: snap.supersetMode,
     volumeScheme: snap.volumeScheme,
     dupMode: snap.dupMode,
@@ -193,7 +335,10 @@ export function replanBBMesoFromFact(
     packingV2: snap.packingV2,
     intensityLevel: snap.intensityLevel,
     avoidAxialLoad: snap.avoidAxialLoad,
-    injuries: Array.isArray(snap.injuries) ? snap.injuries : [],
+    injuries: [
+      ...(Array.isArray(snap.injuries) ? snap.injuries : []),
+      ...mergedNewInjuries,
+    ],
     mobilityRestrictions: Array.isArray(snap.mobilityRestrictions) ? snap.mobilityRestrictions : [],
     favoriteExercises: Array.isArray(snap.favoriteExercises) ? snap.favoriteExercises : [],
     excludedExercises: Array.isArray(snap.excludedExercises) ? snap.excludedExercises : [],
@@ -257,6 +402,9 @@ export function replanBBMesoFromFact(
     previousPlans: [previousPlan],
     planStartWeek: tailStartWeek,
   } as BBBuilderInput;
+  const input: BBBuilderInput = opts.overrides
+    ? { ...baseInput, ...opts.overrides, weeks: remaining, patternId }
+    : baseInput;
 
   let rebuilt: BBPlan;
   try {
@@ -274,6 +422,37 @@ export function replanBBMesoFromFact(
     ...w,
     week: offset + i + 1,
   }));
+  const wizardNotes: string[] = [];
+  if (mergedNewInjuries.length > 0) {
+    wizardNotes.push(`🩹 Учтены новые ограничения (${mergedNewInjuries.length}) с недели ${current}`);
+  }
+  if (opts.gymEquipment && opts.gymEquipment.length > 0) {
+    wizardNotes.push(`✈️ Инвентарь обновлён: [${opts.gymEquipment.join(', ')}]`);
+  }
+  if (opts.skipWeek && tail[0]) {
+    (tail[0] as any).deload = true;
+    (tail[0] as any).phase = 'deload';
+    for (const s of tail[0].sessions) {
+      for (const e of s.exercises) {
+        if ((e as any).warmupActivator) continue;
+        e.sets = Math.max(2, Math.round((e.sets || 2) * 0.6));
+        e.rir = Math.min(5, (e.rir ?? 2) + 2);
+        if (Array.isArray(e.workSets)) {
+          e.workSets = e.workSets.slice(0, e.sets).map(ws => ({
+            ...ws,
+            rir: e.rir,
+            weight: ws.weight > 0 ? Math.max(2.5, Math.round(ws.weight * 0.8 * 2) / 2) : 0,
+          }));
+        }
+      }
+    }
+    wizardNotes.push(`⏭ Неделя ${current}: переведена в разгрузочный / реабилитационный режим`);
+  }
+  if (opts.missedDays && opts.missedDays > 0 && tail[0] && tail[0].sessions.length > 1) {
+    const dropCount = Math.min(opts.missedDays, tail[0].sessions.length - 1);
+    tail[0].sessions = tail[0].sessions.slice(0, tail[0].sessions.length - dropCount);
+    wizardNotes.push(`📅 Неделя ${current}: сжата до ${tail[0].sessions.length} тренировок (пропуск ${dropCount} дн.)`);
+  }
   const weeks = [...frozen, ...tail];
 
   const out: BBPlan = {
@@ -289,12 +468,14 @@ export function replanBBMesoFromFact(
     validation: (rebuilt as any).validation || (plan as any).validation,
     rationale: [
       ...((plan as any).rationale || []),
+      ...wizardNotes,
       `🔁 Пересборка остатка: заморожено недель ${frozen.length} (факт не переписан), пересобрано ${tail.length} от фактического пика.`,
     ],
     inputSnapshot: {
       ...(snap as Record<string, unknown>),
       ...((rebuilt as any).inputSnapshot || {}),
       workMax: input.workMax,
+      customPattern: input.customPattern || (snap as any).customPattern,
     },
   } as BBPlan;
 

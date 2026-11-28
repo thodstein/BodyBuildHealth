@@ -44,8 +44,8 @@ describe('Волна-1 — темпы: чистка tempoFor (deload домин�
     expect(tempoFor('тяж', undefined, 'accumulation', 'Румынская тяга').notation).toBe('3-1-1-0');
   });
 
-  it('deload подавляет override — фазовый темп 4-1-1-0', () => {
-    expect(tempoFor('тяж', undefined, 'deload', 'Румынская тяга').notation).toBe('4-1-1-0');
+  it('deload подавляет override — фазовый темп 2-0-1-0 (лёгкий контроль без лишнего TUT)', () => {
+    expect(tempoFor('тяж', undefined, 'deload', 'Румынская тяга').notation).toBe('2-0-1-0');
   });
 
   it('интенс-техника negatives → 4-0-1-0', () => {
@@ -69,7 +69,7 @@ describe('Волна-1.9 — pauseSeconds каталога садятся в с�
   });
 
   it('deload игнорирует паузы каталога (восстановление важнее)', () => {
-    expect(tempoFor('тяж', undefined, 'deload', 'Подъёмы на носки стоя').notation).toBe('4-1-1-0');
+    expect(tempoFor('тяж', undefined, 'deload', 'Подъёмы на носки стоя').notation).toBe('2-0-1-0');
   });
 
   it('catalogTempoHints отдаёт флаги записи каталога', () => {

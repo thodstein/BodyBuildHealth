@@ -123,6 +123,36 @@ export const METHODOLOGY_SPECS: Record<SessionMethodology, MethodologySpec> = {
     honestNote: 'Кровенаполнение (Sarcev) — про ощущение и плотность тренировки. Это осознанный компромисс: паузы >60 с в мета-анализе 2024 дают чуть больше гипертрофии, поэтому ниже 45 с не опускаем и не обещаем «больше роста» от плотности. Гормональный отклик не является медиатором роста (обзор 2025).',
     evidence: 'Milos Sarcev (hyperemia); «Give it a rest» 2024 (PubMed 39205815).',
   },
+  hit_heavy_duty: {
+    id: 'hit_heavy_duty',
+    labelRu: 'HIT / Heavy Duty (Yates/Mentzer)',
+    orderNote: 'сверхнизкий объём (1–2 рабочих сета), предельное усилие (RIR 0–1) и длинный отдых 180–240 с.',
+    protocolLine: 'разминка → 1–2 предельных рабочих сета на 6–10 повторов (RIR 0–1 для опытных), отдых +45 с (180–240 с).',
+    restDeltaSec: 45,
+    restFloorSec: 90,
+    honestNote: 'Низкообъёмный подход (Yates/Mentzer) экономит время и ЦНС при высокой интенсивности стимула; при равном недельном объёме не превосходит классику, поэтому требует жёсткого прогрессивного перегруза.',
+    evidence: 'Dorian Yates HIT; Fisher et al. 2011; Schoenfeld 2017 dose-response.',
+  },
+  smh_lengthened: {
+    id: 'smh_lengthened',
+    labelRu: 'Stretch-Mediated Hypertrophy (растяжение)',
+    orderNote: 'приоритет упражнений и пауз с пиковым натяжением в растянутой позиции + lengthened partials.',
+    protocolLine: 'растянутые движения первыми внутри группы · темп 3-1-1-0 (пауза внизу) · опциональные частичные в растяжении.',
+    restDeltaSec: 0,
+    restFloorSec: 60,
+    honestNote: 'Мета-анализы 2023–2024 (Wolf, Kassiano) показывают преимущество длинно-позиционного растяжения на ряде мышц (бицепс бедра, икры, трицепс, трицепс бедра).',
+    evidence: 'Wolf et al. 2023 (lengthened partials); Kassiano et al. 2024.',
+  },
+  myo_rep_match: {
+    id: 'myo_rep_match',
+    labelRu: 'Myo-rep Match (целевой пул повторов)',
+    orderNote: 'на изоляции и тренажёрах: активационный сет 12–15 + мини-сеты с паузой 15–20 с до целевого числа повторов.',
+    protocolLine: 'база обычная → изоляция/блоки 1 активационный сет (12–15) + 3–4 мини-сета (3–5 повт, отдых 15–20 с).',
+    restDeltaSec: -20,
+    restFloorSec: 30,
+    honestNote: 'Тайм-эффективный метод (Fagerli): позволяет набрать высокий эффективный объём стимулирующих повторов вдвое быстрее без потери результата (при сходной усталости).',
+    evidence: 'Børge Fagerli Myo-Reps; Sødal et al. 2023.',
+  },
 };
 
 const METHODOLOGY_SET: ReadonlySet<string> = new Set(Object.keys(METHODOLOGY_SPECS));
