@@ -4,7 +4,7 @@ import {
   type ScheduleItem, type TimeBlock, type SynergyId,
   type PowerLevel, type LabSlice, type TimelineWeekData, type UlWarning as UlWarningShape,
   SYNERGY_ID_SUBSTANCES, TITRATION_RULES, SYNERGY_ID_LABELS,
-  NUTRIENT_UL, NUTRIENT_UL_ALIAS, NUTRIENT_LIMIT_INFO,
+  NUTRIENT_UL, NUTRIENT_UL_ALIAS, NUTRIENT_LIMIT_INFO, PLAN_DOSED_NUTRIENTS,
   DEPLETION_CASCADES, SUBSTANCE_HALF_LIFE,
   FORM_BIOAVAIL_MULT, MINERAL_SEPARATION_HOURS, MEAL_CONTEXT_RULES,
 } from './types';
@@ -26,7 +26,7 @@ import { SUPPORT_CATALOG_DATA } from '../../data/support-database';
 import { readLabValue } from '../../core/constants';
 import { SYNERGY_NETWORK } from '../../data/support-synergy-network';
 import { PHASE_PROTOCOL, type PhaseKey } from '../tz-bridge-phase';
-import { resolvePlanDose } from './substances';
+import { planDoseWithTitration, resolvePlanDose, titrationFactorOf } from './substances';
 import { currentLabSlice } from './lab-slice';
 import { labFieldEntry } from './lab-field-number';
 import { LAB_PANEL_KEYS, labMarkerCanon } from './lab-marker-name';
@@ -195,6 +195,43 @@ export function planDosesInUlScale(planDoses: Record<string, number>): Record<st
  * @param planDoses — дозы плана в натуральной единице вещества.
  * @param appliedDoses — дозы-приёма после капа (в единице реестра, из `applyTitration`).
  */
+/**
+ * Замечания `block`-DDI по конкретным веществам плана (E3).
+ *
+ * `checkInteractions` возвращает пары, где один конец может быть классом
+ * (`@anticoagulant`) или препаратом профиля. В карточку плана попадают только
+ * концы, которые реально стоят в плане: иначе «⛔» повис бы на веществе,
+ * которого в плане нет. Состав плана функция не меняет.
+ */
+export function blockFlagsForPlan(
+  alerts: Array<{ a: string; b: string; severity: string; reason: string }>,
+  substances: string[],
+): Record<string, string[]> {
+  const flags: Record<string, string[]> = {};
+  const present = new Set(substances.map((s) => canonId(s)));
+  for (const i of alerts) {
+    if (i.severity !== 'block') continue;
+    const msg = `⛔ ${i.a} + ${i.b}: ${i.reason}`;
+    for (const end of [i.a, i.b]) {
+      const id = canonId(end);
+      if (present.has(id)) (flags[id] ||= []).push(msg);
+    }
+  }
+  return flags;
+}
+
+/**
+ * Категория ХБП по СКФ — для противопоказаний, а не для лечения.
+ * Границы — определение KDIGO: G3 30–59, G4 15–29 мл/мин/1.73 м².
+ * Нет СКФ — пустой список («нет записи» ≠ «почки в норме»).
+ */
+export function ckdStagesFromEgfr(egfr: number | undefined | null): Array<'ckd_stage3' | 'ckd_stage4_5'> {
+  if (egfr === undefined || egfr === null || !Number.isFinite(egfr)) return [];
+  if (egfr < 30) return ['ckd_stage4_5'];
+  if (egfr < 60) return ['ckd_stage3'];
+  return [];
+}
+
 export function checkPlanUpperLimits(
   substances: string[],
   planDoses: Record<string, number>,
@@ -760,6 +797,8 @@ export function applyTitration(
   state: CalculatorState,
   /** Сюда вернутся дозы ДО UL-капа — нужны для честных UL-предупреждений. */
   rawDosesOut?: Record<string, number>,
+  /** Множители лаб-ступеней: доза приёма должна совпадать с карточкой плана. */
+  titrationFactors?: Map<string, number>,
 ): Record<string, number> {
   const d: Record<string, number> = {};
   const c = state.cardio; const p = state.pharma;
@@ -790,10 +829,6 @@ export function applyTitration(
   // Теперь обе стороны берут `resolvePlanDose` (WEIGHT_BASED_DOSING + потолки UL),
   // а `applyTitration` только переводит натуральную единицу в единицу реестра
   // (витамин D: МЕ → мкг) и накладывает UL-кап ниже.
-  const PLAN_DOSED_NUTRIENTS = [
-    'magnesium', 'zinc', 'vitamin_d3', 'selenium', 'vitamin_c', 'omega3',
-    'alpha_lipoic', 'coq10', 'glycine', 'potassium',
-  ];
   for (const id of PLAN_DOSED_NUTRIENTS) {
     if (!substances.includes(id)) continue;
     const natural = resolvePlanDose(id, bw);
@@ -810,6 +845,14 @@ export function applyTitration(
   if (substances.includes('tudca')) {
     const target = resolvePlanDose('tudca', bw);
     d.tudca = cw <= 2 ? Math.round(target / 2) : target;
+  }
+  // Лаб-титрация: множитель ступени (например, TUDCA ×2 по ALT) применяется к
+  // дозе приёма здесь и только здесь. До этого он жил в тексте причины, а
+  // карточка показывала базовую дозу — два числа для одного назначения.
+  if (titrationFactors) {
+    for (const id of Object.keys(d)) {
+      d[id] = planDoseWithTitration(d[id], titrationFactorOf(titrationFactors, id));
+    }
   }
   // UL-cap: гарантия, что нормализация по весу не превысит верхний допустимый уровень (NUTRIENT_UL).
   // Единицы доз в `d` совпадают с единицами NUTRIENT_UL (мг для макро, мкг для микродоз).

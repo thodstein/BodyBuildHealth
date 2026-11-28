@@ -30,7 +30,7 @@ export type DoseUnit = 'мг' | 'мкг' | 'МЕ' | 'Ед' | 'млрд КОЕ';
 
 /** Вещества, чья внутренняя доза хранится в микрограммах. */
 const MCG_IDS = new Set<string>([
-  'selenium', 'selenium_yeast', 'folate', 'methylfolate', 'vitamin_b12', 'methylcobalamin',
+  'selenium', 'selenium_yeast', 'folate', 'methylfolate', 'vitamin_b12', 'methylcobalamin', 'b12',
   'vitamin_k2', 'biotin', 'iodine', 'molybdenum', 'chromium', 'vitamin_d3', 'vitamin_d',
   // Витамин A — преформированный ретинол; единица реестра UL — мкг RAE.
   'vitamin_a',
@@ -170,6 +170,7 @@ const DEFAULT_UNIT: Record<string, DoseUnit> = {
   selenium: 'мкг',
   folate: 'мкг',
   vitamin_b12: 'мкг',
+  b12: 'мкг',
   vitamin_k2: 'мкг',
   chromium: 'мкг',
   biotin: 'мкг',

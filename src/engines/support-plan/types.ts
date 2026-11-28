@@ -212,6 +212,12 @@ export interface NutritionData {
   potassiumMg: number;
   /** Опция «учёт принятых добавок»: что пользователь уже принимает (из профиля nutrition.currentSupplements) */
   takenSupplements?: Array<{ id: string; doseMg: number }>;
+  /**
+   * Препараты из профиля (`he_profile_v2` → `nutrition.currentMedications`):
+   * id или название. Нужны DDI-контуру: без них class-правила
+   * (`@anticoagulant`, `@ssri`, `@nsaid`) в плане не срабатывают.
+   */
+  currentMedications?: Array<{ id?: string; name?: string } | string>;
 }
 
 // ─── Block 12: Medical Contraindications ───
@@ -416,6 +422,23 @@ export interface CalculatorResult {
   neuroSubs?: string[];
   synergyIdsUsed: SynergyId[];
   titrationApplied: Record<string, number>;
+  /**
+   * Множители лаб-ступеней (id → factor) из моста ТЗ (`computeTierAdjustments`).
+   * Одна карта на все поверхности: карточка, расписание и дозы приёма.
+   */
+  titrationFactors?: Map<string, number>;
+  /**
+   * Замечания безопасности по конкретному веществу (block-DDI, противопоказание).
+   * Вещество НЕ удаляется из плана (это решение пользователя/врача), но карточка
+   * и строка расписания обязаны его показать.
+   */
+  safetyFlags?: Record<string, string[]>;
+  /**
+   * Что отбросила обрезка плана: лимит уровня, сколько кандидатов было, сколько
+   * осталось. Без этого «28 позиций» выглядели как весь план.
+   */
+  planTrim?: { limit: number; candidates: number; shown: number };
+
   labDeltas: LabDelta[];
   overallRiskBefore: number;
   overallRiskAfter: number;
@@ -601,6 +624,18 @@ export const TITRATION_RULES: Record<string, { doses: number[]; conditions: stri
   },
 };
 
+/**
+ * Нутриенты, дозу которых `applyTitration` капает по UL реестра.
+ * Список общий: карточка/расписание (`buildSubstances`) обязаны показать
+ * ровно ту дозу, которая уйдёт в приём, иначе цинк 60 мг при UL 40 стоит на
+ * экране, а в плане уже 40. B6/P5P сюда НЕ входят: их превышение остаётся
+ * предупреждением, а не молчаливым капом (решение прохода 13).
+ */
+export const PLAN_DOSED_NUTRIENTS = [
+  'magnesium', 'zinc', 'vitamin_d3', 'selenium', 'vitamin_c', 'omega3',
+  'alpha_lipoic', 'coq10', 'glycine', 'potassium',
+] as const;
+
 // ═══════════════════════════════════════════════════════════════
 //  PLAN TYPES (из support-plan-engine.ts)
 // ═══════════════════════════════════════════════════════════════
@@ -627,6 +662,22 @@ export interface PlanSubstance {
    * Позиция при этом остаётся в плане — решение за пользователем.
    */
   note?: string;
+  /**
+   * Замечание безопасности (block-DDI или противопоказание). Не удаляет позицию:
+   * снять препарат может только пользователь/врач, но карточка обязана сказать
+   * «⛔ несовместимо» рядом с дозой.
+   */
+  safetyNote?: string;
+  /**
+   * Доказательная база дозы, если она есть в реестрах: уровень (`support-dosing`)
+   * и ссылки (`EVIDENCE_DOSAGES.references`). Нет записи — поля нет, а не «A».
+   */
+  evidence?: { level?: string; refs?: string[] };
+  /**
+   * Доза — формула приложения, а не назначение врача (кардио/ИИ/каберголин).
+   * Показывается рядом с числом, чтобы «40 мг» не читалось как рецепт.
+   */
+  doseDisclaimer?: string;
 }
 
 export interface PlanMechanism {
@@ -751,6 +802,11 @@ export interface PlanResult {
    * `runSupportUnified` всегда возвращает массив; пустой — опция выключена.
    */
   dietCoverage?: NutrientCoverage[];
+  /**
+   * Что отбросила обрезка плана (E6): лимит уровня, число кандидатов, сколько
+   * показано. `undefined` — обрезки не было или движок старый.
+   */
+  planTrim?: { limit: number; candidates: number; shown: number };
 }
 
 export interface LabFindingSub {

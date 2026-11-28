@@ -1864,8 +1864,7 @@ function buildRecommendation(ctx: MapperCtx): SupportRecommendation {
       priority: 1,
     });
   }
-  // Титрация (факторы — для UI; dosis записываем в reason)
-  const titrationFactors = new Map<string, number>();
+  // Титрация (факторы — для UI; доза записывается в reason)
   for (const t of tierAdj.titrations) {
     const canon = canonId(t.id);
     const existing = subs.find(s => canonId(s.substanceId) === canon);
@@ -1873,8 +1872,8 @@ function buildRecommendation(ctx: MapperCtx): SupportRecommendation {
       existing.reason += ` [TITR↑${t.factor}× по ${t.marker}: ${t.reason}]`;
       existing.priority = 1;
     }
-    titrationFactors.set(canon, (titrationFactors.get(canon) ?? 1) * t.factor);
   }
+  const titrationFactors = accumulateTitrationFactors(tierAdj.titrations);
   // ── 3e. Синергии (после всех препаратов) ─
   const synergyCtx = {
     hasOral: (ctx.aasIds || []).some(id => ['oxandrolone','anavar','stanozolol','winstrol','methandienone','dianabol','oxymetholone','anadrol','turinabol','oral_turinabol','methyltestosterone'].some(x => id.toLowerCase().includes(x))),
@@ -2228,6 +2227,25 @@ export function resolveManualPlan(ctx: MapperCtx): SupportRecommendation {
 }
 
 // Универсальный ресолвер
+/**
+ * Множители лаб-ступеней: МАКСИМУМ по веществу, а не произведение.
+ *
+ * ALT/AST/GGT — разные маркеры одного органа; до прохода 211 произведение
+ * жило только в тексте, а после E2 стало умножать дозу: три «×2» давали
+ * TUDCA ×8 = 8 г. Клинически это не «три показания», а одна ступень,
+ * поэтому берём верхнюю предложенную кратность.
+ */
+export function accumulateTitrationFactors(
+  titrations: Array<{ id: string; factor: number }>,
+): Map<string, number> {
+  const out = new Map<string, number>();
+  for (const t of titrations) {
+    const canon = canonId(t.id);
+    out.set(canon, Math.max(out.get(canon) ?? 1, t.factor));
+  }
+  return out;
+}
+
 export function resolvePlan(ctx: MapperCtx): SupportRecommendation {
   const r = (() => {
     switch (ctx.level) {

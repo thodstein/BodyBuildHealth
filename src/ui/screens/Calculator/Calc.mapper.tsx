@@ -29,12 +29,11 @@ import { SUPPORT_CATALOG_DATA } from '../../../data/support-catalog-data';
 import '../../../data/support-catalog-init';
 import { SafetyGuardrails, SafetyConflicts, SafetyProcedures, SafetyAssayWarnings, SafetyGaps, SafetyLabFindings, SafetyCumulativeLoad, SafetyPillBurden, SafetyPedEscalation, SafetyInjections } from './CalcSafetyLayer';
 import { CalcSystemPanel, SYSTEM_PANELS, SYSTEM_TO_PANEL } from './CalcSystemPanel';
-import { DEFAULT_DOSAGES } from '../../../data/support-meta';
-import { formatDefaultDose, naturalFromMg } from '../../../data/dose-units';
+import { formatDefaultDose } from '../../../data/dose-units';
 import { canonId } from '../../../engines/support-plan/shared-constants';
 import { supportNameRu } from '../../../data/support-names';
 import { isCuratedSupport } from '../../../data/support-db/mech-map';
-import { NON_PILL_SUPPORT_IDS, resolvePlanDose } from '../../../engines/support-plan/substances';
+import { NON_PILL_SUPPORT_IDS, resolvePlanDose, resolvePlanDoseDisplay, resolvePlanSubstanceDose } from '../../../engines/support-plan/substances';
 import { checkInteractions, type DrugInteraction } from '../../../data/drug-interactions';
 import { SYNERGY_NETWORK } from '../../../data/support-synergy-network';
 import { CONTRAINDICATIONS, getContraindications, checkContraindications } from '../../../data/substance-contraindications';
@@ -710,15 +709,14 @@ function subNameRu(id: string): string {
   // приоритетный fallback. Раньше это была третья копия одной и той же логики.
   return supportNameRu(id, FALLBACK_NAMES[id] || FALLBACK_NAMES[id?.toLowerCase()]);
 }
+/**
+ * Доза карточки вещества — тот же резолвер, что у плана (`resolvePlanDose`).
+ * Раньше здесь предпочиталась доза каталога, а план брал `DEFAULT_DOSAGES`:
+ * tudca 500 против 1000, omega3 2000 против 4000, B6 50 против 25 на двух
+ * экранах одного приложения. Единица — натуральная (мкг/МЕ/млрд КОЕ).
+ */
 export function subDosage(id: string): { mg: number; timing: string } | null {
-  const e = SUPPORT_CATALOG_DATA[id] || SUPPORT_CATALOG_DATA[id.toLowerCase()] || SUPPORT_CATALOG_DATA[id.toUpperCase()];
-  // ВНУТРЕННЯЯ доза — НАТУРАЛЬНАЯ единица вещества (мкг для селена/биотина,
-  // МЕ для D3), как в `DEFAULT_DOSAGES`: её читают `formatDefaultDose`,
-  // сравнение с уже принятым (`applyDietAwareToRecSubs`) и экспорт врачу.
-  // `e.dosage.mg` каталога — МИЛЛИГРАММЫ, поэтому переводим: иначе селен
-  // показывался как «0.2 мкг», а витамин D — как «0.13 МЕ».
-  if (e?.dosage) return { mg: naturalFromMg(id, e.dosage.mg), timing: e.dosage.timing };
-  return DEFAULT_DOSAGES[canonId(id)] || DEFAULT_DOSAGES[id] || DEFAULT_DOSAGES[id.toLowerCase()] || null;
+  return resolvePlanSubstanceDose(id);
 }
 /**
  * Доза, которую реально рекомендует план (карточка/расписание/титрация) —
@@ -727,9 +725,11 @@ export function subDosage(id: string): { mg: number; timing: string } | null {
  * при 140 кг карточка показывала магний 350 мг, а текст — 200 мг.
  * Лаб-титрация (`titrationFactors`) — ориентир, она остаётся в обосновании.
  */
-function planDoseOf(id: string, weight?: number): number {
-  if (!subDosage(id)) return 0; // нет дозы в справочнике — не печатаем фолбэк 500 мг
-  return resolvePlanDose(id, weight);
+function planDoseOf(id: string, weight?: number, factors?: Map<string, number>): number {
+  // Тот же резолвер и тот же лаб-множитель, что у карточки плана, плюс UL-кап:
+  // иначе калькулятор печатал TUDCA 1000 мг, а экран поддержки — 2000 мг.
+  // 0 — дозы нет ни в одном реестре (фолбэка 500 мг больше нет).
+  return resolvePlanDoseDisplay(id, weight, factors);
 }
 function subTier(id: string): string {
   const e = SUPPORT_CATALOG_DATA[id] || SUPPORT_CATALOG_DATA[id.toLowerCase()] || SUPPORT_CATALOG_DATA[id.toUpperCase()];
@@ -1462,11 +1462,9 @@ export const CalcMapperCard: React.FC<CalcMapperProps> = ({ state, onStateChange
                           sub={{ substanceId: id, category: 'other' as const, k: 0, reason: 'Ручной выбор', mechsCovered: entry.mechanisms || [], q: 'B' }}
                           rec={{ subs: [], suppression: [], coverage: [], gaps: [], conflicts: [], guardrails: [], boosters: [], activatedMechs: [], summary: '', rationale: '', level: 'medium', phase: 'on', phaseLabel: 'На курсе' } as any}
                           subNameRu={(id: string) => SUPPORT_CATALOG_DATA[id]?.nameRu || SUPPORT_CATALOG_DATA[id]?.name || id}
-                          subDosage={(id: string) => {
-                            const cat = SUPPORT_CATALOG_DATA[id]?.dosage;
-                            // Каталог — миллиграммы, `subDosage`-контракт — натуральная единица.
-                            return cat ? { mg: naturalFromMg(id, cat.mg), timing: cat.timing } : { mg: 0, timing: '' };
-                          }}
+                          // Тот же резолвер, что у плана: каталог не должен показывать
+                          // второе число для того же вещества (tudca 500 vs 1000).
+                          subDosage={resolvePlanSubstanceDose}
                           subTier={(id: string) => SUPPORT_CATALOG_DATA[id]?.tier || 'standard'}
                           canonIdLocal={(id: string) => id}
                         />
@@ -3065,7 +3063,7 @@ export const CalcMapperCard: React.FC<CalcMapperProps> = ({ state, onStateChange
                   {finalRec.subs.filter(s => !NON_DRUG_IDS.has(s.substanceId)).map((s, i) => {
                     const titrF = finalRec.titrationFactors?.get(canonIdLocal(s.substanceId));
                     // Доза — плана (как в карточке ниже), не DEFAULT×титрация.
-                    const mg = planDoseOf(s.substanceId, state.profile?.weight) || null;
+                    const mg = planDoseOf(s.substanceId, state.profile?.weight, finalRec.titrationFactors) || null;
                     const isTitr = !!titrF && titrF > 1;
                     return (
                       <span
@@ -3130,6 +3128,9 @@ export const CalcMapperCard: React.FC<CalcMapperProps> = ({ state, onStateChange
                     subTier={subTier}
                     titrationFactors={finalRec.titrationFactors}
                     canonIdLocal={canonIdLocal}
+                    safetyNote={planResult?.substances?.find((p) => canonIdLocal(p.id) === canonIdLocal(s.substanceId))?.safetyNote}
+                    planEvidence={planResult?.substances?.find((p) => canonIdLocal(p.id) === canonIdLocal(s.substanceId))?.evidence}
+                    doseDisclaimer={planResult?.substances?.find((p) => canonIdLocal(p.id) === canonIdLocal(s.substanceId))?.doseDisclaimer}
                   />
                 </div>
               ))}
@@ -4308,13 +4309,11 @@ function pushLabMonitoring(lines: string[], rec: SupportRecommendation, opts: { 
 }
 
 function canonIdLocal(id: string): string {
-  const map: Record<string, string> = {
-    telmi: 'telmisartan', tmg: 'betaine', pharma_anastrozole: 'anastrozole',
-    pharma_cabergoline: 'cabergoline', nac_sup: 'nac', silymarin: 'milk_thistle',
-    coq10: 'coq10', '5_mthf': 'folate', l_carnitine: 'l_carnitine',
-    agmatine_sulfate: 'agmatine',
-  };
-  return map[id?.toLowerCase()] || map[id] || (id?.toLowerCase() || id);
+  // Полный реестр алиасов (`udca`, `b12`, `selenium_yeast`, `methylfolate`…),
+  // а не частичная копия: по нему ищутся safetyNote/evidence/бейдж титрации.
+  const c = canonId(id);
+  const extra: Record<string, string> = { '5_mthf': 'folate', agmatine_sulfate: 'agmatine' };
+  return extra[c] || c;
 }
 
 export function buildPlanText(rec: SupportRecommendation, weight?: number): string {
@@ -4335,7 +4334,7 @@ export function buildPlanText(rec: SupportRecommendation, weight?: number): stri
       const dose = subDosage(s.substanceId);
       // Доза с правильной единицей (мкг/МЕ/Ед/ФЕ) — из резолвера плана:
       // раньше ВСЁ печаталось как «мг», а вес/UL не учитывались вовсе.
-      const scaled = planDoseOf(s.substanceId, weight);
+      const scaled = planDoseOf(s.substanceId, weight, rec.titrationFactors);
       const doseStr = scaled > 0
         ? ` · ${formatDefaultDose(s.substanceId, scaled)} (${dose?.timing || ''})`
         : '';
@@ -4423,7 +4422,7 @@ export function buildDoctorReport(rec: SupportRecommendation, state: CalculatorS
       const name = subNameRu(s.substanceId);
       const dose = subDosage(s.substanceId);
       // Та же доза, что в карточке плана (вес + потолки UL), а не DEFAULT×титрация.
-      const scaled = planDoseOf(s.substanceId, state.profile?.weight);
+      const scaled = planDoseOf(s.substanceId, state.profile?.weight, rec.titrationFactors);
       const doseStr = scaled > 0
         ? `, ${formatDefaultDose(s.substanceId, scaled)} (${dose?.timing || ''})`
         : '';

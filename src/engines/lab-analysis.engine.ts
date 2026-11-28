@@ -261,13 +261,24 @@ const LAB_CODE_ALIASES: Record<string, string[]> = {
 };
 
 /**
- * Значение маркера вместе со знаком границы из бланка (проход 150).
+ * Значение маркера вместе со знаком границы из бланка (проход 150) и границами
+ * самого бланка (этап E7).
  *
  * Возвращает `null`, если записи нет. Знак едет рядом с числом: без него
  * «СРБ <5» не отличается от «СРБ 5», и движок делал вывод о стороне, которую
- * бланк не доказал.
+ * бланк не доказал. `refLow`/`refHigh` остаются как записаны — в единице
+ * `unit`; их пересчёт и приоритет решает `blankBounds`.
  */
-function findLabPoint(labs: LabPoint[], code: string): { value: number; bound?: LabBound } | null {
+type LabRead = {
+  value: number;
+  bound?: LabBound;
+  refLow?: number;
+  refHigh?: number;
+  /** Единица бланка: в ней же записаны `refLow`/`refHigh`. */
+  unit: string;
+};
+
+function findLabPoint(labs: LabPoint[], code: string): LabRead | null {
   const upper = code.toUpperCase();
   const lab = labs.find(l => {
     const lc = l.code?.toUpperCase() || '';
@@ -285,10 +296,11 @@ function findLabPoint(labs: LabPoint[], code: string): { value: number; bound?: 
   // удалось, у E2 остаётся честный перевод пмоль/л.
   const targetUnit = REFERENCE_RANGES[code]?.unit || '';
   const converted = convertToUnit(code, lab.value, lab.unit || '', targetUnit);
+  const blank = { refLow: lab.refLow, refHigh: lab.refHigh, unit: lab.unit || '' };
   // Пересчёт единицы — умножение на положительный коэффициент: знак границы
   // при этом не меняется, поэтому он переносится как есть.
-  if (converted !== null) return { value: converted, bound: lab.bound };
-  if (upper === 'ESTRADIOL') return { value: e2PgPerMl(lab.value, lab.unit), bound: lab.bound };
+  if (converted !== null) return { value: converted, bound: lab.bound, ...blank };
+  if (upper === 'ESTRADIOL') return { value: e2PgPerMl(lab.value, lab.unit), bound: lab.bound, ...blank };
   // Проход 178: единица указана, но это ДРУГАЯ величина, чем шкала (инсулин
   // «пмоль/л» против «мкЕд/мл», АпоB «ммоль/л» против «г/л»): коэффициент
   // вещества неизвестен, пересчитать нечем. Тогда записи для вывода нет —
@@ -297,7 +309,31 @@ function findLabPoint(labs: LabPoint[], code: string): { value: number; bound?: 
   // неразобранная единица («балл») остаётся прежним путём — число читается в
   // единице приложения, о чём говорит пометка «единица не указана».
   if (String(lab.unit || '').trim() && unitsIncommensurable(lab.unit || '', targetUnit)) return null;
-  return { value: lab.value, bound: lab.bound };
+  return { value: lab.value, bound: lab.bound, ...blank };
+}
+
+/**
+ * Норма бланка в единице приложения (этап E7).
+ *
+ * `LabPoint.refLow/refHigh` — диапазон метода конкретной лаборатории, записанный
+ * в единице бланка (`lab.unit`). Для вердикта он приводится к единице
+ * `REFERENCE_RANGES[code].unit` тем же `convertToUnit`, что и значение: иначе
+ * «13.9» тестостерона в нмоль/л сравнивалось бы с «400» из бланка в нг/дл.
+ *
+ * Возвращает `null` — пара не применяется, — если границ нет, они не пара
+ * (`refLow >= refHigh`) или хотя бы одну нельзя пересчитать. Число из чужой
+ * единицы в сравнение не идёт: молчаливая подстановка «как есть» и была бы
+ * ложным вердиктом.
+ */
+function blankBounds(code: string, read: LabRead): { low: number; high: number } | null {
+  const { refLow, refHigh } = read;
+  if (refLow === undefined || refHigh === undefined) return null;
+  if (!Number.isFinite(refLow) || !Number.isFinite(refHigh) || refLow >= refHigh) return null;
+  const targetUnit = REFERENCE_RANGES[code]?.unit || '';
+  const low = convertToUnit(code, refLow, read.unit, targetUnit);
+  const high = convertToUnit(code, refHigh, read.unit, targetUnit);
+  if (low === null || high === null || !(low < high)) return null;
+  return { low, high };
 }
 
 function findLab(labs: LabPoint[], code: string): number | null {
@@ -384,24 +420,35 @@ export function interpretLabs(labs: LabPoint[], sex?: 'male' | 'female', cycle?:
       bounds = { ...r, high: band.high, criticalHigh: Number.POSITIVE_INFINITY };
     }
 
+    // Этап E7 (`docs/LAB-NORMS-SINGLE-SOURCE.md` §5): норма бланка главнее
+    // каталога. Бланк — диапазон метода и пациента, каталог — средняя норма,
+    // поэтому границы записи заменяют `low`/`high`. `criticalHigh` остаётся
+    // каталожным: это порог действия, а не норма. Женская фаза специфичнее
+    // бланка — бланк о фазе не знает, поэтому E2/ЛГ/ФСГ с заданной фазой
+    // по-прежнему судятся фазовым коридором (и объединением фаз для ЛГ/ФСГ).
+    const phaseOwnsBounds = fem && !!cycle?.phase && (code === 'ESTRADIOL' || code === 'LH' || code === 'FSH');
+    const blank = phaseOwnsBounds ? null : blankBounds(code, read);
+    if (blank) bounds = { ...bounds, low: blank.low, high: blank.high };
+
     let status: LabInterpretation['status'] = 'normal';
     // Проход 150: сторону отклонения доказывает либо точное число, либо граница
     // (`boundProvesSide` — то же правило, что у дневника, трендов и отчёта).
     // «СРБ <5» при верхней границе 3 не говорит ни «выше», ни «в норме»: вывода
     // нет, запись попадает в `boundUnproven`, а не в «системное воспаление».
+    // Критический порог — каталожный (не норма бланка), поэтому проверяется
+    // ДО вердикта по бланку: пролактин 550 при лабораторной норме 50–600 не
+    // должен терять критическое значение 500 только потому, что попал в бланк.
+    const crit = bounds.criticalHigh;
+    const criticalByCatalog = crit !== undefined && (value > crit || (read.bound === '>' && value >= crit));
     const proven = boundProvesSide(read.bound, value, bounds.low, bounds.high);
-    if (!proven) {
+    if (!proven && !criticalByCatalog) {
       if (read.bound) boundUnproven.push({ code, value, bound: read.bound });
       continue;
     }
-    status = proven;
-    // P0 fix: high = >high, critical = >criticalHigh (раньше было max(high, critical-1)=79 для ALT 40/80 → 50 считался нормой).
-    // Проход 150: «>N» при N ≥ критической границы доказывает критическое, а
-    // точное число — строгим сравнением, как раньше.
+    status = proven ?? 'normal';
     // Проход 170: `criticalHigh` может отсутствовать (общий Т3/Т4) — тогда
     // «критически высоко» не выводится вовсе: уровня нет, а не «равен верхнему».
-    const crit = bounds.criticalHigh;
-    if (proven === 'high' && crit !== undefined && (value > crit || (read.bound === '>' && value >= crit))) {
+    if (criticalByCatalog) {
       status = 'critical_high';
     }
 

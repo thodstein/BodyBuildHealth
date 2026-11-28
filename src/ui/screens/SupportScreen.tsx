@@ -2695,6 +2695,15 @@ const renderCatalogDetailInner = (subId: string): React.ReactNode => {
     if (planResult.derivedSupport && planResult.derivedSupport.length > 0) {
       riskNotes.push(`ℹ Оценочное покрытие (q=C, механизмы выведены из каталога): ${planResult.derivedSupport.join(', ')}`);
     }
+    // E6: обрезка плана больше не молчит — иначе «28 позиций» читались как весь набор.
+    if (planResult.planTrim && planResult.planTrim.candidates > planResult.planTrim.shown) {
+      riskNotes.push(`✂ Показано ${planResult.planTrim.shown} из ${planResult.planTrim.candidates} кандидатов — лимит уровня ${planResult.planTrim.limit}. Отброшенные не «не нужны»: они за пределами лимита.`);
+    }
+    // E3: блок-DDI и второй реестр помечают позицию, но не удаляют её.
+    const safetyNotes = [...new Set((planResult.substances || []).map(s => s.safetyNote).filter(Boolean) as string[])];
+    if (safetyNotes.length > 0) {
+      riskNotes.push(`⚠ Сочетания в плане (⛔ — блок, ⚠ — осторожность): ${safetyNotes.join('; ')}`);
+    }
     if (planResult.ulWarnings && planResult.ulWarnings.length > 0) {
       // SafeLevel (железо) — не UL: не называем предел тем, чем он не является.
       const hasSafeLevel = planResult.ulWarnings.some(w => w.limitKind === 'SafeLevel');

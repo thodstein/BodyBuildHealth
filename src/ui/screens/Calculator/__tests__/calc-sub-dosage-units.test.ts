@@ -1,11 +1,16 @@
 /**
- * calc-sub-dosage-units.test.ts — «subDosage отдаёт НАТУРАЛЬНУЮ единицу».
+ * calc-sub-dosage-units.test.ts — «subDosage отдаёт НАТУРАЛЬНУЮ единицу»
+ * и ту же дозу, что план.
  *
  * Аудит 2026-11: `subDosage` предпочитала каталожную дозу (`dosage.mg` —
  * МИЛЛИГРАММЫ), а потребители подписывали её `formatDefaultDose` /
  * сравнивали с фактическим приёмом, которые работают в натуральной единице
  * (мкг/МЕ). Итог: селен «0.2 мкг» вместо 200 мкг, витамин D «0.13 МЕ»
  * вместо 2000 МЕ, а биотин считался перекрытым приёмом 5 мкг.
+ *
+ * Проход 211: источники дозы сведены в один (`resolvePlanDose`). Раньше здесь
+ * ожидался NAC 600 мг из каталога, хотя план показывал 1200 мг из справочника.
+ * Теперь оба входа отвечают 1200 — это и проверяется.
  */
 import { describe, it, expect } from 'vitest';
 import { subDosage } from '../Calc.mapper';
@@ -30,10 +35,16 @@ describe('subDosage: натуральная единица, а не мг кат�
     expect(formatDefaultDose('biotin', d!.mg)).toBe('5000 мкг');
   });
 
-  it('мг-вещества не меняются (NAC 600 мг)', () => {
+  it('мг-вещества — доза плана, а не каталога (NAC 1200 мг)', () => {
     const d = subDosage('nac');
-    expect(d?.mg).toBe(600);
-    expect(formatDefaultDose('nac', d!.mg)).toBe('600 мг');
+    expect(d?.mg).toBe(1200);
+    expect(formatDefaultDose('nac', d!.mg)).toBe('1.2 г');
+  });
+
+  it('tudca: 1000 мг из справочника (каталог 500 не перебивает)', () => {
+    const d = subDosage('tudca');
+    expect(d?.mg).toBe(1000);
+    expect(formatDefaultDose('tudca', d!.mg)).toBe('1 г');
   });
 
   it('неизвестное вещество — null, а не выдуманная доза', () => {

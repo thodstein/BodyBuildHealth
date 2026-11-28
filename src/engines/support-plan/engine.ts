@@ -6,7 +6,8 @@ import {
 import {
   getBlacklist, canonId, sameClassIds, calcAllRisks, buildTzInput, tzToScores,
   synergyScoreWithPlan, conflictScoreWithPlan, applyTitration, calcLabDeltas,
-  generateSchedule, checkDepletionCascade, checkPlanUpperLimits, aggregateDailyLoad,
+  generateSchedule, checkDepletionCascade, checkPlanUpperLimits, aggregateDailyLoad, ckdStagesFromEgfr,
+  blockFlagsForPlan,
   toSystemRisksFromTz, toSystemRisks, getContraindicationAlerts,
   generateSynergyRecommendations,
   SYS_META, TZ_AUTO_BLACKLIST,
@@ -20,10 +21,12 @@ import { getSupportMechIndex } from '../../data/support-db/mech-map';
 import { getPrioritySubstances, getSubstancePriority, type SeverityLevel } from '../../data/lab-priority-map';
 import { checkContraindications } from '../../data/substance-contraindications';
 import { checkInteractions } from '../../data/drug-interactions';
+import { resolveInteractionId } from '../../data/support-interactions-db';
 import { resolvePlanDose } from './substances';
+import { findSupportDbPairs } from './support-pairs';
 import { resolvePlan } from '../tz-mapper-engine';
 import type { SupportLevel } from '../tz-bridge-mechanism';
-import { buildMapperCtx, labSliceToValues } from './mapper-ctx';
+import { buildMapperCtx, labSliceToValues, labValuesForEngine } from './mapper-ctx';
 import { currentLabSlice } from './lab-slice';
 import { labFieldNumber } from './lab-field-number';
 import { CARDIO_EMPTY, cardioStateFromCard } from './cardio-vitals';
@@ -563,6 +566,9 @@ export function calculateSupportTZ(state: CalculatorState): CalculatorResult {
       if (hasTestForBudget) mandatoryIds.add(canonId('bergamot'));
     }
     const planLimit = Math.max(AUTO_PLAN_LIMIT[state.powerLevel] ?? AUTO_PLAN_LIMIT.mid, mandatoryIds.size);
+    // Сколько кандидатов было ДО обрезки: без этого «28 позиций» выглядели как
+    // весь план, а отброшенный хвост исчезал бесследно (E6).
+    const candidateIds = new Set(substances.map((id) => canonId(id)));
     const prioritized = substances.filter(id => mandatoryIds.has(canonId(id)));
     const optional = substances.filter(id => !mandatoryIds.has(canonId(id)) && !isAutoDoctorOnly(id));
     const finalSubstances = [...new Set([...prioritized, ...optional])].slice(0, planLimit);
@@ -596,10 +602,20 @@ export function calculateSupportTZ(state: CalculatorState): CalculatorResult {
       ...substances.filter(id => !mandatoryIds.has(canonId(id)) && !isAutoDoctorOnly(id)),
     ])].slice(0, planLimit);
     substances.splice(0, substances.length, ...finalAfterSynergy);
+    const planTrim = {
+      limit: planLimit,
+      // Кандидаты до обрезки + добавленные синергией: иначе «показано» могло
+      // оказаться больше «кандидатов», и обрезка выглядела бы отрицательной.
+      candidates: new Set([...candidateIds, ...finalAfterSynergy.map((id) => canonId(id))]).size,
+      shown: finalAfterSynergy.length,
+    };
 
     // ── 7. Финальный расчёт риска С поддержкой (включая ВСЕ вещества) ──
+    // Лаб-титрация из моста: множители ступеней (ALT → TUDCA ×2 и т. п.).
+    // Без них «×2» оставалось текстом, а доза — базовой.
+    const labTitration = unifiedRec?.titrationFactors;
     const rawDoses: Record<string, number> = {};
-    const titration = applyTitration(substances, state, rawDoses);
+    const titration = applyTitration(substances, state, rawDoses, labTitration);
     // Дозы плана считаем ДО расписания: все читатели (расписание, UL-контур)
     // должны видеть одну и ту же дозу, иначе карточка плана говорит «200 мг»,
     // а строка приёма — «100 мг» (или «по инструкции»).
@@ -608,7 +624,7 @@ export function calculateSupportTZ(state: CalculatorState): CalculatorResult {
       const weight = state.profile?.weight || 80;
       for (const id of substances) {
         if (planDoses[id] !== undefined) continue;
-        const dose = resolvePlanDose(id, weight);
+        const dose = resolvePlanDose(id, weight, labTitration);
         if (dose > 0) planDoses[id] = dose;
       }
     }
@@ -757,12 +773,46 @@ export function calculateSupportTZ(state: CalculatorState): CalculatorResult {
     const synergyRecs = generateSynergyRecommendations(substances.slice(), activeSystemsList, allDb, planSystemCoverage);
 
     // ── DDI (Drug-Drug Interactions) из drug-interactions.ts ──
-    const ddiAlerts = checkInteractions(substances);
+    // Препараты профиля — в том же DDI-контуре: class-правила должны видеть
+    // варфарин/SSRI/НПВС пользователя, а не только вещества плана.
+    const rawDdiAlerts = checkInteractions([...substances, ...profileMedicationIds()]);
+    // Одна пара — одна строка: правила `x5htp` и `5htp` описывают одно вещество,
+    // и при SSRI в профиле давали два одинаковых ⛔. Ключ — severity + причина.
+    const seenDdi = new Set<string>();
+    const ddiAlerts = rawDdiAlerts.filter((i) => {
+      const key = `${i.severity}|${i.reason}`;
+      if (seenDdi.has(key)) return false;
+      seenDdi.add(key);
+      return true;
+    });
     const ddiAlertStrings = ddiAlerts.map(i =>
       i.severity === 'block'
         ? `⛔ DDI: ${i.a} + ${i.b}: ${i.reason} — ${i.action}`
         : `⚠ DDI: ${i.a} + ${i.b}: ${i.reason} — ${i.action}`
     );
+
+    // ── Замечания безопасности по конкретным веществам плана ──
+    // `block` из `drug-interactions` раньше оставался только строкой в общем
+    // списке: карточка вещества о нём не знала. Здесь тот же блок попадает в
+    // `safetyFlags` — карточка показывает «⛔ несовместимо», состав плана не
+    // меняется (снять препарат может пользователь/врач).
+    const safetyFlags: Record<string, string[]> = blockFlagsForPlan(ddiAlerts, substances);
+    // ── Второй реестр (`INTERACTIONS_DB`, 265 записей): пары, которых нет в
+    // `drug-interactions`. Оба конца — в плане, иначе это не конфликт стека.
+    // Класс-псевдонимы не разворачиваем (см. `support-pairs.ts`).
+    // Пары, уже названные `drug-interactions`, не дублируем вторым реестром.
+    const ddiPairKeys = new Set(ddiAlerts.map(i =>
+      [canonId(i.a.replace(/^@/, '')), canonId(i.b.replace(/^@/, ''))].sort().join('|')));
+    const supportPairs = findSupportDbPairs(substances)
+      .filter(p => !ddiPairKeys.has([p.aId, p.bId].sort().join('|')));
+    const supportPairAlerts = supportPairs
+      .filter(p => p.type === 'conflict' || p.type === 'caution')
+      .map(p => `${pairMark(p)} Стек: ${p.a} + ${p.b} — ${p.description}`);
+    for (const p of supportPairs) {
+      if (p.type === 'synergy') continue;
+      const msg = `${pairMark(p)} ${p.a} + ${p.b}: ${p.description}`;
+      for (const id of [p.aId, p.bId]) (safetyFlags[id] ||= []).push(msg);
+    }
 
     // ── Маппинг state.contraindications → healthConditions для checkContraindications ──
     // state.contraindications (hasCVD, hasDiabetes, ...) → condition IDs (ihd, diabetes, ...)
@@ -785,6 +835,21 @@ export function calculateSupportTZ(state: CalculatorState): CalculatorResult {
     // Демография
     if ((state.profile.age || 30) > 65) healthConditionsMapped.push('elderly');
     if ((state.profile.age || 30) > 50) healthConditionsMapped.push('age_over_50');
+    // СКФ из бланка/расчёта — категория ХБП, а не анкета: человек может не отметить
+    // болезнь почек, но СКФ 28 обязана включить противопоказания почек.
+    // Границы категорий — определение KDIGO (G3 30–59, G4 15–29 мл/мин/1.73 м²),
+    // а не новый порог лечения; явная СКФ бланка главнее расчёта.
+    {
+      const labValues = labValuesForEngine(
+        currentLabSlice(state.labs),
+        state.profile?.sex === 'female' ? 'female' : 'male',
+        state.profile?.age,
+      );
+      const egfr = labValues['EGFR'];
+      for (const stage of ckdStagesFromEgfr(egfr)) {
+        if (!healthConditionsMapped.includes(stage)) healthConditionsMapped.push(stage);
+      }
+    }
 
     const result: CalculatorResult = {
       risk: { systems: [], overallRaw, overallAfterSupport, timestamp: new Date().toISOString() },
@@ -800,6 +865,7 @@ export function calculateSupportTZ(state: CalculatorState): CalculatorResult {
           ? `⛔ ${a.substanceId}: ${a.message} — ${a.action}`
           : `⚠ ${a.substanceId}: ${a.message} — ${a.action}`),
         ...ddiAlertStrings,
+        ...supportPairAlerts,
       ],
       negativeBlocks: blacklist,
       comparisonBeforeAfter: (Object.keys(SYS_META) as RiskSystemId[]).map(id => ({
@@ -819,6 +885,11 @@ export function calculateSupportTZ(state: CalculatorState): CalculatorResult {
       timestamp: new Date().toISOString(),
       depletionWarnings: depletionWarnings.length > 0 ? depletionWarnings : undefined,
       ulWarnings: ulWarnings.length > 0 ? ulWarnings : undefined,
+      // Лаб-титрация — тем же картам, что у доз: карточка плана и расписание
+      // обязаны видеть один множитель (support-plan/index.ts передаёт его в buildSubstances).
+      titrationFactors: labTitration,
+      safetyFlags: Object.keys(safetyFlags).length > 0 ? safetyFlags : undefined,
+      planTrim,
       dailyLoad: Object.keys(dailyLoad).length > 0 ? dailyLoad : undefined,
       phaseAssignedDrugs: phaseAssignedDrugs.length > 0 ? phaseAssignedDrugs : undefined,
       protocolWarnings: protocolWarnings.length > 0 ? protocolWarnings : undefined,
@@ -859,6 +930,36 @@ function diaryMicroValue(raw: unknown): number | null {
   if (raw === null || raw === undefined || raw === '') return null;
   const numeric = typeof raw === 'number' ? raw : Number(String(raw).replace(',', '.'));
   return Number.isFinite(numeric) ? numeric : null;
+}
+
+/**
+ * Препараты пользователя из профиля (`he_profile_v2` → `nutrition.currentMedications`).
+ * Движок не импортирует UI-модуль профиля (он тянет React), поэтому читает тот же
+ * ключ хранилища, что `profile-manager` (`STORAGE_KEY`), и берёт только id/имя.
+ * Без них DDI-контур слеп к класс-правилам: `@anticoagulant`, `@ssri`, `@nsaid`.
+ */
+/** Иконка по строгости: ⛔ только conflict HIGH, остальное — ⚠. */
+function pairMark(p: { type: string; severity: string }): string {
+  return p.type === 'conflict' && p.severity === 'HIGH' ? '⛔' : '⚠';
+}
+
+function profileMedicationIds(): string[] {
+  try {
+    const raw = localStorage.getItem('he_profile_v2');
+    if (!raw) return [];
+    const profile = JSON.parse(raw);
+    const meds = profile?.nutrition?.currentMedications;
+    if (!Array.isArray(meds)) return [];
+    return meds
+      .map((m: any) => (typeof m === 'string' ? m : m?.id || m?.name || ''))
+      .map((s: string) => String(s).trim())
+      .filter(Boolean)
+      // Русские названия («Варфарин») реестр знает через ALIAS_MAP: без этого
+      // `checkInteractions` сравнивал их с латинскими id и молчал.
+      .map((s: string) => resolveInteractionId(s));
+  } catch {
+    return [];
+  }
 }
 
 /** Микронутриенты дневника, которые считаем для покрытия рационом. */

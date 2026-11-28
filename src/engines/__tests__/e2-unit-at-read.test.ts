@@ -23,7 +23,13 @@ import { normalizeFlatLabs } from '../support-plan/engine-helpers';
 import { cycleState } from '../female-cycle-phase.engine';
 
 const point = (code: string, value: number, unit: string): LabPoint => ({
-  id: `${code}-1`, code, name: code, value, unit, date: '2026-11-10', phase: 'any',
+  id: `${code}-1`,
+  code,
+  name: code,
+  value,
+  unit,
+  date: '2026-11-10',
+  phase: 'any',
 });
 
 const luteal = cycleState({ sex: 'female', lastPeriodStart: '2026-10-30', cycleLengthDays: 28 }, '2026-11-14');
@@ -114,7 +120,9 @@ describe('источник: единица применяется на обои�
   const reexport = readFileSync(resolve(process.cwd(), 'src/engines/support-plan/engine-helpers.ts'), 'utf8');
 
   it('интерпретация читает E2 через e2PgPerMl', () => {
-    expect(analysis).toContain("if (upper === 'ESTRADIOL') return { value: e2PgPerMl(lab.value, lab.unit), bound: lab.bound };");
+    // Проход 211: хвост `return` расширен границами бланка (`...blank`), поэтому
+    // проверяем сам вызов, а не всю строку — иначе гард ловит форматирование.
+    expect(analysis).toContain("if (upper === 'ESTRADIOL') return { value: e2PgPerMl(lab.value, lab.unit)");
   });
 
   it('плоский список анализов читает E2 через e2PgPerMl', () => {

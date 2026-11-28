@@ -29,6 +29,7 @@ import { mechanismCoverageOf } from '../risk-engine-tz-spec';
 import type { CalculatorState, CalculatorResult, PlanResult } from './types';
 import { clamp } from './types';
 import { buildSubstances, buildScheduleFromPlan, computeWeekScale } from './substances';
+import { canonId } from './shared-constants';
 import {
   buildSystems, buildMechanisms, buildCoverageGaps,
   buildUncoveredMechanisms, buildRiskDynamics, buildRiskBreakdown,
@@ -81,7 +82,7 @@ function runSupportUnifiedInner(state: CalculatorState): PlanResult {
     boostAdded: tzRes.boostAdded,
     jointSubs: tzRes.jointSubs,
     neuroSubs: tzRes.neuroSubs,
-  }, weight);
+  }, weight, tzRes.titrationFactors);
 
   // ── 1a. Опции подбора (opt-in, карточка «⚙️ Опции подбора»): генетика + учёт принятых ──
   // Опции выключены → байт-в-байт прежний план.
@@ -121,6 +122,22 @@ function runSupportUnifiedInner(state: CalculatorState): PlanResult {
     const annotated = annotatePlanSubsByDiet(substances, dietCoverageRows);
     substances = annotated.subs;
     dietCoverageNotes.push(...annotated.notes);
+  }
+
+  // ── 1c. Замечания безопасности (DDI блока и второго реестра) ──
+  // Позиция НЕ удаляется: снять препарат может пользователь/врач, а не движок.
+  // Но карточка и экспорт обязаны сказать «⛔ несовместимо» рядом с дозой.
+  if (tzRes.safetyFlags) {
+    const flags = tzRes.safetyFlags;
+    // p5p — активная форма B6: второй реестр знает её только как VITAMIN_B6.
+    const safetyAlias: Record<string, string> = { p5p: 'vitamin_b6' };
+    substances = substances.map((s) => {
+      const key = canonId(s.id);
+      const list = flags[key] || flags[s.id] || flags[safetyAlias[key]];
+      if (!list || list.length === 0) return s;
+      const merged = [...new Set([...(s.safetyNote ? [s.safetyNote] : []), ...list])].join(' · ');
+      return { ...s, safetyNote: merged };
+    });
   }
 
   // ── 2. Dosages ──
@@ -235,6 +252,8 @@ function runSupportUnifiedInner(state: CalculatorState): PlanResult {
     // 🍽 опция «рацион покрывает вещество»: пустые массивы — опция выключена.
     dietCoverageNotes,
     dietCoverage: dietCoverageRows,
+    // Что отбросила обрезка плана — в карточку и шеринг, а не в тишину.
+    planTrim: tzRes.planTrim,
   };
 }
 
