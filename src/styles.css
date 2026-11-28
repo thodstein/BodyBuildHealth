@@ -2102,6 +2102,15 @@ input[type="range"]::-moz-range-thumb {
 .nutrition-tab-btn.inactive { background:var(--card-bg); color:var(--text-dim); border:1px solid var(--border); }
 .nutrition-tab-btn.inactive:hover { border-color:var(--border-light); color:var(--text); }
 
+/* Меню питания (подвкладки в выдвижной панели): инерционная прокрутка списка
+ * в WebView и видимый тонкий скроллбар на десктопе — иначе длинный список
+ * выглядел как обрезанный блок без возможности прокрутки. */
+.nutrition-nav-drawer {
+  -webkit-overflow-scrolling: touch;
+  scrollbar-width: thin;
+  overscroll-behavior: contain;
+}
+
 /* === LOADING STATES === */
 .screen-loading {
   display:flex; flex-direction:column; align-items:center; justify-content:center;

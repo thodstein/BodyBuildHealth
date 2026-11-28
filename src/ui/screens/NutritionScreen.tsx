@@ -5511,7 +5511,15 @@ export const NutritionScreen: React.FC<{ initialSubTab?: string }> = ({ initialS
               borderRight: '1px solid rgba(255,255,255,0.08)',
               boxShadow: '8px 0 32px rgba(0,0,0,0.5)',
               overflowY: 'auto',
-              padding: '12px 12px calc(16px + max(env(safe-area-inset-bottom,0px),0px))',
+              overscrollBehavior: 'contain',
+              touchAction: 'pan-y',
+              // §UI: панель живёт в stacking-контексте `.screen` (z-index:1), поэтому
+              // плавающая нижняя навигация (`z-index:100`) остаётся сверху и перехватывает
+              // тапы. Прежний зазор учитывал только safe-area, и последние подвкладки
+              // уходили под пилюлю — «докрутил до конца, а нижних разделов нет».
+              // Зазор — тот же `--tabbar-clear`, что у скролл-тела экрана.
+              minHeight: 0,
+              padding: '12px 12px calc(12px + var(--tabbar-clear, 110px))',
             }}
           >
             <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8 }}>
