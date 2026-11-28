@@ -254,7 +254,10 @@ export function buildArmIcs(plan: ArmPlan, startDateIso?: string): string {
       const desc = sess.exercises
         .map((e) => `${e.name} ${e.sets}x${e.repsRange[0]}-${e.repsRange[1]}${e.comment ? ` (${e.comment})` : ''}`)
         .join('\\n');
-      ics += `BEGIN:VEVENT\r\nUID:arm-${wk.week}-${sess.day}@bbhealth\r\nDTSTART:${dt}\r\nSUMMARY:${escIcs(summary)}\r\nDESCRIPTION:${escIcs(desc)}\r\nEND:VEVENT\r\n`;
+      // UID включает тег только для Test: тестовая сессия может делить день 7
+      // с рабочей, без тега второе событие перетирало первое в календаре (review 2026-11).
+      const uidTag = String((sess as any).sessionTag || '') === 'Test' ? '-Test' : '';
+      ics += `BEGIN:VEVENT\r\nUID:arm-${wk.week}-${sess.day}${uidTag}@bbhealth\r\nDTSTART:${dt}\r\nSUMMARY:${escIcs(summary)}\r\nDESCRIPTION:${escIcs(desc)}\r\nEND:VEVENT\r\n`;
     }
   }
   ics += 'END:VCALENDAR\r\n';

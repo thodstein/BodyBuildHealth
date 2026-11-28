@@ -15,6 +15,7 @@ import { orderCorrectionsForDay, sessionOrderNote } from '../armlift-session-rul
 import { diagnosticCompleteness } from '../armlift-completeness.engine';
 import { clearDiagHistory } from '../armlift-history.engine';
 import { getArmExerciseById } from '../../../core/exercise-catalog-arm';
+import { sessionLimitsForArm } from '../arm-volume.engine';
 import { buildArmliftingReport, buildArmliftingHtml, buildArmliftingCsv } from '../armlifting-diagnostics.engine';
 
 describe('PRO-5 D1: точки срыва и фолы per-implement', () => {
@@ -407,6 +408,16 @@ describe('PRO-5 D11 E2: CoC-лестница', () => {
     const generic = rankArmliftCorrections('crush', 'coc_gripper', {});
     expect(generic[0].exId).toBe('coc_trainer');
   });
+  it('лесенка CoC: work + overcrush на одном coc_no2 суммируются в targetSets', () => {
+    const corrections = rankArmliftCorrections('crush', 'coc_gripper', { cocLevel: 2 }, 4);
+    const shared = corrections.filter((c) => c.exId === 'coc_no2');
+    expect(shared.length).toBe(2); // work + overcrush
+    const expected = shared.reduce((a, c) => a + c.sets, 0);
+    const spec = buildArmliftSpecBlock('crush', 'coc_gripper', corrections, 4);
+    // было→стало: 4 (второй вариант затирал первый) → сумма work 3 + overcrush 4 = 7.
+    expect(spec[0].targetSets['coc_no2']).toBeGreaterThan(4);
+    expect(spec[0].targetSets['coc_no2']).toBeGreaterThanOrEqual(expected);
+  });
 });
 
 describe('PRO-5 D11 E4 / D12 E7: перетест и история', () => {
@@ -496,6 +507,52 @@ describe('PRO-5 D12 E5: дозы и волны', () => {
     expect(r.plan.weeks[0].sessions[0].exercises[0].sets).toBe(2);
     const r1 = injectArmliftCorrections(plan, [{ exId: 'rolling_thunder', sets: 1 }], { level: 'beginner', workMax: { grip_support: 80 } });
     expect(r1.plan.weeks[0].sessions[0].exercises[0].sets).toBe(1);
+  });
+  it('уровень плана beginner без opts.level тоже режет сет (аудит 2026-11)', () => {
+    const plan = {
+      level: 'beginner', rationale: [] as string[],
+      weeks: [{ week: 1, sessions: [{ sessionTag: 'SupportGrip', exercises: [] }] }],
+    };
+    const r = injectArmliftCorrections(plan, [{ exId: 'rolling_thunder', sets: 3 }], { workMax: { grip_support: 80 } });
+    expect(r.injected).toBe(1);
+    expect(r.plan.weeks[0].sessions[0].exercises[0].sets).toBe(2);
+  });
+  it('кап сессии армлифтинга — канон 5/6, не хардкод 8 (аудит 2026-11)', () => {
+    // было→стало: канон armlifting 5/6, не 8 — переполнение считалось по exercises.length >= 8.
+    const capped = (level: string, counts: number[]) => ({
+      level, rationale: [] as string[],
+      weeks: [{
+        week: 1,
+        sessions: counts.map((n, i) => ({
+          sessionTag: ['SupportGrip', 'PinchGrip', 'CrushGrip'][i],
+          exercises: Array.from({ length: n }, (_, j) => ({ exerciseId: `filler_${i}_${j}`, sets: 1 })),
+        })),
+      }],
+    });
+    for (const [level, wantCap] of [['intermediate', 5], ['enhanced', 6]] as const) {
+      const cap = sessionLimitsForArm({ level, discipline: 'armlifting', sessionTag: 'SupportGrip' }).maxExercises;
+      expect(cap).toBe(wantCap);
+      const full = injectArmliftCorrections(capped(level, [cap, cap, cap]), [{ exId: 'rolling_thunder', sets: 3 }], {
+        workMax: { grip_support: 80 },
+      });
+      expect(full.injected).toBe(0);
+      expect(full.skippedBudget).toBe(1);
+      expect(full.notes.join(' ')).toContain(`переполнены (${cap}`);
+    }
+    // уровень ПЛАНА приоритетнее opts.level и для капа: 5, а не 6 enhanced
+    const mismatch = injectArmliftCorrections(capped('intermediate', [5, 5, 5]), [{ exId: 'rolling_thunder', sets: 3 }], {
+      level: 'enhanced',
+      workMax: { grip_support: 80 },
+    });
+    expect(mismatch.injected).toBe(0);
+    // свободная сессия — переезд, кап не пробит (4 + 1 = 5)
+    const r = injectArmliftCorrections(capped('intermediate', [5, 4, 0]), [{ exId: 'rolling_thunder', sets: 3 }], {
+      workMax: { grip_support: 80 },
+    });
+    expect(r.injected).toBe(1);
+    const used = r.plan.weeks[0].sessions.find((s: any) => s.exercises.some((e: any) => e.exerciseId === 'rolling_thunder'));
+    expect(used?.sessionTag).toBe('PinchGrip');
+    expect(used?.exercises.length).toBe(5);
   });
 });
 

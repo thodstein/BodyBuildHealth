@@ -101,14 +101,16 @@ export interface HookVolumeExercise {
 /**
  * 28.11.2026 было→стало: hookVolumeOf суммировал ВСЕ wrist_flexors и supinators,
  * включая cup/toproll — hook-кап ругался на плане без hook-объёма. Теперь считается
- * только hook-специфика: substitutionGroup supination/hammer + wrist_flexors с
- * супинированным/нейтральным предплечьем (workingAngle.forearm !== 'pronated').
- * Поле угла отсутствует — фолбэк по группе замены (supination); cup_iso без
- * подтверждённого супинированного предплечья не засчитывается.
+ * только hook-специфика: супинация + wrist_flexors с супинированным/нейтральным
+ * предплечьем (flexor-pronator, Marotta 2026).
+ *
+ * `hammer` (брахиалис/брахиорадиалис) ИСКЛЮЧЁН: это сгибатели локтя, не
+ * flexor-pronator; иначе кап срезал главную мышцу hook-плана до 1 сета
+ * (проверено дампом 28.11: brachialis 5 → 1).
  */
 export function isHookVolumeExercise(ex: HookVolumeExercise): boolean {
   const sg = String(ex?.substitutionGroup || '').toLowerCase();
-  if (sg === 'supination' || sg === 'hammer') return true;
+  if (sg === 'supination') return true;
   if (String(ex?.muscle || '').toLowerCase() !== 'wrist_flexors') return false;
   const forearm = String(ex?.workingAngle?.forearm || '').toLowerCase();
   if (forearm === 'pronated') return false;

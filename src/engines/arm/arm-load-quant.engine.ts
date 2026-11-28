@@ -57,8 +57,12 @@ export function workMaxFromBenchmarks(input: BenchToWorkMaxInput): Record<string
     wm['grip_crush'] = Math.round(Number(input.cocLevel) * 25 * 2) / 2;
   if (Number.isFinite(Number(input.pronHoldSec)) && Number(input.pronHoldSec) > 0)
     wm['pronators'] = Math.round((10 + Number(input.pronHoldSec) * 0.4) * 2) / 2;
-  if (Number.isFinite(Number(input.cupHoldSec)) && Number(input.cupHoldSec) > 0)
-    wm['wrist_flexors_cup_hold'] = Math.round((15 + Number(input.cupHoldSec) * 0.5) * 2) / 2;
+  if (Number.isFinite(Number(input.cupHoldSec)) && Number(input.cupHoldSec) > 0) {
+    // Аудит 2026-11: ключ был `wrist_flexors_cup_hold` — его НИКТО не читал
+    // (weightForMuscle знает только `wrist_flexors`), т.е. cup-холд молча терялся.
+    const cup = Math.round((15 + Number(input.cupHoldSec) * 0.5) * 2) / 2;
+    wm['wrist_flexors'] = Math.max(wm['wrist_flexors'] || 0, cup);
+  }
   return wm;
 }
 

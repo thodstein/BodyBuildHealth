@@ -104,3 +104,6 @@ export * from './arm-humerus-axis.engine';
 export * from './arm-antagonist.engine';
 export * from './arm-medley.engine';
 export * from './arm-for.engine';
+// Аудит 2026-11: калибровка workMax и тестовая неделя
+export * from './arm-calibration.engine';
+export * from './arm-test-week.engine';

@@ -184,8 +184,9 @@ describe('arm-pro5 safety (P1)', () => {
     );
   });
   it('checkHookCap: кап 12', () => {
-    // 28.11.2026 было→стало: hook-объём считает только hook-специфику (supination/hammer
-    // + wrist_flexors в супинированном/нейтральном предплечье), а не все supinators+wrist_flexors.
+    // 28.11.2026 было→стало: hook-объём считает только flexor-pronator (супинация +
+    // сгибание кисти в супинированном/нейтральном предплечье). hammer/брахиалис
+    // исключён — иначе кап резал главную мышцу hook-плана (review 2026-11).
     const wk: any = {
       week: 1,
       sessions: [

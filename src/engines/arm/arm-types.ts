@@ -275,6 +275,26 @@ export interface ArmBuilderInput {
   /** 26.10.2026 (§8 п.1): перекос ротаторов плеча из диагностики (ER:IR risk) —
    *  shoulder_stab получает приоритет объёма (баланс ротаторов, Pascoa 2026). */
   shoulderPriority?: boolean;
+  // ── Аудит 2026-11: калибровка и тестовая неделя ──
+  /** Замеры для калибровки workMax (5–8 повт @RIR 2 / холд / сингл). */
+  calibration?: ArmCalibrationEntry[];
+  /** Неделя 1 — калибровочная: тестовый подход, workMax ещё не задан. */
+  calibrationPending?: boolean;
+  /** Тестовая неделя каждые N недель (0/undefined = выкл). */
+  testWeekEvery?: number;
+}
+
+export type ArmCalibrationExercise =
+  'wrist_curl' | 'pronation_hold' | 'cup_hold' | 'rolling_thunder' | 'side_press' | 'coc';
+
+export interface ArmCalibrationEntry {
+  exercise: ArmCalibrationExercise;
+  weightKg?: number;
+  reps?: number;
+  rir?: number;
+  holdSec?: number;
+  /** CoC-уровень (0 Trainer … 4 No.4) для exercise='coc'. */
+  cocLevel?: number;
 }
 
 export interface ArmInjury {

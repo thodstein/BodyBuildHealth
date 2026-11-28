@@ -18,9 +18,11 @@ import { ARM_SPLIT_PATTERNS } from '../../../engines/arm/arm-split-patterns';
 import {
   ARM_MUSCLE_RU,
   ARM_MUSCLES,
+  type ArmCalibrationExercise,
   type ArmSpecializationBlock,
   type ArmWeeklyCheckin,
 } from '../../../engines/arm/arm-types';
+import { calibrateArmWorkMax } from '../../../engines/arm/arm-calibration.engine';
 import {
   loadArmCheckins,
   saveArmCheckin,
@@ -1146,6 +1148,15 @@ export function ArmAutoConstructor() {
   const [courseIntensity, setCourseIntensity] = useState<'mild' | 'moderate' | 'heavy'>('moderate');
   const [showPed, setShowPed] = useState(false);
   const [workMaxEdit, setWorkMaxEdit] = useState<Record<string, string>>({});
+  // Аудит 2026-11: калибровка workMax из одного теста + тестовая неделя.
+  const [calEx, setCalEx] = useState<ArmCalibrationExercise>('wrist_curl');
+  const [calW, setCalW] = useState('');
+  const [calReps, setCalReps] = useState('6');
+  const [calRir, setCalRir] = useState('2');
+  const [calHold, setCalHold] = useState('15');
+  const [calCoc, setCalCoc] = useState('2');
+  const [calPending, setCalPending] = useState(false);
+  const [testEvery, setTestEvery] = useState('8');
   // PRO A–J: старт/руки/бенчи/дневник/спарринг (всё опционально)
   const [proBw, setProBw] = useState<string>('');
   const [proAge, setProAge] = useState<string>('');
@@ -2212,6 +2223,9 @@ export function ArmAutoConstructor() {
       if (snap.technique) setTechnique(String(snap.technique));
       if (snap.goal) setGoal(String(snap.goal));
       if (snap.level && (LEVELS as readonly string[]).includes(String(snap.level))) setLevel(String(snap.level));
+      // Аудит 2026-11: калибровка/тестовая неделя — часть входа плана.
+      setCalPending(snap.calibrationPending === true);
+      setTestEvery(Number(snap.testWeekEvery) > 0 ? String(snap.testWeekEvery) : '');
       if (Number(snap.weeks) > 0) setWeeks(Math.max(2, Math.min(52, Math.round(Number(snap.weeks)))));
       if (Number(snap.daysPerWeek) > 0) setDaysPerWeek(Math.max(2, Math.min(6, Math.round(Number(snap.daysPerWeek)))));
       if (snap.progressionStyle) setProgStyle(String(snap.progressionStyle));
@@ -2332,6 +2346,9 @@ export function ArmAutoConstructor() {
         // P0-3: явные блоки специализации (цели/доноры по неделям) — только когда заданы.
         specializationSchedule: specialization && specBlocks.length ? specBlocksToSchedule(specBlocks) : undefined,
         workMax,
+        // Аудит 2026-11: калибровочная неделя 1 и тестовая неделя каждые N нед.
+        calibrationPending: calPending || undefined,
+        testWeekEvery: parseFloat(testEvery) > 0 ? parseFloat(testEvery) : undefined,
         // P0-2 было→стало: при выключенном разделе PED дозы/интенсивность не уходят
         // в сборку (саммари честно пишет «Выкл»), а не меняют план скрытно.
         pedDoses: showPed && Object.keys(pedDoses).length ? pedDoses : undefined,
@@ -3352,6 +3369,145 @@ export function ArmAutoConstructor() {
                 </AdField>
               ))}
             </AdGrid>
+            {/* Аудит 2026-11: калибровка workMax одним тестом (5–8 повт @RIR 2 / холд). */}
+            <div
+              data-arm="calibration"
+              style={{ marginTop: 10, paddingTop: 8, borderTop: '1px solid rgba(255,255,255,0.08)' }}
+            >
+              <div className="ad-sec-t">🧪 Калибровка (один замер → workMax)</div>
+              <AdGrid cols="3">
+                <AdField label="Тест">
+                  <select
+                    aria-label="Тест калибровки"
+                    value={calEx}
+                    onChange={(e) => {
+                      const v = e.target.value as ArmCalibrationExercise;
+                      setCalEx(v);
+                      // RT/боковое — сингл по протоколу; кисть — 5–8 повторов.
+                      if (v === 'rolling_thunder' || v === 'side_press') setCalReps('1');
+                      else if (v === 'wrist_curl') setCalReps('6');
+                    }}
+                  >
+                    <option value="wrist_curl">Сгибание кисти 5–8</option>
+                    <option value="pronation_hold">Пронация — холд</option>
+                    <option value="cup_hold">Cup — холд</option>
+                    <option value="rolling_thunder">Rolling Thunder</option>
+                    <option value="side_press">Боковое</option>
+                    <option value="coc">Эспандер CoC</option>
+                  </select>
+                </AdField>
+                {calEx === 'coc' ? (
+                  <AdField label="Уровень CoC (0…4)">
+                    <input
+                      aria-label="Уровень CoC"
+                      value={calCoc}
+                      onChange={(e) => setCalCoc(e.target.value)}
+                      inputMode="decimal"
+                    />
+                  </AdField>
+                ) : (
+                  <AdField label="Вес, кг">
+                    <input
+                      aria-label="Вес калибровки"
+                      value={calW}
+                      onChange={(e) => setCalW(e.target.value)}
+                      inputMode="decimal"
+                      placeholder="—"
+                    />
+                  </AdField>
+                )}
+                {calEx === 'pronation_hold' || calEx === 'cup_hold' ? (
+                  <AdField label="Холд, с">
+                    <input
+                      aria-label="Холд калибровки"
+                      value={calHold}
+                      onChange={(e) => setCalHold(e.target.value)}
+                      inputMode="decimal"
+                    />
+                  </AdField>
+                ) : calEx === 'coc' ? (
+                  <AdField label="Заметка">
+                    <span className="ad-muted">оценка по ступени</span>
+                  </AdField>
+                ) : (
+                  <>
+                    <AdField label="Повторы">
+                      <input
+                        aria-label="Повторы калибровки"
+                        value={calReps}
+                        onChange={(e) => setCalReps(e.target.value)}
+                        inputMode="numeric"
+                      />
+                    </AdField>
+                    <AdField label="RIR">
+                      <input
+                        aria-label="RIR калибровки"
+                        value={calRir}
+                        onChange={(e) => setCalRir(e.target.value)}
+                        inputMode="numeric"
+                      />
+                    </AdField>
+                  </>
+                )}
+              </AdGrid>
+              <AdBtn
+                variant="ghost"
+                block
+                data-arm="calibration-apply"
+                onClick={() => {
+                  const entry: any = { exercise: calEx };
+                  const w = parseFloat(calW);
+                  if (Number.isFinite(w) && w > 0) entry.weightKg = w;
+                  if (calEx === 'coc') {
+                    // Без клампа: движок отклонит уровень вне 0…4 и покажет «не распознано».
+                    const lvl = parseFloat(calCoc);
+                    entry.cocLevel = Number.isFinite(lvl) ? lvl : 0;
+                  } else if (calEx === 'pronation_hold' || calEx === 'cup_hold') {
+                    entry.holdSec = parseFloat(calHold) || 0;
+                  } else {
+                    // Пустые повторы ≠ 1: для сгибания кисти максимум не из чего считать.
+                    const reps = parseInt(calReps, 10);
+                    if (Number.isFinite(reps)) entry.reps = reps;
+                    entry.rir = parseFloat(calRir) || 0;
+                  }
+                  const res = calibrateArmWorkMax([entry], {
+                    bodyWeightKg: parseFloat(proBw) || profileSnapshot.bodyWeightKg,
+                  });
+                  const patch = Object.entries(res.workMaxPatch);
+                  if (!patch.length) {
+                    flash('⚠ Калибровка: нужны вес и повторы/холд — иначе максимум не из чего считать');
+                    return;
+                  }
+                  setWorkMaxEdit((prev) => {
+                    const next = { ...prev };
+                    // Не понижаем уже заданный максимум прокси-замером (cup-холд vs сгибание).
+                    for (const [k, v] of patch) next[k] = String(Math.max(Number(prev[k]) || 0, v));
+                    return next;
+                  });
+                  flash(
+                    `🧪 Калибровка (${res.confidence}): ${patch.map(([k, v]) => `${ARM_MUSCLE_RU[k] || k} ${v} кг`).join(', ')}`,
+                  );
+                }}
+              >
+                🧪 Рассчитать workMax
+              </AdBtn>
+              <AdSwitch
+                checked={calPending}
+                onChange={setCalPending}
+                label="Неделя 1 — калибровочная (тестовый блок, workMax пока нет)"
+              />
+              <div className="ad-row" style={{ display: 'flex', gap: 8, alignItems: 'end', marginTop: 6 }}>
+                <AdField label="Тестовая неделя каждые N нед (0 = выкл)">
+                  <input
+                    aria-label="Тестовая неделя каждые N недель"
+                    value={testEvery}
+                    onChange={(e) => setTestEvery(e.target.value)}
+                    inputMode="numeric"
+                    style={{ width: 90 }}
+                  />
+                </AdField>
+              </div>
+            </div>
           </AdSec>
 
           <AdSec

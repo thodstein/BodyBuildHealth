@@ -27,6 +27,16 @@ function openSec(re: RegExp) {
 const isoInWeeks = (n: number) => new Date(Date.now() + n * 7 * 86400000).toISOString().slice(0, 10);
 
 describe('Arm PRO-PLAN UI', () => {
+  it('калибровка: замер 40 кг × 6 @RIR 2 заполняет workMax кисти (50.5)', () => {
+    render(<ArmAutoConstructor />);
+    fireEvent.click(screen.getByRole('button', { name: '2 Атлет' }));
+    openSec(/Рабочие максимумы/);
+    fireEvent.change(screen.getByLabelText('Вес калибровки'), { target: { value: '40' } });
+    fireEvent.change(screen.getByLabelText('Повторы калибровки'), { target: { value: '6' } });
+    fireEvent.change(screen.getByLabelText('RIR калибровки'), { target: { value: '2' } });
+    fireEvent.click(screen.getByRole('button', { name: /Рассчитать workMax/ }));
+    expect((screen.getByLabelText(/Кисть \(кг\)/) as HTMLInputElement).value).toBe('50.5');
+  });
   it('секция «Периодизация и старты»: стили прогрессии выбираются', () => {
     render(<ArmAutoConstructor />);
     openPlanSec();

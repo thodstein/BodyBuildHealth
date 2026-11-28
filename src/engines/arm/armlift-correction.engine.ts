@@ -520,7 +520,10 @@ export function buildArmliftSpecBlock(
     const targetSets: Record<string, number> = {};
     const dayMap: Record<string, string> = {};
     for (const c of top) {
-      targetSets[c.exId] = Math.max(1, Math.round(c.sets * mult[k]));
+      // Аудит 2026-11 было→стало: сетка перезаписывалась по exId, и в CoC-лестнице
+      // work + overcrush (оба coc_no2) второй вариант затирал первый (~3 сета терялось).
+      // targetSets — целевое число сетов упражнения за неделю, варианты суммируются.
+      targetSets[c.exId] = (targetSets[c.exId] || 0) + Math.max(1, Math.round(c.sets * mult[k]));
       dayMap[c.exId] = c.dayTag;
     }
     const last = k === n - 1;

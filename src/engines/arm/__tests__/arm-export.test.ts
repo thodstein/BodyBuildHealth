@@ -12,8 +12,15 @@ import {
 
 describe('arm-export', () => {
   const plan: any = (() => {
-    let p: any = buildArmPlan({ discipline:'armwrestling', patternId:'arm_4_upper_lower', level:'intermediate', goal:'strength', technique:'balanced', weeks:4 });
-    p = finalizeArmPlan(p,{level:'intermediate'});
+    let p: any = buildArmPlan({
+      discipline: 'armwrestling',
+      patternId: 'arm_4_upper_lower',
+      level: 'intermediate',
+      goal: 'strength',
+      technique: 'balanced',
+      weeks: 4,
+    });
+    p = finalizeArmPlan(p, { level: 'intermediate' });
     return p;
   })();
   it('print html contains plan name and weeks', () => {
@@ -36,19 +43,39 @@ describe('arm-export', () => {
     const base: any = plan.weeks[0].sessions[0];
     const p: any = {
       ...plan,
-      weeks: [{
-        ...plan.weeks[0],
-        sessions: [
-          { ...base, day: 7, sessionTag: 'A', exercises: [] },
-          { ...base, day: 8, sessionTag: 'LegsCore', exercises: [] },
-        ],
-      }],
+      weeks: [
+        {
+          ...plan.weeks[0],
+          sessions: [
+            { ...base, day: 7, sessionTag: 'A', exercises: [] },
+            { ...base, day: 8, sessionTag: 'LegsCore', exercises: [] },
+          ],
+        },
+      ],
     };
     const ics = buildArmIcs(p, '2026-09-01');
     const d7 = ics.match(/UID:arm-1-7@bbhealth\r\nDTSTART:(\d{8})T/);
     const d8 = ics.match(/UID:arm-1-8@bbhealth\r\nDTSTART:(\d{8})T/);
     expect(d7?.[1]).toBeTruthy();
     expect(d8?.[1]).toBe(d7?.[1]); // clamp 1..7, а не восьмой день
+  });
+  it('ICS: Test-сессия в том же дне не перетирает рабочую (UID с тегом)', () => {
+    const base: any = plan.weeks[0].sessions[0];
+    const p: any = {
+      ...plan,
+      weeks: [
+        {
+          ...plan.weeks[0],
+          sessions: [
+            { ...base, day: 7, sessionTag: 'A', exercises: [] },
+            { ...base, day: 7, sessionTag: 'Test', exercises: [] },
+          ],
+        },
+      ],
+    };
+    const ics = buildArmIcs(p, '2026-09-01');
+    expect(ics).toContain('UID:arm-1-7@bbhealth');
+    expect(ics).toContain('UID:arm-1-7-Test@bbhealth');
   });
   it('ics escaping', () => {
     const ics = buildArmIcs(plan);

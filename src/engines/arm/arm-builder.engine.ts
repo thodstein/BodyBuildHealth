@@ -64,6 +64,8 @@ import {
 import { legsAnchorBlock, weeksUntilStart, planWeightCut } from './arm-competition-prep.engine';
 import { armFactFeedback, factRateFor, armPerMuscleLoadAlerts } from './arm-plan-feedback.engine';
 import { armCheckinTrend } from './arm-weekly-checkin.engine';
+import { calibrateArmWorkMax } from './arm-calibration.engine';
+import { injectArmTestWeek } from './arm-test-week.engine';
 
 function distributeArmPhases(totalWeeks: number, goal: string, deloadEvery = 4): Record<number, string> {
   const map: Record<number, string> = {};
@@ -577,6 +579,27 @@ export function buildArmPlan(input: ArmBuilderInput): ArmPlan {
   }
   // Бенчи → workMax: явный workMax пользователя приоритетнее
   const mergedWorkMax: Record<string, number> = { ...(pro.workMaxPatch || {}), ...(input.workMax || {}) };
+  // Аудит 2026-11 (P0-1): калибровка из теста — только там, где пользователь не задал
+  // максимум явно. Значения оценочные/замеренные, confidence честно едет в rationale.
+  let calibrationLines: string[] = [];
+  if (Array.isArray(input.calibration) && input.calibration.length) {
+    try {
+      const cal = calibrateArmWorkMax(input.calibration);
+      for (const [k, v] of Object.entries(cal.workMaxPatch)) {
+        if (!(Number(mergedWorkMax[k]) > 0)) mergedWorkMax[k] = v;
+      }
+      calibrationLines = [
+        `🧪 Калибровка (${cal.confidence}): ${
+          Object.entries(cal.workMaxPatch)
+            .map(([k, v]) => `${k}=${v}`)
+            .join(', ') || 'нет замеров'
+        }.`,
+        ...cal.notes,
+      ];
+    } catch {
+      markDegraded('калибровка недоступна — веса без патча');
+    }
+  }
 
   // TOP T1/T2a/T7a: матчап + RFD + L/R — всё gated на новых опциональных полях (старые входы дают factor 1)
   let matchupPlan: ReturnType<typeof profileOpponent> | null = null;
@@ -1118,7 +1141,10 @@ export function buildArmPlan(input: ArmBuilderInput): ArmPlan {
   }
   const tableRatio = input.tableTimeRatio ?? (discipline === 'armlifting' ? 0.2 : 0.55);
 
-  const planWeeks: ArmWeek[] = [];
+  let planWeeks: ArmWeek[] = [];
+  // Аудит 2026-11: база абсолютного шага для лёгких весов (<20 кг) — вес мышцы в прошлой неделе.
+  const lastWeightByMuscle: Record<string, number> = {};
+  const lastWeightWeek: Record<string, number> = {};
   const usedIdsGlobal = new Set<string>();
   const angleHistory: Record<string, ArmWorkingAngle[]> = {};
   let larrattWeeks = 0; // PRO-5 P4: недель с применёнными синглами
@@ -1424,7 +1450,31 @@ export function buildArmPlan(input: ArmBuilderInput): ArmPlan {
           const wgtBase = hasExternalLoad(loadMode)
             ? weightForMuscle(mus, effectiveWorkMax, pct) * injuryWeightFactor
             : 0;
-          const wgt = weekLoadMult === 1 || wgtBase === 0 ? wgtBase : Math.round(wgtBase * weekLoadMult * 2) / 2;
+          const wgtRaw = weekLoadMult === 1 || wgtBase === 0 ? wgtBase : wgtBase * weekLoadMult;
+          let wgt = Math.round(wgtRaw * 2) / 2;
+          // Аудит 2026-11 (P1-6): 0.5%/нед на 5 кг = 0.025 кг — округление до 0.5 кг
+          // стирало прогрессию. Для лёгких ТЯЖЁЛЫХ весов (<20 кг) держим минимум +0.5 кг/нед,
+          // но только если недельная цель не ниже прошлой (техника/памп/волна не выравниваются).
+          if (
+            wgt > 0 &&
+            wgt < 20 &&
+            effCh === 'тяж' &&
+            effectiveCyclePct > 0 &&
+            !isDeload &&
+            !isPeaking &&
+            !peaksRuntime.taperWeeks.includes(w) &&
+            (lastWeightWeek[mus] ?? 0) < w
+          ) {
+            const prevW = lastWeightByMuscle[mus] || 0;
+            const maxKg = weightForMuscle(mus, effectiveWorkMax, 1);
+            if (prevW > 0 && wgtRaw >= prevW - 0.001 && wgt <= prevW && prevW + 0.5 <= maxKg) wgt = prevW + 0.5;
+          }
+          // База шага — ПЕРВЫЙ тяжёлый вес мышцы в неделе (техника/памп её не сдвигают;
+          // второй сеанс той же недели не толкает ещё +0.5).
+          if (wgt > 0 && effCh === 'тяж' && (lastWeightWeek[mus] ?? 0) < w) {
+            lastWeightByMuscle[mus] = wgt;
+            lastWeightWeek[mus] = w;
+          }
           workSets.push({
             reps: repVal,
             rir,
@@ -1693,6 +1743,23 @@ export function buildArmPlan(input: ArmBuilderInput): ArmPlan {
     });
   }
 
+  // Аудит 2026-11 (P0-1): калибровочная неделя 1 — тестовый блок, пока workMax нет.
+  if ((input as any).calibrationPending === true && planWeeks.length > 0) {
+    try {
+      const inj = injectArmTestWeek(
+        { pattern, weeks: planWeeks, rotationMuscleVolume: {}, rationale: [], level, discipline, mrvByMuscle } as any,
+        { targets: [1], level },
+      );
+      planWeeks = inj.plan.weeks;
+      for (const line of inj.notes) calibrationLines.push(line);
+      if (inj.applied > 0) {
+        calibrationLines.push('🧪 Калибровочная неделя 1: тестовый блок вставлен — введите факт и пересоберите план.');
+      }
+    } catch {
+      markDegraded('калибровочная неделя недоступна');
+    }
+  }
+
   // TOP wave-4: contestSim перестраивает последнюю неделю в генеральную репетицию (до подсчёта объёма)
   let simRationale: string[] = [];
   if ((input as any).contestSim === true && planWeeks.length >= 2) {
@@ -1912,6 +1979,7 @@ export function buildArmPlan(input: ArmBuilderInput): ArmPlan {
   }
   // PRO A–J: строки оркестратора (аддитивно)
   for (const line of pro.rationale) rationale.push(line);
+  for (const line of calibrationLines) rationale.push(line);
   for (const line of selectionWarnings) rationale.push(line);
   // TOP T1/T2a/T7a: матчап + RFD + L/R (только при заданных входах)
   if (matchupPlan) rationale.push(`Матчап: ${matchupPlan.note}`);

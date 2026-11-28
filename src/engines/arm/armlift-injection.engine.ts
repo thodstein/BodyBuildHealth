@@ -3,11 +3,13 @@
  * Только армлифтинг-домен: упражнения exercise-catalog-arm по exId, сессии SupportGrip /
  * PinchGrip / CrushGrip / GripHeavy. Точек стола (12 ArmWeakPoint), ARM_CORRECTIONS,
  * injectArmCorrections — не касается: хабы раздельные.
- * Правила: per-day dedup (exId@sessionTag), бюджет недели, кап сессии 8, скип делода,
+ * Правила: per-day dedup (exId@sessionTag), бюджет недели, кап сессии — канон
+ * sessionLimitsForArm (armlifting: 5 natural / 6 enhanced), скип делода,
  * вес из workMax (grip_support/grip_pinch), холды для статики, rationale-строка.
  * Чистые функции (план клонируется).
  */
 import { getArmExercises } from '../../core/exercise-catalog-arm';
+import { sessionLimitsForArm, perExerciseCap } from './arm-volume.engine';
 import type { ArmliftCorrection } from './armlift-correction.engine';
 
 export interface ArmliftInjectionItem {
@@ -78,7 +80,11 @@ const MUSCLE_BY_SG: Record<string, string> = {
 };
 
 function catalogById(exId: string): any {
-  try { return getArmExercises().find((e: any) => e.id === exId); } catch { return undefined; }
+  try {
+    return getArmExercises().find((e: any) => e.id === exId);
+  } catch {
+    return undefined;
+  }
 }
 
 function findSession(week: any, item: ArmliftInjectionItem, cat: any): any {
@@ -99,27 +105,44 @@ function findSession(week: any, item: ArmliftInjectionItem, cat: any): any {
 function weightFor(cat: any, workMax: Record<string, number>, intensityPct: number): number {
   const sg = String(cat?.substitutionGroup || '');
   const key = sg === 'grip_pinch' ? 'grip_pinch' : sg === 'grip_crush' ? 'grip_crush' : 'grip_support';
-  const base = Number(workMax[key]) > 0 ? Number(workMax[key])
-    : Number(workMax.grip_support) > 0 ? Number(workMax.grip_support)
-      : sg === 'grip_pinch' ? 20 : 60;
+  const base =
+    Number(workMax[key]) > 0
+      ? Number(workMax[key])
+      : Number(workMax.grip_support) > 0
+        ? Number(workMax.grip_support)
+        : sg === 'grip_pinch'
+          ? 20
+          : 60;
   return Math.round(base * intensityPct * 2) / 2;
 }
 
-export function injectArmliftCorrections(plan: any, items: ArmliftInjectionItem[], opts: ArmliftInjectionOpts = {}): ArmliftInjectionResult {
+export function injectArmliftCorrections(
+  plan: any,
+  items: ArmliftInjectionItem[],
+  opts: ArmliftInjectionOpts = {},
+): ArmliftInjectionResult {
   const copy: any = JSON.parse(JSON.stringify(plan || {}));
   const notes: string[] = [];
-  let injected = 0, skippedBudget = 0, skippedDup = 0, skippedDeload = 0;
+  let injected = 0,
+    skippedBudget = 0,
+    skippedDup = 0,
+    skippedDeload = 0;
   const list = (Array.isArray(items) ? items : []).filter((t) => t && typeof t.exId === 'string').slice(0, 3);
   if (!list.length || !Array.isArray(copy.weeks)) {
     return { plan: copy, injected, skippedBudget, skippedDup, skippedDeload, notes };
   }
   const level = String(opts.level || copy.level || 'intermediate');
+  // Аудит 2026-11: доза beginner берётся с уровня ПЛАНА (copy.level), а не только opts.level —
+  // иначе beginner-план без opts.level получал полные сеты. Тот же уровень идёт в кап сессии.
+  const planLevel = String((copy as any).level || opts.level || 'intermediate');
+  const lvl = planLevel.toLowerCase();
   const budget = opts.budget ?? BUDGET[level] ?? 85;
   const workMax: Record<string, number> = opts.workMax ?? copy.workMax ?? copy.inputSnapshot?.workMax ?? {};
   const allIdx = copy.weeks.map((_: any, i: number) => i);
-  const weekIdxs = Array.isArray(opts.weekIdxs) && opts.weekIdxs.length
-    ? opts.weekIdxs.filter((i) => i >= 0 && i < allIdx.length)
-    : [0];
+  const weekIdxs =
+    Array.isArray(opts.weekIdxs) && opts.weekIdxs.length
+      ? opts.weekIdxs.filter((i) => i >= 0 && i < allIdx.length)
+      : [0];
   for (const wi of weekIdxs) {
     const week = copy.weeks[wi];
     if (!week || (week as any).deload) {
@@ -128,40 +151,65 @@ export function injectArmliftCorrections(plan: any, items: ArmliftInjectionItem[
       continue;
     }
     const seen = new Set<string>();
-    for (const sess of week.sessions) for (const ex of sess.exercises || []) {
-      if (ex?.exerciseId) seen.add(`${ex.exerciseId}@${sess.sessionTag}`);
-    }
+    for (const sess of week.sessions)
+      for (const ex of sess.exercises || []) {
+        if (ex?.exerciseId) seen.add(`${ex.exerciseId}@${sess.sessionTag}`);
+      }
     for (const t of list) {
       const cat = catalogById(t.exId);
-      if (!cat) { notes.push(`⚠ ${t.exId} — нет в каталоге`); continue; }
+      if (!cat) {
+        notes.push(`⚠ ${t.exId} — нет в каталоге`);
+        continue;
+      }
       const target = findSession(week, t, cat);
-      if (!target) { notes.push(`⚠ ${t.exId} — нет сессии (нед ${wi + 1})`); continue; }
+      if (!target) {
+        notes.push(`⚠ ${t.exId} — нет сессии (нед ${wi + 1})`);
+        continue;
+      }
       const dk = `${t.exId}@${target.sessionTag}`;
       if (seen.has(dk) || (target.exercises || []).some((e: any) => e.exerciseId === t.exId)) {
-        skippedDup++; notes.push(`⊘ ${t.exId} уже есть в ${target.sessionTag} (нед ${wi + 1})`); continue;
+        skippedDup++;
+        notes.push(`⊘ ${t.exId} уже есть в ${target.sessionTag} (нед ${wi + 1})`);
+        continue;
       }
-      const rawSets = Math.max(1, Math.min(6, Math.round(Number(t.sets) || 3)));
+      const rawSets = Math.max(1, Math.min(12, Math.round(Number(t.sets) || 3)));
       // D12 E5: новичку −1 сет (минимум 1) — сухожилия адаптируются 8–12 нед.
-      const lvl = String(opts.level || '').toLowerCase();
       const sets = lvl === 'beginner' ? Math.max(1, rawSets - 1) : rawSets;
-      const weeklySets = week.sessions.reduce((a: number, s: any) =>
-        a + (s.exercises || []).reduce((aa: number, e: any) => aa + (e.sets || 0), 0), 0);
+      const weeklySets = week.sessions.reduce(
+        (a: number, s: any) => a + (s.exercises || []).reduce((aa: number, e: any) => aa + (e.sets || 0), 0),
+        0,
+      );
       if (weeklySets + sets > budget) {
-        skippedBudget++; notes.push(`⊘ ${t.exId} превысит budget ${budget} (нед ${wi + 1}: ${weeklySets}+${sets})`); continue;
+        skippedBudget++;
+        notes.push(`⊘ ${t.exId} превысит budget ${budget} (нед ${wi + 1}: ${weeklySets}+${sets})`);
+        continue;
       }
       let sess = target;
-      if ((sess.exercises || []).length >= 8) {
-        sess = (week.sessions || []).find((x: any) => (x.exercises || []).length < 8) || null;
-        if (!sess) { skippedBudget++; notes.push(`⊘ ${t.exId} — сессии переполнены (8, нед ${wi + 1})`); continue; }
+      // Аудит 2026-11 было→стало: переполнением считалось exercises.length >= 8 (хардкод),
+      // хотя канон armlifting — 5 упражнений (6 enhanced, sessionLimitsForArm). Инъекция
+      // клала 7–8 в сессию, которую финализатор/валидатор уже считал переполненной.
+      const sessionCap = (s: any): number =>
+        sessionLimitsForArm({ level: planLevel, discipline: 'armlifting', sessionTag: s?.sessionTag }).maxExercises;
+      if ((sess.exercises || []).length >= sessionCap(sess)) {
+        sess = (week.sessions || []).find((x: any) => (x.exercises || []).length < sessionCap(x)) || null;
+        if (!sess) {
+          skippedBudget++;
+          notes.push(`⊘ ${t.exId} — сессии переполнены (${sessionCap(target)}, нед ${wi + 1})`);
+          continue;
+        }
+        // Фолбэк-сессия могла уже содержать это упражнение — не дублируем (review 2026-11).
+        if ((sess.exercises || []).some((e: any) => e.exerciseId === t.exId)) {
+          skippedDup++;
+          notes.push(`⊘ ${t.exId} уже есть в ${sess.sessionTag} (фолбэк, нед ${wi + 1})`);
+          continue;
+        }
       }
       const intensityPct = Number.isFinite(Number(t.intensityPct)) ? Number(t.intensityPct) : 0.65;
       const weight = weightFor(cat, workMax, intensityPct);
       const isHold = /hold|pinch|hub|silver/i.test(t.exId) || cat?.movementPattern === 'grip_pinch';
       const rir = Number.isFinite(Number(t.rir)) ? Number(t.rir) : 2;
       // PRO-CORR K5: холд из коррекции (короче/длиннее 20с), кламп 3–60с.
-      const holdLen = isHold
-        ? Math.max(3, Math.min(60, Math.round(Number((t as any).holdSeconds) || 20)))
-        : 0;
+      const holdLen = isHold ? Math.max(3, Math.min(60, Math.round(Number((t as any).holdSeconds) || 20))) : 0;
       const sg = String(cat.substitutionGroup || '');
       const muscle = MUSCLE_BY_SG[sg] || 'grip_support';
       const repsAvg = isHold ? 1 : 5;
@@ -175,8 +223,11 @@ export function injectArmliftCorrections(plan: any, items: ArmliftInjectionItem[
         repsRange: isHold ? [1, 1] : [3, 8],
         rir,
         workSets: Array.from({ length: sets }, () => ({
-          reps: repsAvg, rir, weight,
-          restSeconds: 120, tempo: '2-1-1-0',
+          reps: repsAvg,
+          rir,
+          weight,
+          restSeconds: 120,
+          tempo: '2-1-1-0',
           ...(isHold ? { holdSeconds: holdLen } : {}),
         })),
         isTable: false,
@@ -187,12 +238,67 @@ export function injectArmliftCorrections(plan: any, items: ArmliftInjectionItem[
         exerciseId: t.exId,
         equipment: cat.equipment,
         comment: `Армлифтинг-коррекция @${Math.round(intensityPct * 100)}%${weakNote}`,
-        rationale: `Коррекция слабого звена хвата: ${cat.name} ${sets}×${isHold ? 'холд' : 'повт'} (${(cat as any).technique || ''})`.slice(0, 140),
+        rationale:
+          `Коррекция слабого звена хвата: ${cat.name} ${sets}×${isHold ? 'холд' : 'повт'} (${(cat as any).technique || ''})`.slice(
+            0,
+            140,
+          ),
       };
       sess.exercises.push(newEx);
       seen.add(`${t.exId}@${sess.sessionTag}`);
+      // Сумма work+overcrush может превысить per-exercise cap (CoC: 3+4=7 при капе 4).
+      // Делим на второй гриппер того же семейства, если есть место (review 2026-11).
+      try {
+        const capSets = perExerciseCap(String(muscle), planLevel);
+        if (sets > capSets) {
+          const alt = getArmExercises().find(
+            (e) =>
+              e.id !== t.exId &&
+              String(e.substitutionGroup || '') === String(cat.substitutionGroup || '') &&
+              !(sess.exercises || []).some((x: any) => x.exerciseId === e.id),
+          );
+          if (alt && (sess.exercises || []).length < sessionCap(sess)) {
+            const remainder = sets - capSets;
+            newEx.sets = capSets;
+            newEx.workSets = newEx.workSets.slice(0, capSets);
+            const altWeight = weightFor(alt as any, workMax, intensityPct);
+            sess.exercises.push({
+              ...newEx,
+              name: alt.name,
+              sets: remainder,
+              exerciseId: alt.id,
+              equipment: (alt as any).equipment,
+              workSets: Array.from({ length: remainder }, () => ({
+                reps: repsAvg,
+                rir,
+                weight: altWeight,
+                restSeconds: 120,
+                tempo: '2-1-1-0',
+                ...(isHold ? { holdSeconds: holdLen } : {}),
+              })),
+              comment: `${newEx.comment} · часть 2: ${remainder} сета`,
+              rationale: `Вторая часть коррекции: ${sets} сетов > капа ${capSets}, остаток на ${alt.name}`.slice(
+                0,
+                140,
+              ),
+            });
+            notes.push(`↔ ${t.exId}: ${sets} сетов > капа ${capSets} — ${remainder} на ${alt.name}`);
+          } else {
+            // Места под второй гриппер нет — честно урезаем до капа, а не оставляем 6 сетов.
+            newEx.sets = capSets;
+            newEx.workSets = newEx.workSets.slice(0, capSets);
+            notes.push(
+              `⚠ ${t.exId}: ${sets} сетов > капа ${capSets} — урезано до ${capSets} (нет места под второй гриппер)`,
+            );
+          }
+        }
+      } catch {
+        /* деление опционально */
+      }
       injected++;
-      notes.push(`✓ ${t.exId} → ${sess.sessionTag} ${sets}×${isHold ? 'холд' : 'повт'} @${weight}кг (нед ${wi + 1})`);
+      notes.push(
+        `✓ ${t.exId} → ${sess.sessionTag} ${newEx.sets}×${isHold ? 'холд' : 'повт'} @${weight}кг (нед ${wi + 1})`,
+      );
     }
   }
   if (injected > 0) {
@@ -236,7 +342,11 @@ export function correctionsToInjectionItems(
   const pct = Number.isFinite(Number(intensityPct)) ? Number(intensityPct) : 0.65;
   const r = Number.isFinite(Number(rir)) ? Number(rir) : 2;
   return (corrections || []).slice(0, n).map((c) => ({
-    exId: c.exId, sets: c.sets, dayTag: c.dayTag, intensityPct: pct, rir: r,
+    exId: c.exId,
+    sets: c.sets,
+    dayTag: c.dayTag,
+    intensityPct: pct,
+    rir: r,
     ...(Number.isFinite(Number(c.holdSeconds)) ? { holdSeconds: Number(c.holdSeconds) } : {}),
   }));
 }
@@ -263,20 +373,29 @@ export function applyArmliftSpecWave(
     for (let i = 0; i < (plan?.weeks || []).length && weeks.length < want; i++) {
       if (!(plan.weeks[i] as any)?.deload) weeks.push(i);
     }
-  } catch { /* noop */ }
+  } catch {
+    /* noop */
+  }
   if (!weeks.length || !baseItems.length) {
     return injectArmliftCorrections(plan, [], opts);
   }
   let acc: ArmliftInjectionResult = {
     plan: JSON.parse(JSON.stringify(plan || {})),
-    injected: 0, skippedBudget: 0, skippedDup: 0, skippedDeload: 0, notes: [],
+    injected: 0,
+    skippedBudget: 0,
+    skippedDup: 0,
+    skippedDeload: 0,
+    notes: [],
   };
   (spec || []).slice(0, want).forEach((sw, k) => {
     const wi = weeks[k];
     if (wi == null) return;
     const items = baseItems.map((b) => {
       const s = sw?.targetSets?.[b.exId];
-      return { ...b, sets: s != null && Number.isFinite(Number(s)) ? Math.max(1, Math.min(6, Math.round(Number(s)))) : b.sets };
+      return {
+        ...b,
+        sets: s != null && Number.isFinite(Number(s)) ? Math.max(1, Math.min(12, Math.round(Number(s)))) : b.sets,
+      };
     });
     const r = injectArmliftCorrections(acc.plan, items, { ...opts, weekIdxs: [wi] });
     acc = {

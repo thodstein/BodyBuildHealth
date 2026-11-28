@@ -42,7 +42,7 @@ export const TAG_MUSCLES_ARM: Record<string, string[]> = {
   CrushGrip: ['grip_crush', 'brachialis', 'wrist_flexors', 'brachioradialis'],
   HubPinch: ['grip_pinch', 'thumb', 'risers'],
   Hammer: ['brachialis', 'brachioradialis', 'biceps_long', 'wrist_flexors'],
-  Support: ['back_pressure', 'side_pressure', 'shoulder_stab', 'core_anchor'],
+  Support: ['back_pressure', 'side_pressure', 'shoulder_stab', 'core_anchor', 'biceps_long'],
   SidePress: ['side_pressure', 'shoulder_stab', 'core_anchor', 'wrist_flexors'],
   BackPress: ['back_pressure', 'brachialis', 'biceps_long', 'shoulder_stab'],
   FullArm: ['wrist_flexors', 'pronators', 'supinators', 'brachialis', 'risers', 'grip_support', 'back_pressure'],

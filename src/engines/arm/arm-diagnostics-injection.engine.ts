@@ -14,7 +14,7 @@ import type { ArmWeakCause } from './arm-weak-cause.engine';
 import { getArmLandmarks, tendonWeeklyLimit } from './arm-volume-landmarks.engine';
 import { getArmExercises } from '../../core/exercise-catalog-arm';
 import { armTendonSetForExercises, isArmTendonMuscle } from './arm-tendon-sets.engine';
-import { armWeeklyVolumeFor, sessionLimitsForArm } from './arm-volume.engine';
+import { aggregateArmVolume, armWeeklyVolumeFor, sessionLimitsForArm } from './arm-volume.engine';
 
 export interface ArmInjectionOpts {
   dayMap?: Record<string, string>; // weakPoint → sessionTag
@@ -347,11 +347,18 @@ export function injectArmCorrections(
         notes.push(`⊘ ${wp} → ${exId} tendon hard cap 26 (нед ${wi + 1}: сейчас ${tendonSets}+${addSets})`);
         continue;
       }
-      // session cap 8
+      // session cap: хаб-инъекция — осознанная добавка коррекции, её лимит 8,
+      // а не канон генерации 6/7 (иначе в заполненную сессию коррекция не попадает).
       if (targetSession.exercises.length >= 8) {
         let alt: any = null;
         for (const tag of (corr.dayTags || []).slice(1)) {
-          const s = week.sessions.find((x: any) => x.sessionTag === tag && x.exercises.length < 8);
+          const s = week.sessions.find(
+            (x: any) =>
+              x.sessionTag === tag &&
+              x.exercises.length < 8 &&
+              // Не кладём дубль упражнения в альтернативную сессию (review 2026-11).
+              !(x.exercises || []).some((e: any) => e.exerciseId === exId),
+          );
           if (s) {
             alt = s;
             break;
@@ -439,7 +446,7 @@ export function injectArmCorrections(
       // по времени — честно сообщаем, а не молча теряем сеты коррекции.
       try {
         const lim = sessionLimitsForArm({
-          level: String((copy as any).level || (opts as any).level || 'intermediate'),
+          level,
           discipline: (copy as any).discipline,
           sessionTag: finalSession.sessionTag,
         });
@@ -468,6 +475,22 @@ export function injectArmCorrections(
       const week = copy.weeks[wi];
       if (!week || (week as any).deload) continue;
       if (copy.weeklyVolume) copy.weeklyVolume[week.week] = armWeeklyVolumeFor([week as any]);
+      // Инъекция идёт ПОСЛЕ финализатора: indirect-баланс её уже не видел.
+      // Проверяем эффективный объём и честно сообщаем, если коррекция вывела мышцу за MRV.
+      try {
+        const agg = aggregateArmVolume([week as any]);
+        const over = Object.entries(agg)
+          .filter(([m, v]) => {
+            const mrv = Number((copy as any).mrvByMuscle?.[m] ?? 0);
+            return mrv > 0 && v.effectiveSets > mrv + 0.01;
+          })
+          .map(([m, v]) => `${m} ${Math.round(v.effectiveSets * 10) / 10}/${(copy as any).mrvByMuscle?.[m]}`);
+        if (over.length) {
+          notes.push(`⚠ нед ${week.week}: коррекция вывела за MRV — ${over.join(', ')} (эффективный объём/кап)`);
+        }
+      } catch {
+        /* проверка опциональна */
+      }
     }
   }
   return { plan: copy, injected, skippedBudget, skippedDup, skippedHumerus, notes };

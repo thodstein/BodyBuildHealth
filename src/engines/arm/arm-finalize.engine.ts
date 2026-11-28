@@ -2,7 +2,7 @@
  * arm-finalize.engine.ts — 12 пассов финализации арм-плана.
  * Зеркало bb-finalize.engine.ts.
  */
-import type { ArmPlan } from './arm-types';
+import type { ArmPlan, ArmExercise } from './arm-types';
 import { ARM_MUSCLES } from './arm-types';
 import { ruCount, RU_EXERCISES } from '../ru-plural';
 import { getArmLandmarks } from './arm-volume-landmarks.engine';
@@ -21,6 +21,15 @@ import { applyArmTradeoffToPlan } from './arm-tradeoff.engine';
 import { ARM_MUSCLE_SG } from './arm-day-types';
 import { ARM_EXERCISES } from '../../core/exercise-catalog-arm';
 import { armEquipmentAllows } from './arm-builder.engine';
+import { hookVolumeOf, isHookVolumeExercise } from './arm-pro5-safety.engine';
+import { injectArmTestWeek } from './arm-test-week.engine';
+
+/** Последняя НЕ-тестовая сессия недели: баланс-пассы не должны доукомплектовывать
+ *  калибровочную Test-сессию обычными упражнениями (review 2026-11). */
+function lastWorkSession(wk: { sessions: Array<{ sessionTag: string; exercises: unknown[] }> }): any {
+  const list = (wk.sessions || []).filter((s) => s.sessionTag !== 'Test');
+  return list[list.length - 1];
+}
 
 function ensurePronSupBalance(plan: ArmPlan): void {
   for (const wk of plan.weeks) {
@@ -33,7 +42,7 @@ function ensurePronSupBalance(plan: ArmPlan): void {
       }
     if (pron > 0 && sup === 0) {
       // добавить супинацию в последнюю сессию
-      const last = wk.sessions[wk.sessions.length - 1];
+      const last = lastWorkSession(wk);
       if (last && last.exercises.length < 6) {
         last.exercises.push({
           muscle: 'supinators' as any,
@@ -55,7 +64,7 @@ function ensurePronSupBalance(plan: ArmPlan): void {
         });
       }
     } else if (sup > 0 && pron === 0) {
-      const last = wk.sessions[wk.sessions.length - 1];
+      const last = lastWorkSession(wk);
       if (last && last.exercises.length < 6) {
         last.exercises.push({
           muscle: 'pronators' as any,
@@ -98,7 +107,7 @@ function ensureFlexExtBalance(plan: ArmPlan): void {
         if (ex.muscle === 'wrist_extensors') ext += ex.sets;
       }
     if (flex > 0 && ext === 0 && flex >= 6) {
-      const last = wk.sessions[wk.sessions.length - 1];
+      const last = lastWorkSession(wk);
       if (last) {
         last.exercises.push({
           muscle: 'wrist_extensors' as any,
@@ -318,6 +327,8 @@ function assignHoldsAndStatics(plan: ArmPlan): void {
     for (const sess of wk.sessions) {
       if (sess.character === 'техника' || sess.character === 'лёг') {
         for (const ex of sess.exercises) {
+          // Тестовые замеры не превращаем в холды/изометрию — иначе тест врёт.
+          if (ex.provenanceSource === 'arm-test-week') continue;
           if (['grip_support', 'grip_pinch', 'grip_crush'].includes(ex.muscle)) {
             ex.holdSeconds = 10;
             ex.workSets.forEach((ws) => (ws.holdSeconds = 10));
@@ -365,6 +376,9 @@ function injectTendonConditioning(plan: ArmPlan, level: string): void {
       const hasTendon = sess.exercises.some((e) => isArmTendonMuscle(e.muscle));
       if (!hasTendon) continue;
       for (const ex of sess.exercises) {
+        // Тестовые/калибровочные замеры не переписываем в tendon-режим:
+        // «5ПМ» должен остаться 5 повторами, иначе калибровка врёт (review 2026-11).
+        if (ex.provenanceSource === 'arm-test-week') continue;
         if (isArmTendonMuscle(ex.muscle)) {
           // GripStrength F1: 3с negative для tendon, high-rep 15-20, RPE 5-6
           if (ex.sets <= 4) {
@@ -409,7 +423,7 @@ function ensureGripCoverage(plan: ArmPlan): void {
         if (ex.muscle === 'grip_pinch') hasPinch = true;
       }
     if (!hasSupport) {
-      const last = wk.sessions[wk.sessions.length - 1];
+      const last = lastWorkSession(wk);
       // Лимит сессии: без проверки упражнение добавлялось в полную сессию и тут же
       // вылетало в enforceSessionLimits (работа впустую + мусор в rationale).
       const supportLimit = last
@@ -440,7 +454,7 @@ function ensureGripCoverage(plan: ArmPlan): void {
         });
     }
     if (!hasPinch) {
-      const last = wk.sessions[wk.sessions.length - 1];
+      const last = lastWorkSession(wk);
       if (last && last.exercises.length < 6)
         last.exercises.push({
           muscle: 'grip_pinch' as any,
@@ -479,7 +493,7 @@ function ensureCocCoverage(plan: ArmPlan): void {
         }
       }
     if (hasCrush) continue;
-    const last = wk.sessions[wk.sessions.length - 1];
+    const last = lastWorkSession(wk);
     if (last && last.exercises.length < 6) {
       last.exercises.push({
         muscle: 'grip_crush' as any,
@@ -521,7 +535,10 @@ function enforceInputSafety(plan: ArmPlan): void {
         // Билдер уже применил травму к 'catalog'; добавленное пассами
         // (finalizer/diagnostic/manual) масштабируем здесь ОДИН раз.
         // MEV-floor уже учёл травму в дозе и весе — повторно не трогаем.
-        const alreadyDosed = ex.provenance === 'catalog' || ex.provenanceSource === 'arm-finalize:mev-floor';
+        const alreadyDosed =
+          ex.provenance === 'catalog' ||
+          ex.provenanceSource === 'arm-finalize:mev-floor' ||
+          ex.provenanceSource === 'arm-finalize:frequency-split';
         const factor = alreadyDosed ? 1 : armInjuryVolumeFactor(injuries, ex.muscle);
         const weightFactor = alreadyDosed ? 1 : armInjuryWeightFactor(injuries, ex.muscle);
         const repsCap = armInjuryRepsCap(injuries, ex.muscle);
@@ -659,6 +676,8 @@ function ensureMevFloor(plan: ArmPlan, level: string): void {
           if (ex.muscle !== mus) continue;
           const cap = perExerciseCap(mus, level);
           if (ex.sets >= cap) continue;
+          // Тестовый/калибровочный замер не добиваем до MEV — он должен остаться замером.
+          if (ex.provenanceSource === 'arm-test-week') continue;
           const add = Math.min(need, cap - ex.sets, Math.max(0, limits.maxSets - sessionSets));
           if (add <= 0) continue;
           const last = ex.workSets[ex.workSets.length - 1];
@@ -680,7 +699,18 @@ function ensureMevFloor(plan: ArmPlan, level: string): void {
       if (need <= 0) continue;
       // 2) второе упражнение той же группы замены — в самую короткую сессию с местом
       const groups = ARM_MUSCLE_SG[mus] || [];
-      for (const sess of [...wk.sessions].sort((a, b) => a.exercises.length - b.exercises.length)) {
+      // Частота ≥2 (аудит 2026-11, P0-3): сначала пробуем сессию, где мышцы ещё НЕТ —
+      // это поднимает частоту стимула, а не кучу сетов в один день.
+      const hasMus = (s: any) => s.exercises.some((e: any) => e.muscle === mus);
+      for (const sess of [...wk.sessions]
+        // LegsCore/Test — не арм-сессии: не добиваем туда арм-изоляцию (review 2026-11).
+        .filter((s) => s.sessionTag !== 'LegsCore' && s.sessionTag !== 'Test')
+        .sort((a, b) => {
+          const ha = hasMus(a) ? 1 : 0;
+          const hb = hasMus(b) ? 1 : 0;
+          if (ha !== hb) return ha - hb;
+          return a.exercises.length - b.exercises.length;
+        })) {
         if (need <= 0) break;
         const limits = sessionLimitsForArm({ level, discipline: plan.discipline, sessionTag: sess.sessionTag });
         if (sess.exercises.length >= limits.maxExercises) continue;
@@ -745,6 +775,259 @@ function ensureMevFloor(plan: ArmPlan, level: string): void {
   }
 }
 
+/**
+ * Hook-кап как ИСПОЛНЯЕМЫЙ гейт (аудит 2026-11, P0-2).
+ *
+ * Мельконян 2026 (PMID 42741895, n=46): hook-техника ассоциирована с травмой
+ * локтя (OR 2.5, 95% CI 1.1–5.8, exploratory); Marotta 2026 — flexor-pronator
+ * перегруз. Раньше кап был только предупреждением: hook-план давал 18–24 сета
+ * при капе 12. Теперь excess срезается с supinators (драйвер hook) и, если есть
+ * место, переносится в pronation/rising того же сеанса (toproll-вектор).
+ */
+function enforceHookCap(plan: ArmPlan, level: string): void {
+  const snap: any = plan.inputSnapshot || {};
+  const technique = String(plan.technique || 'balanced');
+  const explicit = snap.hookCapSets != null;
+  if (technique !== 'hook' && !explicit) return;
+  const cap = Number(snap.hookCapSets) > 0 ? Number(snap.hookCapSets) : 12;
+  for (const wk of plan.weeks) {
+    if (wk.deload || wk.taper || wk.phase === 'deload' || wk.phase === 'peaking') continue;
+    const vol = hookVolumeOf(wk as any);
+    if (vol <= cap) continue;
+    let toCut = vol - cap;
+    let moved = 0;
+    const donors = wk.sessions
+      .flatMap((s) => s.exercises)
+      .filter((e) => isHookVolumeExercise(e as any) && e.sets > 1)
+      .sort((a, b) => {
+        const sa = a.muscle === 'supinators' ? 0 : 1;
+        const sb = b.muscle === 'supinators' ? 0 : 1;
+        if (sa !== sb) return sa - sb;
+        const ra = a.role === 'accessory' ? 0 : 1;
+        const rb = b.role === 'accessory' ? 0 : 1;
+        if (ra !== rb) return ra - rb;
+        return b.sets - a.sets;
+      });
+    // Недельные итоги для MRV-проверки переноса.
+    const weekTotals: Record<string, number> = {};
+    for (const s of wk.sessions)
+      for (const e of s.exercises) weekTotals[e.muscle] = (weekTotals[e.muscle] || 0) + e.sets;
+    for (const ex of donors) {
+      if (toCut <= 0) break;
+      const cut = Math.min(toCut, Math.max(0, ex.sets - 1));
+      if (cut <= 0) continue;
+      ex.sets -= cut;
+      ex.workSets = ex.workSets.slice(0, ex.sets);
+      weekTotals[ex.muscle] = Math.max(0, (weekTotals[ex.muscle] || 0) - cut);
+      toCut -= cut;
+      const sess = wk.sessions.find((s) => s.exercises.includes(ex));
+      let toAdd = cut;
+      if (sess) {
+        for (const t of sess.exercises) {
+          if (toAdd <= 0) break;
+          if (t.muscle !== 'pronators' && t.muscle !== 'risers') continue;
+          // Перенос не должен выводить целевую мышцу за MRV (review 2026-11).
+          const mrv = Number(plan.mrvByMuscle?.[t.muscle] ?? 99);
+          const mrvRoom = Number.isFinite(mrv) ? Math.max(0, mrv - (weekTotals[t.muscle] || 0)) : 99;
+          const room = Math.min(Math.max(0, perExerciseCap(t.muscle, level) - t.sets), mrvRoom);
+          const add = Math.min(toAdd, room);
+          if (add <= 0) continue;
+          const last = t.workSets[t.workSets.length - 1];
+          for (let i = 0; i < add; i++) {
+            t.workSets.push(
+              last
+                ? { ...last, rir: Math.min(5, (Number(last.rir) || 0) + 1) }
+                : { reps: t.repsRange[0], rir: 3, weight: 0 },
+            );
+          }
+          t.sets += add;
+          weekTotals[t.muscle] = (weekTotals[t.muscle] || 0) + add;
+          toAdd -= add;
+          moved += add;
+        }
+      }
+    }
+    const after = hookVolumeOf(wk as any);
+    const residual = after > cap ? ` остаток ${after} > ${cap} (упражнения нельзя резать ниже 1 сета)` : '';
+    plan.rationale.push(
+      moved > 0
+        ? `Н${wk.week}: hook-объём ${vol} > капа ${cap} — срезано и перенесено в pronation/rising ${moved} сетов (flexor-pronator, Marotta 2026).${residual}`
+        : `Н${wk.week}: hook-объём ${vol} > капа ${cap} — срезано ${vol - cap}, перенести некуда (нет pronation/rising в том же сеансе).${residual}`,
+    );
+  }
+}
+
+/**
+ * Indirect-aware баланс (roadmap P1-5).
+ *
+ * Проблема: target задавался по MRV мышцы, а косвенная нагрузка (pinch→thumb,
+ * hammer→wrist, cupping→risers) добавлялась СВЕРХУ — thumb 13.8 при MRV 9 на
+ * каждом плане. Теперь после сборки недели эффективный объём (direct+indirect)
+ * сверяется с MRV, и лишние ПРЯМЫЕ сеты срезаются (accessory первыми, не ниже 1).
+ */
+function rebalanceIndirectOverflow(plan: ArmPlan, level: string): void {
+  for (const wk of plan.weeks) {
+    if (wk.deload || wk.taper || wk.phase === 'deload' || wk.phase === 'peaking') continue;
+    const noted = new Set<string>();
+    const stuck = new Set<string>();
+    for (let guard = 0; guard < 40; guard++) {
+      const agg = aggregateArmVolume([wk as any]);
+      let target: { muscle: string; excess: number } | null = null;
+      for (const [m, v] of Object.entries(agg)) {
+        if (stuck.has(m)) continue;
+        const mrv = Number(plan.mrvByMuscle?.[m] ?? getArmLandmarks(level, m).mrv);
+        if (!Number.isFinite(mrv) || mrv <= 0) continue;
+        const excess = v.effectiveSets - mrv;
+        if (excess > 0.001 && v.directSets > 1 && (!target || excess > target.excess)) {
+          target = { muscle: m, excess };
+        }
+      }
+      if (!target) break;
+      const exs = wk.sessions
+        // LegsCore/Test — не арм-сессии: их объём не трогаем (review 2026-11).
+        .filter((s) => s.sessionTag !== 'LegsCore' && s.sessionTag !== 'Test')
+        .flatMap((s) => s.exercises)
+        .filter((e) => e.muscle === target!.muscle && e.sets > 1 && e.provenanceSource !== 'arm-test-week');
+      if (!exs.length) {
+        // Нечего резать — фиксируем и идём к следующей мышце, а не обрываем неделю.
+        stuck.add(target.muscle);
+        if (!noted.has(target.muscle)) {
+          noted.add(target.muscle);
+          plan.rationale.push(
+            `Н${wk.week}: ${target.muscle} — косвенная нагрузка выше MRV, прямые сеты уже минимальны (перебор модели, не плана).`,
+          );
+        }
+        continue;
+      }
+      exs.sort((a, b) => (a.role === 'accessory' ? 0 : 1) - (b.role === 'accessory' ? 0 : 1) || b.sets - a.sets);
+      const ex = exs[0];
+      ex.sets -= 1;
+      ex.workSets = ex.workSets.slice(0, ex.sets);
+      if (!noted.has(target.muscle)) {
+        noted.add(target.muscle);
+        plan.rationale.push(
+          `Н${wk.week}: ${target.muscle} — эффективный объём (прямой + косвенный) > MRV, срезан прямой сет (indirect-aware).`,
+        );
+      }
+    }
+  }
+}
+
+/**
+ * Перенос частоты (roadmap P0-3): если мышца стоит в ОДНОЙ сессии и держит 4+
+ * сета, часть переносится во вторую сессию — частота 2×/нед при том же объёме.
+ * Порог 4 сета / 40% — эвристика (практика тренеров), не измеренная величина.
+ */
+function splitMuscleFrequency(plan: ArmPlan, level: string): void {
+  for (const wk of plan.weeks) {
+    if (wk.deload || wk.taper || wk.phase === 'deload' || wk.phase === 'peaking') continue;
+    const noted = new Set<string>();
+    for (const mus of ARM_MUSCLES) {
+      const holding = wk.sessions.filter(
+        (s) => s.sessionTag !== 'LegsCore' && s.sessionTag !== 'Test' && s.exercises.some((e) => e.muscle === mus),
+      );
+      if (holding.length !== 1) continue;
+      const donorSess = holding[0];
+      const donor = donorSess.exercises
+        .filter((e) => e.muscle === mus && e.provenanceSource !== 'arm-test-week')
+        .sort((a, b) => b.sets - a.sets)[0];
+      if (!donor || donor.sets < 4) continue;
+      const cap = perExerciseCap(mus, level);
+      const weekly = donor.sets;
+      const move = Math.max(2, Math.min(cap - 1, Math.floor(weekly * 0.4), weekly - 2));
+      if (move < 2) continue;
+      // Целевая сессия: без этой мышцы, есть место по упражнениям и сетам, не LegsCore/Test.
+      const targetSess = wk.sessions.find((s) => {
+        if (s === donorSess || s.sessionTag === 'LegsCore' || s.sessionTag === 'Test') return false;
+        if (s.exercises.some((e) => e.muscle === mus)) return false;
+        const lim = sessionLimitsForArm({ level, discipline: plan.discipline, sessionTag: s.sessionTag });
+        if (s.exercises.length >= lim.maxExercises) return false;
+        const sets = s.exercises.reduce((a, e) => a + (Number(e.sets) || 0), 0);
+        return sets + move <= lim.maxSets;
+      });
+      if (!targetSess) continue;
+      const groups = ARM_MUSCLE_SG[mus] || [];
+      const usedHere = new Set(targetSess.exercises.map((e) => e.exerciseId).filter(Boolean) as string[]);
+      const pool = ARM_EXERCISES.filter((e) => {
+        if (usedHere.has(e.id)) return false;
+        const sg = String(e.substitutionGroup || '').toLowerCase();
+        const mp = String(e.movementPattern || '').toLowerCase();
+        if (!groups.some((g) => sg === g || sg.includes(g) || mp.includes(g))) return false;
+        if (
+          mobilityBlockReason(
+            e,
+            Array.isArray((plan.inputSnapshot as any)?.mobilityRestrictions)
+              ? (plan.inputSnapshot as any).mobilityRestrictions
+              : [],
+          )
+        )
+          return false;
+        if (
+          !armEquipmentAllows(
+            String(e.equipment || ''),
+            Array.isArray((plan.inputSnapshot as any)?.equipment) ? (plan.inputSnapshot as any).equipment : [],
+          )
+        )
+          return false;
+        return true;
+      });
+      const tpl = pool[wk.week % Math.max(1, pool.length)];
+      if (!tpl) continue;
+      // Снимаем сеты с донора и создаём второе упражнение в целевой сессии.
+      donor.sets -= move;
+      donor.workSets = donor.workSets.slice(0, donor.sets);
+      const baseSet = donor.workSets[0];
+      // Режим нагрузки — от шаблона, а не от донора: резина/свой вес не получают
+      // килограммы донора (иначе «≈5 кг · резина», review 2026-11).
+      const tplMp = String(tpl.movementPattern || '').toLowerCase();
+      const mode: ArmExercise['loadMode'] =
+        tpl.equipment === 'bodyweight'
+          ? 'bodyweight'
+          : tpl.equipment === 'band'
+            ? 'band'
+            : String(tpl.id || '')
+                  .toLowerCase()
+                  .includes('iso') || tplMp.includes('isometric')
+              ? 'isometric'
+              : 'tool';
+      const external = mode === 'tool' || mode === 'isometric';
+      const splitSets = Array.from({ length: move }, () =>
+        baseSet
+          ? { ...baseSet, weight: external ? baseSet.weight : 0 }
+          : { reps: donor.repsRange[0], rir: 3, weight: 0 },
+      );
+      // Тяжёлое упражнение с весом получает такую же разминочную рампу, как в билдере.
+      const splitTop = Math.max(0, ...splitSets.map((x) => Number(x.weight) || 0));
+      const splitWarmup = donor.character === 'тяж' && splitTop > 0 ? buildArmWarmupSets(splitTop) : [];
+      targetSess.exercises.push({
+        muscle: mus as any,
+        name: tpl.name,
+        role: 'accessory',
+        character: donor.character,
+        sets: move,
+        repsRange: donor.repsRange,
+        rir: Math.max(2, donor.rir),
+        workSets: splitSets,
+        ...(splitWarmup.length ? { warmupSets: splitWarmup } : {}),
+        movementPattern: tpl.movementPattern as any,
+        substitutionGroup: tpl.substitutionGroup,
+        exerciseId: tpl.id,
+        equipment: tpl.equipment,
+        loadMode: mode,
+        provenance: 'finalizer',
+        provenanceSource: 'arm-finalize:frequency-split',
+        comment: 'перенос частоты: вторая сессия мышцы (объём тот же)',
+      });
+      if (!noted.has(mus)) {
+        noted.add(mus);
+        plan.rationale.push(
+          `Н${wk.week}: ${mus} — частота 2×/нед (${move} сетов перенесены во вторую сессию, объём тот же).`,
+        );
+      }
+    }
+  }
+}
+
 export function finalizeArmPlan(plan: ArmPlan, opts?: { level?: string; tableRatio?: number }): ArmPlan {
   const level = opts?.level || plan.level || 'intermediate';
   // 26.10.2026: ratio брался хардкодом 0.55 — для армлифтинга билдер ставит 0.2,
@@ -780,6 +1063,24 @@ export function finalizeArmPlan(plan: ArmPlan, opts?: { level?: string; tableRat
   }
   capEnforcement(plan, level);
   ensureMevFloor(plan, level);
+  // Hook-кап — ПОСЛЕ floor: иначе добор MEV возвращал срезанные supinators/risers
+  // и объём снова уходил за кап (проверено дампом: 23 при капе 12).
+  enforceHookCap(plan, level);
+  // Тестовая неделя — ДО rebalance/frequency: её сеты должны попасть в effective-MRV,
+  // иначе гард видит только direct и пропускает перегруз (review 2026-11).
+  try {
+    const every = Number((plan.inputSnapshot as any)?.testWeekEvery);
+    if (Number.isFinite(every) && every > 0) {
+      const inj = injectArmTestWeek(plan, { every, level });
+      plan.weeks = inj.plan.weeks;
+      (plan as any)._testWeekApplied = true;
+      for (const line of inj.notes) plan.rationale.push(line);
+    }
+  } catch {
+    plan.rationale.push('⚠ Тестовая неделя недоступна — замеры не вставлены.');
+  }
+  rebalanceIndirectOverflow(plan, level);
+  splitMuscleFrequency(plan, level);
   enforceSessionLimits(plan, level);
   orderSessionExercises(plan);
   assignHoldsAndStatics(plan);
