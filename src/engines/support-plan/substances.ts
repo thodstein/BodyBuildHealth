@@ -239,9 +239,11 @@ function evidenceFor(id: string, cid: string): { level?: string; refs?: string[]
   // `support-dosing` канонизирует id сам, `evidence-dosage-db` — нет: для `udca`
   // запись лежит под `tudca`, поэтому второй попытки по канону не избежать.
   const level = getEvidenceLevel(id) || getEvidenceLevel(cid);
+  // Ссылка, приложенная прямо к записи дозы (DailyMed-лейбл) — самый точный источник.
+  const ownRefs = (DEFAULT_DOSAGES[cid] || DEFAULT_DOSAGES[id])?.refs || [];
   const doseDbRefs = getEvidenceDosage(id)?.references || getEvidenceDosage(cid)?.references || [];
   const protocolRefs = getProtocolRefs(id).length > 0 ? getProtocolRefs(id) : getProtocolRefs(cid);
-  const refs = doseDbRefs.length > 0 ? doseDbRefs : protocolRefs;
+  const refs = ownRefs.length > 0 ? ownRefs : doseDbRefs.length > 0 ? doseDbRefs : protocolRefs;
   if (!level && refs.length === 0) return undefined;
   return { level, refs: refs.length > 0 ? refs : undefined };
 }
@@ -269,7 +271,12 @@ function capPlanDoseAtUl(id: string, natural: number): number {
 }
 
 /** Препараты, чья доза в плане — формула приложения, а не назначение. */
-const FORMULA_DOSED_MEDS = new Set(['telmisartan', 'nebivolol', 'anastrozole', 'cabergoline']);
+const FORMULA_DOSED_MEDS = new Set([
+  'telmisartan', 'nebivolol', 'anastrozole', 'cabergoline',
+  // Рецептурные препараты из DEFAULT_DOSAGES: доза в плане — таблица/формула
+  // приложения, а не назначение. Подпись та же, чтобы «40 мг» не читалось рецептом.
+  'tadalafil', 'spironolactone', 'hydrochlorothiazide', 'indapamide',
+]);
 const FORMULA_DOSE_NOTE = 'Расчёт приложения, не назначение: дозу препарата определяет врач.';
 
 /**

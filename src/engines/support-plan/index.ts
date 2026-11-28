@@ -253,7 +253,15 @@ function runSupportUnifiedInner(state: CalculatorState): PlanResult {
     dietCoverageNotes,
     dietCoverage: dietCoverageRows,
     // Что отбросила обрезка плана — в карточку и шеринг, а не в тишину.
-    planTrim: tzRes.planTrim,
+    planTrim: tzRes.planTrim
+      ? {
+          ...tzRes.planTrim,
+          // Опции (генетика/учёт рациона) могут пометить или добавить позиции:
+          // показываем фактический список, а не срез до опций.
+          shown: substances.length,
+          candidates: Math.max(tzRes.planTrim.candidates, substances.length),
+        }
+      : undefined,
   };
 }
 

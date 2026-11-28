@@ -404,6 +404,26 @@ function sexRefs(
   }
 }
 
+/**
+ * Норма для строки отчёта (этап E7).
+ *
+ * Приоритет: границы бланка из дневника (`normSource: blank`, уже в единице
+ * записи) → каталог/фазовый коридор (`sexRefs`) → таблица группы (запасной
+ * вариант для строк в других единицах). Так отчёт не печатает «выше нормы»
+ * по каталогу там, где бланк дал другой интервал.
+ */
+export function reportRefsForMarker(
+  diaryMarker: { normSource?: 'blank' | 'catalog'; lln?: number; uln?: number } | null | undefined,
+  catalogRefs: { refLow?: number; refHigh?: number } | null | undefined,
+  fallback: { refLow?: number; refHigh?: number },
+): { refLow?: number; refHigh?: number } {
+  const blankNorm = diaryMarker?.normSource === 'blank';
+  return {
+    refLow: blankNorm ? diaryMarker?.lln : (catalogRefs?.refLow ?? fallback.refLow),
+    refHigh: blankNorm ? diaryMarker?.uln : (catalogRefs?.refHigh ?? fallback.refHigh),
+  };
+}
+
 function gatherLabs(dateFrom: string, dateTo: string, sex: ReportSex = 'male', cycle: CycleState | null = null): ReportSection {
   const diary = getLabDiary();
 
@@ -485,11 +505,16 @@ function gatherLabs(dateFrom: string, dateTo: string, sex: ReportSex = 'male', c
       // единице колонки; таблица группы — только запасной вариант для строк,
       // которые записаны в других единицах (TT нмоль/л, E2 пмоль/л).
       const refs = sexRefs(marker.code, sex, cycle, marker.marker, marker.unit);
+      // Этап E7: норма бланка (в дневнике помечена `normSource: blank`) главнее
+      // каталога и фазового коридора — она уже в единице записи. Иначе отчёт
+      // печатал «выше нормы» по каталогу там, где бланк дал другой интервал.
+      const picked = reportRefsForMarker(lastCurrent, refs, marker);
 
       const m: ReportMetric = {
         label: marker.name, unit: marker.unit, prev: prevVal, current: current ?? 'Нет данных',
         bound, prevBound,
-        refLow: refs?.refLow ?? marker.refLow, refHigh: refs?.refHigh ?? marker.refHigh,
+        refLow: picked.refLow,
+        refHigh: picked.refHigh,
         delta: compared.delta, deltaPct: compared.deltaPct, trend: compared.trend,
         sparkline: computeSparkline(hist, 'value', dateFrom, dateTo),
       };

@@ -73,15 +73,19 @@ export function findSupportDbPairs(ids: string[]): SupportDbPair[] {
     const bKeys = registryKeys(item.substanceB);
     const a = aKeys.find((k) => present.has(k));
     const b = bKeys.find((k) => present.has(k));
-    if (!a || !b || a === b) continue;
+    if (!a || !b) continue;
+    const aId = canonId(a.replace(/^PHARMA_/, ''));
+    const bId = canonId(b.replace(/^PHARMA_/, ''));
+    // Сравниваем канон-id, а не строки ключей: `X` и `PHARMA_X` — один препарат.
+    if (aId === bId) continue;
     const sorted = [a, b].sort();
     const key = sorted.join('|');
     const description = describe(item);
     const candidate: SupportDbPair = {
       a: sorted[0],
       b: sorted[1],
-      aId: canonId(sorted[0].replace(/^PHARMA_/, '')),
-      bId: canonId(sorted[1].replace(/^PHARMA_/, '')),
+      aId,
+      bId,
       type: item.type,
       severity: item.severity,
       description,

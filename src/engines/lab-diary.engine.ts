@@ -30,6 +30,13 @@ export interface LabDiaryMarker {
   lln?: number;
   uln?: number;
   /**
+   * Откуда норма: `blank` — `refLow/refHigh` из бланка/пресета (этап E7),
+   * `catalog` — `getLabNorm`/`markerNorms`. Отчёт и дневник обязаны знать
+   * источник: бланк главнее каталога, но норма каталога не должна выдаваться
+   * за бланк.
+   */
+  normSource?: 'blank' | 'catalog';
+  /**
    * Проход 142: знак границы бланка. Дневник получал только число, поэтому
    * «>1000» на графике и в карточке выглядел точным измерением.
    */
@@ -127,14 +134,42 @@ export function getLabDiaryStats(diary: LabDiaryEntry[]): LabDiaryStats {
 }
 
 /** Получить историю по одному маркеру */
-export function getMarkerHistory(diary: LabDiaryEntry[], code: string): { date: string; value: number; bound?: LabBound; inRange?: boolean; unit: string }[] {
-  const result: { date: string; value: number; bound?: LabBound; inRange?: boolean; unit: string }[] = [];
+export function getMarkerHistory(diary: LabDiaryEntry[], code: string): Array<{
+  date: string;
+  value: number;
+  bound?: LabBound;
+  inRange?: boolean;
+  unit: string;
+  /** Норма на эту дату — нужна отчёту, чтобы бланк был главнее каталога (E7). */
+  lln?: number;
+  uln?: number;
+  normSource?: 'blank' | 'catalog';
+}> {
+  const result: Array<{
+    date: string;
+    value: number;
+    bound?: LabBound;
+    inRange?: boolean;
+    unit: string;
+    lln?: number;
+    uln?: number;
+    normSource?: 'blank' | 'catalog';
+  }> = [];
   for (const day of diary) {
     const marker = day.markers.find(m => m.code === code);
     if (marker) {
       // Проход 142: точка графика — это значение вместе со знаком и вердиктом,
       // а не одно число: иначе «>1000» рисуется как 1000.
-      result.push({ date: day.date, value: marker.value, bound: marker.bound, inRange: marker.inRange, unit: marker.unit });
+      result.push({
+        date: day.date,
+        value: marker.value,
+        bound: marker.bound,
+        inRange: marker.inRange,
+        unit: marker.unit,
+        lln: marker.lln,
+        uln: marker.uln,
+        normSource: marker.normSource,
+      });
     }
   }
   return result;
@@ -191,16 +226,49 @@ export function getTopTestedMarkers(diary: LabDiaryEntry[], limit: number = 15):
 }
 
 /** Получить аномальные маркеры (вне нормы) за последние N дней */
-export function getRecentAbnormalMarkers(diary: LabDiaryEntry[], days: number = 90): { date: string; code: string; name: string; value: number; bound?: LabBound; unit: string; lln?: number; uln?: number }[] {
+export function getRecentAbnormalMarkers(
+  diary: LabDiaryEntry[],
+  days: number = 90,
+): Array<{
+  date: string;
+  code: string;
+  name: string;
+  value: number;
+  bound?: LabBound;
+  unit: string;
+  lln?: number;
+  uln?: number;
+  normSource?: 'blank' | 'catalog';
+}> {
   const cutoff = localIsoDateOffset(-days);
-  const result: { date: string; code: string; name: string; value: number; bound?: LabBound; unit: string; lln?: number; uln?: number }[] = [];
+  const result: Array<{
+    date: string;
+    code: string;
+    name: string;
+    value: number;
+    bound?: LabBound;
+    unit: string;
+    lln?: number;
+    uln?: number;
+    normSource?: 'blank' | 'catalog';
+  }> = [];
   for (const day of diary) {
     if (day.date < cutoff) continue;
     for (const m of day.markers) {
       // Проход 142: только доказанное отклонение. Обрезанное «>5» при верхней
       // границе 400 в аномалии не попадает — сторону граница не доказала.
       if (m.inRange === false) {
-        result.push({ date: day.date, code: m.code, name: m.name, value: m.value, bound: m.bound, unit: m.unit, lln: m.lln, uln: m.uln });
+        result.push({
+          date: day.date,
+          code: m.code,
+          name: m.name,
+          value: m.value,
+          bound: m.bound,
+          unit: m.unit,
+          lln: m.lln,
+          uln: m.uln,
+          normSource: m.normSource,
+        });
       }
     }
   }
@@ -222,7 +290,21 @@ export function getLabDiarySummary(diary: LabDiaryEntry[], days: number = 30): {
 }
 
 /** Импортировать результаты из IndexedDB LabPoint[] в дневник */
-export function importLabsToDiary(labs: { id: string; code: string; name: string; value: number; unit: string; date: string; bound?: LabBound }[], markerNorms: Record<string, { uln?: number; lln?: number }>): void {
+export function importLabsToDiary(
+  labs: Array<{
+    id: string;
+    code: string;
+    name: string;
+    value: number;
+    unit: string;
+    date: string;
+    bound?: LabBound;
+    /** Границы бланка в единице записи (этап E7). */
+    refLow?: number;
+    refHigh?: number;
+  }>,
+  markerNorms: Record<string, { uln?: number; lln?: number }>,
+): void {
   if (!labs || labs.length === 0) return;
   const before = JSON.stringify(getLabDiary());
 
@@ -235,12 +317,19 @@ export function importLabsToDiary(labs: { id: string; code: string; name: string
     }
     const day = byDate.get(lab.date)!;
     const norm = markerNorms[lab.code] || {};
+    // Этап E7: пара бланка главнее справочника, но только если это реальная
+    // пара чисел. Одна граница/перевёрнутый интервал не применяются.
+    const blankPair =
+      Number.isFinite(lab.refLow) && Number.isFinite(lab.refHigh) && (lab.refLow as number) < (lab.refHigh as number);
+    const lln = blankPair ? lab.refLow : norm.lln;
+    const uln = blankPair ? lab.refHigh : norm.uln;
     // Проход 142: вердикт «в норме» — только если он доказан (см. diaryRangeVerdict).
-    const inRange = diaryRangeVerdict(lab.value, norm.lln, norm.uln, lab.bound);
+    const inRange = diaryRangeVerdict(lab.value, lln, uln, lab.bound);
     const marker: LabDiaryMarker = {
       code: lab.code, name: lab.name || lab.code,
       value: lab.value, unit: lab.unit || '',
-      lln: norm.lln, uln: norm.uln, bound: lab.bound, inRange,
+      lln, uln, bound: lab.bound, inRange,
+      normSource: blankPair ? 'blank' : 'catalog',
     };
     // P0 fix: дедуп по коду на одну дату — последняя запись побеждает (иначе ×2 маркера и ×2 аномалии)
     const existingIdx = day.markers.findIndex(m => m.code === lab.code);
@@ -282,7 +371,17 @@ export function importLabsToDiary(labs: { id: string; code: string; name: string
  * `complete` пустой список ничего не значит — данные приходят асинхронно.
  */
 export function syncLabsToDiary(
-  labs: { id: string; code: string; name: string; value: number; unit: string; date: string; bound?: LabBound }[],
+  labs: Array<{
+    id: string;
+    code: string;
+    name: string;
+    value: number;
+    unit: string;
+    date: string;
+    bound?: LabBound;
+    refLow?: number;
+    refHigh?: number;
+  }>,
   sex?: 'male' | 'female',
   opts?: { complete?: boolean },
 ): void {

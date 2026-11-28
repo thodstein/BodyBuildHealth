@@ -7,7 +7,7 @@ import {
   getBlacklist, canonId, sameClassIds, calcAllRisks, buildTzInput, tzToScores,
   synergyScoreWithPlan, conflictScoreWithPlan, applyTitration, calcLabDeltas,
   generateSchedule, checkDepletionCascade, checkPlanUpperLimits, aggregateDailyLoad, ckdStagesFromEgfr,
-  blockFlagsForPlan,
+  blockFlagsForPlan, contraindicationFlagsForPlan,
   toSystemRisksFromTz, toSystemRisks, getContraindicationAlerts,
   generateSynergyRecommendations,
   SYS_META, TZ_AUTO_BLACKLIST,
@@ -851,6 +851,10 @@ export function calculateSupportTZ(state: CalculatorState): CalculatorResult {
       }
     }
 
+    const contraAlerts = checkContraindications(substances, healthConditionsMapped);
+    const contraFlags = contraindicationFlagsForPlan(contraAlerts, substances);
+    for (const [id, list] of Object.entries(contraFlags)) (safetyFlags[id] ||= []).push(...list);
+
     const result: CalculatorResult = {
       risk: { systems: [], overallRaw, overallAfterSupport, timestamp: new Date().toISOString() },
       schedule, selectedSubstances: substances,
@@ -861,7 +865,7 @@ export function calculateSupportTZ(state: CalculatorState): CalculatorResult {
       labDeltas, overallRiskBefore: overallRaw, overallRiskAfter: overallAfterSupport,
       contraindicationAlerts: [
         ...getContraindicationAlerts(state),
-        ...checkContraindications(substances, healthConditionsMapped).map(a => a.severity === 'absolute'
+        ...contraAlerts.map(a => a.severity === 'absolute'
           ? `⛔ ${a.substanceId}: ${a.message} — ${a.action}`
           : `⚠ ${a.substanceId}: ${a.message} — ${a.action}`),
         ...ddiAlertStrings,

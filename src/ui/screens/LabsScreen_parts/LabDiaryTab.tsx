@@ -377,6 +377,7 @@ export const LabDiaryTab: React.FC<{ labs: LabPoint[]; sex?: 'male' | 'female' }
                       </div>
                       <div style={{ fontSize:10, color:'#fff', marginTop:2 }}>
                         {m.lln !== undefined ? `норма: ${m.lln}` : ''}{m.lln !== undefined && m.uln !== undefined ? '-' : ''}{m.uln !== undefined ? `${m.uln}` : ''}
+                        {m.normSource === 'blank' ? ' (бланк)' : ''}
                       </div>
                     </div>
                   </div>

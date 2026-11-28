@@ -2945,6 +2945,11 @@ export type SupportPhase = 'course' | 'bridge' | 'pct' | 'fertility';
 export interface SubstanceDosage {
   mg: number;
   timing: string;
+  /**
+   * Ссылка на источник ИМЕННО этой дозы (лейбл/гайдлайн), если она проверена.
+   * Не всякая запись имеет источник: отсутствие — честный долг, а не «доказано».
+   */
+  refs?: string[];
 }
 
 export interface SupportLevel {
@@ -3104,7 +3109,7 @@ export const DEFAULT_DOSAGES: Record<string, SubstanceDosage> = {
   hcg: { mg: 500, timing: '2x/нед, схема 3/1 (МЕ)' }, l_carnitine: { mg: 2000, timing: 'натощак' },
   vitamin_e: { mg: 200, timing: 'с едой (мг α-токоферола)' }, selenium: { mg: 200, timing: 'с едой (мкг)' },
   vitamin_c: { mg: 1000, timing: 'натощак' }, probiotics: { mg: 20, timing: 'натощак (млрд КОЕ)' },
-  coq10: { mg: 200, timing: 'с едой' }, prebiotics: { mg: 5000, timing: 'с едой (мг)' },
+  coq10: { mg: 200, timing: 'с едой' }, prebiotics: { mg: 5000, timing: 'с едой (мг)', refs: ['Bonnema 2010, РКИ (PMID 20497775) — инулин 5 г/сут переносится'] },
   alpha_lipoic: { mg: 600, timing: 'натощак (R-форма)' },
   berberine: { mg: 500, timing: 'с едой, 2x/д' },
   collagen: { mg: 10000, timing: 'с едой (мг, гидролизат)' },
@@ -3137,24 +3142,24 @@ export const DEFAULT_DOSAGES: Record<string, SubstanceDosage> = {
   p5p: { mg: 25, timing: 'утром, с едой' },
   // ── Tier-system препараты (v4) ──
   niacin: { mg: 500, timing: 'на ночь (с едой, ↑ постепенно)' },
-  phosphatidylserine: { mg: 300, timing: 'с едой' },
-  glycine: { mg: 3000, timing: 'перед сном' },
-  theanine: { mg: 200, timing: 'вечер' },
-  quercetin: { mg: 500, timing: 'с едой' },
+  phosphatidylserine: { mg: 300, timing: 'с едой', refs: ['Bruton 2021, мета-анализ (PMID 33539192) — 200–300 мг/сут'] },
+  glycine: { mg: 3000, timing: 'перед сном', refs: ['Bannai 2012 (PMID 22529837) — 3 г перед сном'] },
+  theanine: { mg: 200, timing: 'вечер', refs: ['Hidese 2019, РКИ (PMID 31623400) — 200 мг/сут'] },
+  quercetin: { mg: 500, timing: 'с едой', refs: ['Vaez 2023, РКИ (PMID 36317442) — 500 мг/сут'] },
   garlic: { mg: 1200, timing: 'с едой (аллицин)' },
-  beetroot: { mg: 500, timing: 'с едой (нитраты→NO)' },
-  lecithin: { mg: 1200, timing: 'с едой' },
+  beetroot: { mg: 500, timing: 'с едой (нитраты→NO)', refs: ['Gonzaga 2025, РКИ (PMID 39853480) — 500 мг экстракта свеклы'] },
+  lecithin: { mg: 1200, timing: 'с едой', refs: ['Hirose 2018, РКИ (PMID 29310653) — 1200 мг/сут'] },
   b_complex: { mg: 1, timing: 'с едой (B6 25+B12 1000+Folate 400)' },
   iron_bisglycinate: { mg: 30, timing: 'с VitC, натощак' },
-  tadalafil: { mg: 5, timing: 'утро (PDE5i, простата)' },
+  tadalafil: { mg: 5, timing: 'утро (PDE5i, простата)', refs: ['DailyMed Tadalafil Tablets, setid 415bd983 — BPH и ED+BPH 5 мг 1×/сут'] },
   agmatine: { mg: 1000, timing: '2x/день (натощак)' },
   tmg: { mg: 1000, timing: 'с едой (ан-гидрат TMG)' },
   pycnogenol: { mg: 150, timing: 'с едой' },
   citrulline: { mg: 6000, timing: '2x/день (pre-workout)' },
-  bergamot: { mg: 500, timing: 'с едой 2x/д' },
-  astaxanthin: { mg: 4, timing: 'с жирной едой' },
+  bergamot: { mg: 500, timing: 'с едой 2x/д', refs: ['Bruno 2017 (PMID 28443024) — 500 мг/сут BPF (разовая доза)'] },
+  astaxanthin: { mg: 4, timing: 'с жирной едой', refs: ['Ito 2018, РКИ (PMID 29941810) — 4 мг/сут'] },
   dandelion: { mg: 500, timing: '2x/день (диуретик)' },
-  hesperidin: { mg: 500, timing: 'с едой (+diosmin 450)' },
+  hesperidin: { mg: 500, timing: 'с едой (+diosmin 450)', refs: ['Struckmann 1999, обзор (PMID 10474049) — MPFF 500 мг: 450 мг диосмина + 50 мг гесперидина'] },
   serrapeptase: { mg: 10, timing: '2x/день, натощак' },
   nattokinase: { mg: 100, timing: '2x/день, натощак' },
   bromelain: { mg: 500, timing: 'натощак (противовоспал.)' },
@@ -3163,11 +3168,11 @@ export const DEFAULT_DOSAGES: Record<string, SubstanceDosage> = {
   astragalus: { mg: 500, timing: 'с едой' },
   cordyceps: { mg: 1000, timing: 'с едой' },
   // ── v5 из протоколов ──
-  chromium: { mg: 200, timing: 'с едой (мкг)' },
+  chromium: { mg: 200, timing: 'с едой (мкг)', refs: ['Georgaki 2024, систематический обзор РКИ (PMID 39541030) — 50–1000 мкг/сут; 200 мкг в диапазоне'] },
   tamoxifen: { mg: 20, timing: 'утро' },
-  spironolactone: { mg: 25, timing: 'утро ⚠ через врача' },
-  hydrochlorothiazide: { mg: 25, timing: 'утро ⚠ через врача (12.5-25 мг)' },
-  indapamide: { mg: 2.5, timing: 'утро ⚠ через врача (1.5-2.5 мг)' },
+  spironolactone: { mg: 25, timing: 'утро ⚠ через врача', refs: ['DailyMed Spironolactone Tablets, setid eb314e91 — ХСН старт 25 мг 1×/сут; АГ 25–100 мг/сут'] },
+  hydrochlorothiazide: { mg: 25, timing: 'утро ⚠ через врача (12.5-25 мг)', refs: ['DailyMed Hydrochlorothiazide Tablets, setid f795db5e — АГ старт 25 мг 1×/сут'] },
+  indapamide: { mg: 2.5, timing: 'утро ⚠ через врача (1.5-2.5 мг)', refs: ['DailyMed Indapamide Tablets, setid 59cd3331 — АГ 1.25 мг → 2.5 мг 1×/сут'] },
   melatonin: { mg: 1, timing: 'перед сном (до 3 мг)' },
   calcium: { mg: 1000, timing: 'в 2 приёма с D3+K2 (мг)' },
   metformin: { mg: 500, timing: 'после еды ⚠ через врача' },

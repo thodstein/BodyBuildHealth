@@ -84,6 +84,7 @@ import { computeTierAdjustments, type TierAdjustmentResult, type TierAddSub, typ
 import { computeSynergy } from '../data/lab-synergy-engine';
 import { checkContraindications, type ContraAlert } from '../data/substance-contraindications';
 import { checkInteractions } from '../data/drug-interactions';
+import { stripDosePhrases } from './support-plan/tier-reason';
 
 // ════════════════════════════════════════════════════════════════════════════
 //  ТИПЫ РЕКОМЕНДАЦИИ
@@ -1859,7 +1860,8 @@ function buildRecommendation(ctx: MapperCtx): SupportRecommendation {
       category: 'pharma' as TzCategory,
       k: 0.55,
       q: 'B',
-      reason: `[TIER-${a.tier} ${a.marker}] ${a.reason}` + (a.dose ? ` (${a.dose})` : ''),
+      // Доза — только в карточке плана (этап E2): проза ступени объясняет «почему».
+      reason: `[TIER-${a.tier} ${a.marker}] ${stripDosePhrases(a.reason)}`,
       mechsCovered: [],
       priority: 1,
     });

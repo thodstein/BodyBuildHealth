@@ -196,6 +196,27 @@ export function planDosesInUlScale(planDoses: Record<string, number>): Record<st
  * @param appliedDoses — дозы-приёма после капа (в единице реестра, из `applyTitration`).
  */
 /**
+ * Противопоказания по конкретным веществам плана (E3).
+ *
+ * `checkContraindications` возвращает список для экрана; карточка вещества о нём
+ * не знала. Абсолютное — `⛔`, относительное — `⚠`; состав плана не меняется.
+ */
+export function contraindicationFlagsForPlan(
+  alerts: Array<{ substanceId: string; severity: string; message: string; action: string }>,
+  substances: string[],
+): Record<string, string[]> {
+  const flags: Record<string, string[]> = {};
+  const present = new Set(substances.map((s) => canonId(s)));
+  for (const a of alerts) {
+    const id = canonId(a.substanceId);
+    if (!present.has(id)) continue;
+    const mark = a.severity === 'absolute' ? '⛔' : '⚠';
+    (flags[id] ||= []).push(`${mark} ${a.message.replace(/^[⛔⚠]\s*/, '')} — ${a.action}`);
+  }
+  return flags;
+}
+
+/**
  * Замечания `block`-DDI по конкретным веществам плана (E3).
  *
  * `checkInteractions` возвращает пары, где один конец может быть классом

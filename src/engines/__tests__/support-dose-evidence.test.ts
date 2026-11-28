@@ -28,6 +28,11 @@ describe('доказательность дозы в карточке плана
     const unknown = byId('nonexistent_substance_xyz');
     expect(unknown.evidence).toBeUndefined();
   });
+
+  it('ссылка, приложенная к дозе (DailyMed), показывается в карточке', () => {
+    const tadalafil = byId('tadalafil');
+    expect((tadalafil.evidence?.refs || []).join(' ')).toContain('DailyMed');
+  });
 });
 
 describe('«расчёт, не назначение» у формульных доз', () => {
